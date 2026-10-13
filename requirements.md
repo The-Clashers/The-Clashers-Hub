@@ -34,7 +34,10 @@ verdicts.
 
 Scope and non-goals (the contract): live, read-only, public data for any
 clan or player (search, clan detail, player detail, war views, compare)
-plus browser-side analysis engines. Not a tracker (no history, no polling,
+plus browser-side analysis engines. The app ships with its own bundled
+reference data and game icons (Town Hall cap tables, the super-troop map,
+the unit icon set), so no third-party requests happen at runtime beyond
+the game API proxy. Not a tracker (no history, no polling,
 no snapshot database). No accounts (no sign-up, no auth; saved tags live
 in local storage). No write access to the game. Success is the
 ten-second demo: a grader types their own clan's name, lands on the roster
@@ -73,9 +76,9 @@ are expanded in section 6 below.
 
 ## 4. Functional requirements
 
-The lab asks for at least six; fifteen are specified. FR-14 and FR-15 are
-the team's original additions beyond the lab's example set. Details and
-status also live in the
+The lab asks for at least six; eighteen are specified. FR-14 through
+FR-18 are the team's original additions beyond the lab's example set.
+Details and status also live in the
 [tracker](./docs/concept/02-requirements-tracker.md).
 
 | ID | The system shall... | Feature | Priority |
@@ -95,6 +98,9 @@ status also live in the
 | FR-13 | compare player vs player and clan vs clan side by side, metric by metric | F-10, F-11 | P1 |
 | FR-14 | give every screen (search, clan, player, compare) a shareable URL | F-12 | P0 |
 | FR-15 | persist recent searches in the browser's local storage | F-13 | P1 |
+| FR-16 | display a progression grid on the player screen: every unit of both villages (troops, spells, heroes, pets, siege machines, and hero equipment where exposed) with its icon, current level, and a maxed-for-Town-Hall indicator | F-17 | P1 |
+| FR-17 | display a preparation-day scouting view when the clan is in preparation: own and opponent rosters side by side with Town Hall levels and pairwise mismatch highlighting | F-18 | P1 |
+| FR-18 | provide a manual refresh control on live-data screens, guarded by a cooldown that serves cached data with a cached-data hint instead of calling the game API again | F-19 | P1 |
 
 ## 5. Non-functional requirements
 
@@ -115,14 +121,16 @@ or a verification method; vague terms are excluded.
 | NFR-08 | Maintainability | CI gate: typecheck, lint, unit tests, and a production build must pass before merge |
 | NFR-09 | Maintainability | A new developer clones and runs the app in under 10 minutes without the API key (fixtures mode) |
 
-## 6. System requirements for two user stories
+## 6. System requirements for the expanded user stories
 
 UR-01 and UR-03 were chosen because together they walk the product's two
 golden paths (the clan-first journey and the tag shortcut) and exercise
-the full request path, both cache layers, and the flagship engine. These
-detail requirements join the architecture-level SR-01 to SR-07 in the
+the full request path, both cache layers, and the flagship engine. UR-04
+joins them with the war-view scope: the scouting view and the per-member
+impact metrics (SR-18, SR-19). These detail requirements join the
+architecture-level SR-01 to SR-07 in the
 [tracker](./docs/concept/02-requirements-tracker.md); the detail series
-runs SR-08 to SR-15.
+runs SR-08 to SR-19.
 
 ### 6.1 UR-01: a clan leader screens an applicant
 
@@ -141,12 +149,21 @@ runs SR-08 to SR-15.
 | SR-13 | The tag box on the home screen accepts a tag with or without the # prefix, normalizes it (uppercase, prepend #) in exactly one component, and routes to /player/:tag with the tag URL-encoded |
 | SR-14 | The player screen fetches GET /api/player/:tag (300 s TTL) and computes the rushed analysis client-side: overall percentage, per-category breakdown, top-deficit list, with super-troop levels normalized against their base troop and entries lacking a maxLevel skipped with a footnote |
 | SR-15 | The player screen renders the hero grid (level versus maximum, equipment where the API exposes it) and the achievements list with progress rails and stars, all from the single player response |
+| SR-16 | The progression grid renders entirely from the same single GET /api/player/:tag response: unit icons resolve through the bundled static icon map with the placeholder fallback, and maxed-for-Town-Hall indicators come from the bundled Town Hall cap reference tables; no request beyond the player fetch is made |
+| SR-17 | The analysis engines are backed by reference data bundled with the app and versioned in the repository: Town Hall cap tables per unit category, the super-troop-to-base-troop map, and hero equipment caps; a unit whose API maxLevel is null falls back to the reference maximum, and only a unit absent from both is skipped and counted in the footnote |
+
+### 6.3 UR-04: a war organizer reads the war
+
+| ID | System requirement |
+|---|---|
+| SR-18 | The preparation-day scouting view renders from the single current-war response: own and opponent rosters side by side with Town Hall levels, and a pairing where the own member's Town Hall is lower than the opponent's is highlighted as a mismatch |
+| SR-19 | The current-war view computes per-member impact client-side from the single war response: attacks used versus allowed, stars, average destruction, stars per attack, and a best-attack quality value; members with zero attacks are listed after participants and never averaged in as zeros |
 
 ## 7. Acceptance criteria
 
-The lab asks for at least two criteria for one user requirement; six are
-given, covering both expanded stories plus the two riskiest behaviors
-(private war logs, key hygiene).
+The lab asks for at least two criteria for one user requirement; nine are
+given, covering both expanded stories, the war-view additions, and the
+riskiest behaviors (private war logs, key hygiene).
 
 | ID | Given / When / Then | Verifies |
 |---|---|---|
@@ -156,6 +173,9 @@ given, covering both expanded stories plus the two riskiest behaviors
 | AC-04 | Given the maxed-account fixture, when the rushed analysis runs, then the overall verdict reads maxed with an empty top-deficit list; given a fixture with an active super troop, the normalized level is used | UR-03, FR-07 |
 | AC-05 | Given a clan whose war log is private, when the Log tab opens, then the designed private-log notice is displayed instead of an error state | UR-04, FR-11 |
 | AC-06 | Given the production client bundle, when it is scanned for the API key string, then there are zero occurrences | NFR-04 |
+| AC-07 | Given the player screen for any player, when the progression grid renders, then every unit of both villages shows its icon, level, and maxed-for-Town-Hall indicator, and no network request occurs beyond the single player fetch | UR-03, FR-16 |
+| AC-08 | Given a clan in preparation day, when the War tab opens, then both rosters render side by side with Town Hall levels and every own member facing a higher-Town-Hall opponent is highlighted | UR-04, FR-17 |
+| AC-09 | Given a screen whose cached data is younger than the route TTL, when the visitor clicks refresh, then the cached response is served with a cached-data hint and no upstream call is made | UR-05, FR-18, NFR-03 |
 
 ## 8. Constraints
 
@@ -193,10 +213,10 @@ The step 7 checklist from the lab, completed against this specification.
 | Every requirement has an ID and is clear and specific | Pass | UR, FR, NFR, SR, AC, CON, ASM series; IDs stable, never renumbered |
 | Functional requirements describe behavior; non-functional describe quality | Pass | Section 4 vs section 5, with a category per NFR |
 | Non-functional requirements are measurable or verifiable where practical | Pass | NFR-02 states thresholds and protocol; NFR-04 verified by CI scan; NFR-07 states a coverage floor |
-| System requirements add detail to user requirements | Pass | SR-08 to SR-12 expand UR-01; SR-13 to SR-15 expand UR-03 |
+| System requirements add detail to user requirements | Pass | SR-08 to SR-12 expand UR-01; SR-13 to SR-17 expand UR-03; SR-18 and SR-19 expand UR-04 |
 | Constraints are distinguished from assumptions | Pass | Sections 8 and 9 are separate; constraints imposed, assumptions to verify |
 | Requirements do not contradict one another | Pass | Priorities and cut line come from one feature list; no-database constraint matches the non-goals |
-| At least one requirement has acceptance criteria | Pass | Six criteria in section 7 cover four URs, three FRs, and NFR-04 |
+| At least one requirement has acceptance criteria | Pass | Nine criteria in section 7 cover five URs, eight FRs, and NFR-04 |
 | User requirements describe stakeholder needs | Pass | Every UR traces to a stakeholder in section 2 and features in section 4 |
 
 ## 11. KanbanFlow task board
@@ -259,8 +279,9 @@ roster with donation flags, tap through to a member.
 
 ### 11.6 M2: player and analysis (weeks 4 to 5)
 
-M2 delivers the analysis centerpiece: the player detail screen and the
-rushed engine with its fixture suite.
+M2 delivers the analysis centerpiece: the player detail screen, the
+rushed engine with its fixture suite, the bundled reference data it leans
+on, the full progression grid, and the manual refresh control.
 
 | ID | Task | Owner | Estimate | Covers |
 |---|---|---|---|---|
@@ -268,11 +289,16 @@ rushed engine with its fixture suite.
 | T-M2-2 | Rushed engine: overall percentage, category breakdown, top deficits, super-troop normalization, fixture suite | Engines | 20 | FR-07, SR-14 |
 | T-M2-3 | Achievements list with progress rails and stars | Screens | 8 | FR-08 |
 | T-M2-4 | Hero panel: levels versus maximum, equipment where exposed | Screens | 8 | FR-09 |
+| T-M2-5 | Progression grid: every unit with icon, level, and maxed-for-Town-Hall chip, grouped by village and category | Screens | 10 | FR-16, SR-16 |
+| T-M2-6 | Reference data bundle: Town Hall cap tables, super-troop map, hero equipment caps, unit icon map | Engines | 6 | FR-16, SR-17 |
+| T-M2-7 | Manual refresh control with cooldown and cached-data hint | Screens | 3 | FR-18 |
 
 ### 11.7 M3: war and compare (weeks 6 to 7)
 
-M3 adds the war views and both compare modes; the war views ship together
-or not at all, per the feature list cut line.
+M3 adds the war views (current war with preparation-day scouting and
+per-member impact metrics, war log with efficiency) and both compare
+modes; the war views ship together or not at all, per the feature list
+cut line.
 
 | ID | Task | Owner | Estimate | Covers |
 |---|---|---|---|---|
@@ -281,6 +307,8 @@ or not at all, per the feature list cut line.
 | T-M3-3 | Compare player vs player, metric by metric with direction coloring | Screens | 12 | FR-13 |
 | T-M3-4 | Compare clan vs clan: roster stats and war record | Screens | 8 | FR-13 |
 | T-M3-5 | Recent searches persisted in local storage | Screens | 4 | FR-15 |
+| T-M3-6 | Preparation-day scouting view: side-by-side rosters with Town Hall levels and mismatch highlighting | Screens | 8 | FR-17, SR-18 |
+| T-M3-7 | Per-member war impact: attacks used, stars per attack, average destruction, attack quality | Engines | 6 | FR-10, FR-12, SR-19 |
 
 ### 11.8 M4: polish and demo (weeks 8 to 9)
 
@@ -307,7 +335,7 @@ current.
 
 ### 11.10 Capacity check
 
-The milestone tasks sum to about 240 pomodoros, roughly 30 focused
+The milestone tasks sum to about 270 pomodoros, roughly 34 focused
 developer days. A conservative capacity estimate for three developers
 over ten part-time weeks is about 600 pomodoros, which leaves room for
 code review, rework, the course report, and the buffer week without

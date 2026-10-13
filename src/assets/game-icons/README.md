@@ -40,9 +40,12 @@ upstream names exactly; renaming breaks the mapping.
 
 The runtime mapping from CoC API unit **names** (as they appear in
 `troops[]`, `heroes[]`, `spells[]`, and equipment fields) to the files in
-this folder will live in a typed module under `src/` when the first screen
-that renders icons lands (see [05 §1](../../../docs/concept/05-scoring-engines.md)
-for the adapter that feeds it). Update that module whenever icons are added.
+this folder lives in a typed module and lands with the reference-data
+bundle (Town Hall cap tables, super-troop map, hero equipment caps) and the
+M2 progression grid (FR-16, see [05 §1](../../../docs/concept/05-scoring-engines.md)
+for the adapter that feeds it). Update that module whenever icons are
+added; the engine test suite fails loudly when a fixture unit name has
+neither a mapping nor the documented placeholder.
 
 ## Fallback rule: never fake an icon
 

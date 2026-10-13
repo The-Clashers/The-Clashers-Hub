@@ -27,7 +27,8 @@ TBD
   helper, no CSS media queries scattered through components; RN paradigm is
   JS-driven layout.
 - Every list that can exceed ~30 rows is virtualized (FlatList), because
-  50-member rosters and paginated search results are the *normal* case.
+  50-member rosters, paginated search results, and the progression grid's
+  ~100 unit tiles are the *normal* case.
 
 ## 4. Component inventory (shared kit)
 
@@ -43,6 +44,9 @@ TBD
 | `ProgressRail` | achievement value/target bar with star markers |
 | `CategoryBars` | rushed per-category horizontal bars |
 | `Gauge` | overall rushed % dial (the flagship number) |
+| `ProgressionGrid` | player progression tiles: `UnitIcon`, level, maxed-for-Town-Hall chip |
+| `UnitIcon` | bundled game-icon lookup with the placeholder fallback, fixed 32 px slot |
+| `RefreshControl` | manual refresh with cooldown and the "cached, Ns ago" hint |
 | `WarResultChip` | win/loss/tie pill |
 | `CompareRow` | metric row with both values + delta arrow |
 | `Legend` | the ONE chart legend pattern, all charts use it, no exceptions |
@@ -72,7 +76,15 @@ TBD
 
 ## 7. Imagery
 
-Clan badges and league icons come from the game API's own `iconUrls` (public
-CDN). They are rendered with RN `Image` (an `<img>` on web) with fixed layout
-slots (badge 48, league icon 24) so slow CDN loads never reflow the layout.
-No game art is bundled with the app, nothing to license, nothing to resize.
+Two icon sources, one rule each.
+
+- **API icons:** clan badges and league icons come from the game API's own
+  `iconUrls` (public CDN). They are rendered with RN `Image` (an `<img>` on
+  web) in fixed layout slots (badge 48, league icon 24) so slow CDN loads
+  never reflow the layout.
+- **Unit icons:** troops, spells, heroes, pets, siege machines, and hero
+  equipment are **bundled locally** from the Supercell Fankit under the
+  copy-locally policy ([icons README](../../src/assets/game-icons/README.md)):
+  fixed 32 px slot, resolved through the typed icon map,
+  `placeholder.svg` when a unit has no bundled icon, never a hotlink to a
+  third-party CDN, never a wrong icon standing in for a missing one.

@@ -42,9 +42,24 @@ one place data actually moves minute-to-minute). Every mutation of user intent
 (adjusting the donation target, re-sorting) is **local engine re-computation**,
 never a refetch.
 
+**Manual refresh (F-19).** Live screens carry a refresh control. It always
+re-issues the same GET; the server's TTL decides what happens next: inside
+the TTL the tier answers from its cache and the response carries the data's
+age, so the screen shows a "cached, Ns ago" hint instead of pretending to be
+fresh; past the TTL it is a normal cache miss and one upstream call happens.
+The client disables the control for a 60 s cooldown after each use, so a
+nervous demo-tapper never reaches the key. The cooldown is pure courtesy,
+not correctness: the cache alone already guards the upstream.
+
 Cache keys include every distinguishing input (tag, filters, cursor), so two
 different searches never alias. 404 responses cache briefly (30 s) too; a
 nonexistent tag shouldn't be hammered by retries.
+
+Bundled reference data (Town Hall cap tables, the super-troop map, hero
+equipment caps, the unit icon set) is the third, zero-request layer: static
+imports at build time, versioned with the code, never fetched, never cached
+([05 §1](./05-scoring-engines.md)). It cannot 404, cannot rate-limit, and costs
+nothing at runtime.
 
 ## 3. State matrix (every screen's four states)
 

@@ -24,10 +24,14 @@ cross-reference the tracker in [02](./02-requirements-tracker.md).
 | F-14 | Favorites / watchlist (local storage) | P2 | | see [06 §"Storage ladder"](./06-data-flow-and-caching.md) |
 | F-15 | Legend & seasonal stats panels | P2 | | only meaningful for top-tier players |
 | F-16 | Clan capital raids view | P2 | | extra endpoint, low analytic value |
+| F-17 | Player progression grid: every unit of both villages with icon, current level, and maxed-for-Town-Hall chip | P1 | FR-16 | renders from the single player response; icons from the bundled map |
+| F-18 | Preparation-day scouting: own and opponent rosters side by side with Town Hall levels and mismatch highlighting | P1 | FR-17 | a state of the War tab, not a separate route |
+| F-19 | Manual refresh with cooldown on live-data screens | P1 | FR-18 | the server cache decides freshness; the screen shows a cached-data hint |
 
-**Cut line for a compressed semester:** F-10, F-11, F-13 go before anything P0
-touches. F-08/F-09 are one milestone together, war views either both ship or
-neither does.
+**Cut line for a compressed semester:** F-10, F-11, F-13, F-17, F-18 go
+before anything P0 touches. F-08/F-09 are one milestone together, war views
+either both ship or neither does; F-19 (refresh) is three pomodoros and
+rides along wherever it fits.
 
 ## 2. Screens & URLs
 
@@ -73,10 +77,13 @@ error (upstream busy / not found), empty
   XP / war-preference; ratio flag chip per row; summary strip (average TH,
   total donations, flagged count); needs-attention sort.
 - **Player detail:** header (name, tag, TH, league, XP, clan role), rushed
-  panel (overall gauge + category bars + top-deficit list), hero grid,
-  achievements list with progress rails.
+  panel (overall gauge + category bars + top-deficit list), progression grid
+  (every unit of both villages with icon, level, and maxed-for-Town-Hall
+  chip), hero grid, achievements list with progress rails.
 - **War (current):** state banner (preparation / in battle / ended), both
-  clans' stars + destruction, per-member attack table.
+  clans' stars + destruction, per-member attack table; during preparation
+  day a scouting view: both rosters side by side with Town Hall levels and
+  mismatch highlighting.
 - **War log:** result chips (win / loss / tie), team size, stars,
   destruction, XP earned per entry; efficiency summary header.
 - **Compare:** two columns, one row per metric, delta arrow + color; radar

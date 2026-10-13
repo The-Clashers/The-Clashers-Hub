@@ -10,9 +10,10 @@
 The Clashers Hub is a **clan and player searcher with the analytics turned on**.
 Type a clan name, any clan in the game, and get its live roster with donation
 flags. Open any member and get a full account read: how rushed the profile is,
-hero and achievement progress, war reliability. Put two players or two clans
-side by side and compare them metric by metric. No login, no setup, nothing to
-install: everything runs on live public game data in the browser.
+unit-by-unit progression with icons, hero and achievement progress, war
+reliability. Put two players or two clans side by side and compare them
+metric by metric. No login, no setup, nothing to install: everything runs on
+live public game data in the browser.
 
 ## 2. The problem we solve
 
@@ -62,7 +63,9 @@ We build for ourselves first: every teammate plays the game and is user #1.
 
 **In scope:** live, read-only, public game data for any clan or player:
 search, clan detail, player detail, war views, compare. Analysis engines that
-run in the browser.
+run in the browser. Bundled reference data (Town Hall cap tables, the
+super-troop map, the unit icon set) ships with the app; beyond the game API
+proxy, nothing third-party is requested at runtime.
 
 **Non-goals:**
 

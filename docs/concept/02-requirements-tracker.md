@@ -8,7 +8,7 @@ never renumbered; drop a row by marking it `Dropped` with a reason.
 Session 7 snapshot: [requirements.md](../../requirements.md) at the repo
 root holds the complete lab-structure specification (stakeholders SH,
 acceptance criteria AC, constraints CON, assumptions ASM, detail system
-requirements SR-08 to SR-15, and the KanbanFlow task breakdown). Status
+requirements SR-08 to SR-19, and the KanbanFlow task breakdown). Status
 lives here; the spec of record lives there.
 
 # Functional Requirements
@@ -30,6 +30,9 @@ lives here; the spec of record lives there.
 | FR-13 | Compare mode: player vs player and clan vs clan, side by side, metric by metric | Draft |
 | FR-14 | Shareable URL for every screen (search, clan, player, compare) | Draft |
 | FR-15 | Recent searches persisted in the browser (local storage) | Draft |
+| FR-16 | Progression grid on the player screen: every unit of both villages with icon, level, maxed-for-Town-Hall indicator | Draft |
+| FR-17 | Preparation-day scouting view: side-by-side rosters with Town Hall levels and mismatch highlighting | Draft |
+| FR-18 | Manual refresh control on live-data screens, guarded by a cooldown serving cached data with a hint | Draft |
 
 # Non-functional Requirements
 

@@ -76,8 +76,11 @@ TTL cache → maybe call upstream through the proxy → return JSON.
 | `GET /api/clan/:tag/warlog` | `/clans/{tag}/warlog` | 600 s |
 
 The cache is an in-memory `Map` per function instance with a small LRU
-wrapper ([06 §"Cache layers"](./06-data-flow-and-caching.md)). Serverless
-cold starts reset it; that is acceptable: a
+wrapper ([06 §"Cache layers"](./06-data-flow-and-caching.md)). Every response
+carries an `age` field (seconds since the upstream fetch) so the client can
+show how fresh its data is, honestly, next to the manual refresh control
+([06 §"Manual refresh"](./06-data-flow-and-caching.md)). Serverless
+cold starts reset the cache; that is acceptable: a
 cold start costs exactly one upstream call, which is the same call a cache
 miss would have made anyway. A shared Redis tier would make the cache sticky
 across instances, but it is deliberately out of scope; see the storage ladder

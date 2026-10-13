@@ -15,8 +15,8 @@ Town Hall badge?"
 
 **Input:** the player payload's unit arrays. Each unit arrives as
 `{ name, level, maxLevel, village }` where `maxLevel` is the unit's **global
-maximum** as reported by the API itself, no reference tables for us to
-maintain.
+maximum** as reported by the API itself; when the API omits it, the bundled
+reference data supplies the fallback (below).
 
 **Normalization (the part that makes it honest):**
 
@@ -46,6 +46,18 @@ maintain.
   the well-known core; completeness is enforced by a unit test so a new super
   troop can't silently fake someone's rushed score.
 
+- *Reference data backs the numbers.* A small bundle of versioned reference
+  files ships with the app: Town Hall cap tables (the maximum level of every
+  unit at every Town Hall, per category), the super-troop map above, and hero
+  equipment caps. The API's own `maxLevel` stays the primary denominator for
+  the rushed formula; the reference tables do two jobs it cannot: they
+  resolve units whose `maxLevel` is null (brand-new content the API has not
+  caught up to), and they power the **maxed-for-Town-Hall** indicators on the
+  progression grid ([F-17](./03-features-list.md)), because a global maximum
+  cannot tell a TH14 player whether their lab is done *for TH14*. Updating
+  the bundle is a docs-sized PR whenever the game ships new content, and the
+  completeness tests below fail loudly when it drifts.
+
 - *Villages are separate.* Units carry a `village` marker (home vs builder
   base). The default analysis is home-village only; builder-base gets its own
   panel, never mixed.
@@ -67,12 +79,15 @@ with equal weights (`w_i = 1`) initially; hero weights can be raised later
 without touching the formula's shape.
 
 **Output:** overall percentage; per-category percentage; units counted vs
-maxed; the top-N largest deficits ("what to upgrade next", which answers
+maxed; per-unit maxed-for-Town-Hall flags (feeding the progression grid
+chips); the top-N largest deficits ("what to upgrade next", which answers
 [UR-03](./02-requirements-tracker.md) literally).
 
-**Edge cases:** units with a null `maxLevel` (brand-new content) are excluded
-and counted in a "new content skipped" footnote; a payload with zero usable
-units returns `null` ("not available") rather than 0.
+**Edge cases:** units with a null `maxLevel` fall back to the reference
+table's maximum for that unit; a unit missing from both the API and the
+reference bundle (brand-new content) is excluded and counted in a "new
+content skipped" footnote; a payload with zero usable units returns `null`
+("not available") rather than 0.
 
 **Interpretation bands (display copy, not judgments of humans):**
 0–5 *core*, 5–15 *light*, 15–30 *rushed*, 30+ *heavy*.
@@ -114,7 +129,11 @@ both zero is *no data*, displayed as a dash, never as a red flag.
 **From the current war (per member):**
 
 - attacks used vs allowed (participation, UR-04);
-- stars and average destruction per used attack (impact);
+- stars, stars per attack, and average destruction per used attack (impact);
+- attack quality: each attack scores `stars × 100 + destructionPercent`
+  (a perfect three-star full-destruction attack is 400, the ceiling); a
+  member's quality is their best attack, and the participant average sets
+  the baseline the table colors against;
 - roster table ordered by impact among participants, non-participants listed
   after.
 
@@ -141,9 +160,13 @@ and we will not ship it.
 - Every engine gets **table-driven unit tests** over `fixtures/`, anonymized
   copies of real payloads ([SR-07](./02-requirements-tracker.md)), including deliberately weird ones: a fully
   maxed account (expect 0%), a fresh TH-limited account, super troops active,
-  null `maxLevel` fields, zero-donation rosters.
+  null `maxLevel` fields (resolved by the reference fallback), zero-donation
+  rosters, and a current-war payload mixing participants with zero-attack
+  members.
 - Property checks where cheap: rushed % always ∈ [0, 100]; the super-troop map
   is total over the fixture set; donation flags never fire below the noise
-  floor.
+  floor; the Town Hall cap table covers every Town Hall appearing in the
+  fixtures; the icon map resolves every fixture unit name or falls back to
+  the documented placeholder.
 - Engines may not import React, the router, the API client, or each other's
   internals, enforced by a lint boundary rule, kept honest by CI ([NFR-08](./02-requirements-tracker.md)).
