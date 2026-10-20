@@ -11,16 +11,13 @@ doc here is incomplete ([08 §"Definition of done" #5](./08-roadmap.md)).
 |---|---|---|
 | 00 | [Overview](./00-overview.md) | What the product is, who it's for, what is explicitly out of scope |
 | 01 | [Tech stack](./01-tech-stack.md) | React Native for Web + Vite + a thin serverless API tier, all free |
-| 02 | [Requirements tracker](./02-requirements-tracker.md) | FR / NFR / UR / SR tables with status, the course-report backbone |
+| 02 | [Requirements](./02-requirements-tracker.md) | The full specification with status: stakeholders, UR / FR / NFR / SR, acceptance criteria, constraints, assumptions, and the task board |
 | 03 | [Features list](./03-features-list.md) | Prioritized features, screens, URL map, the two golden paths |
 | 04 | [API strategy](./04-api-strategy.md) | Talking to the game API safely: proxy, caching, throttling, key hygiene |
 | 05 | [Scoring engines](./05-scoring-engines.md) | The math: rushed analysis, donation balance, war efficiency, compare |
 | 06 | [Data flow & caching](./06-data-flow-and-caching.md) | Request lifecycle, cache layers, state matrix, the no-database decision |
 | 07 | [Design language](./07-design-language.md) | Tokens, layout rules, component kit, accessibility |
 | 08 | [Roadmap](./08-roadmap.md) | Milestones, team split, risk register, definition of done |
-
-Session 7 requirements specification (lab structure plus the KanbanFlow
-task breakdown): [requirements.md](../../requirements.md) at the repo root.
 
 ## Conventions
 
