@@ -1,59 +1,27 @@
-# Session NN: <topic>
-
-One line on what this session was about. Fill this in during or right
-after the session, while the details are fresh.
-
-| | |
-|---|---|
-| Date | YYYY-MM-DD |
-| Lab guide | <activity, or "working session"> |
-| Attendees | <who was there; note absences> |
+# <M-D-YYYY> - Session <NN>
 
 ## Goal
 
-One or two sentences: what we wanted out of this session. If the goal
-moved mid-session (it happens), say so and why.
+<one line on what this session sets out to do>
 
-## What we did
+## Done
 
-| Card | What happened | Ended in |
+| Card | Work | Status |
 |---|---|---|
-| T-M0-1 | <built, decided, tested, parked...> | Done |
-| T-M1-2 | <started, blocked, reviewed...> | In progress |
-
-Card IDs match the KanbanFlow board; "Ended in" is the column the card
-sits in when the session closes (Product Backlog / Sprint Backlog /
-In progress / Testing / Done). A card moved into In progress gets its
-member assigned at that moment, not before.
+| T-M0-1 | <what was built, fixed, decided> | done |
 
 ## Decisions
 
-| Decision | Why |
-|---|---|
-| <what we chose> | <the alternative considered and why it lost> |
+- <decision>
 
-Decisions that change what we build also change the matching concept
-doc in the same PR ([README](../concept/README.md)); this note records
-the call, the concept docs carry the consequences.
+## Blockers
 
-## Blockers and risks
-
-Anything stuck, anything new to watch. If it belongs in the shared
-register, add it there too ([08 §3](../concept/08-roadmap.md)).
+- <none / what is stuck and why>
 
 ## Commits
 
-| Hash | Subject |
-|---|---|
-| abc1234 | <commit subject> |
+- abc1234 <subject>
 
-## Before next session
+## Next
 
-- [ ] <todo, with owner>
-- [ ] <todo, with owner>
-
-## Notes for the report
-
-Anything worth reusing in the course report at the end of the semester:
-numbers, screenshots, quotes from a demo, what we would do differently.
-Short bullets are fine; the report is written from these.
+- [ ] <todo> (<owner>)
