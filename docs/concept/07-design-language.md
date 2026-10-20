@@ -15,7 +15,127 @@ micro-labels whisper, values speak.
 
 ## 2. Tokens (the only allowed values)
 
-TBD
+Source of truth: `src/theme/tokens.ts`. A screen that needs a value not
+listed here files a PR that changes this file and this section together. The
+sample review surface at `/tokens` (T-M0-2) lists every token on one canvas so
+the pairs and the rhythm are checkable at a glance.
+
+### 2.1 Color (per theme)
+
+Light canvas is white with near-black ink; dark canvas is near-black with
+near-white ink. One gold accent, used sparingly. Every text-on-canvas and
+text-on-panel pair was checked at 4.5:1 or better (NFR-06); the lowest pair in
+each theme is noted next to the table.
+
+| Group | Tokens |
+|---|---|
+| Surface | `canvas`, `panel`, `panelRaised`, `panelBorder`, `panelBorderStrong`, `hairline` |
+| Text | `textPrimary`, `textSecondary`, `textMuted`, `textOnAccent`, `textInverse` |
+| Accent (gold) | `accent`, `accentHover`, `accentPressed`, `accentSoft`, `focusRing` |
+| Semantic | `success` / `successSoft`, `warning` / `warningSoft`, `danger` / `dangerSoft`, `info` / `infoSoft` |
+| Chart series | `seriesGold`, `seriesBlue`, `seriesGreen`, `seriesRed`, `seriesMuted` (the four chart types plus a muted series, 07 §5) |
+
+Lowest-contrast text pair per theme:
+
+- Light: `textMuted` on `canvas` at 7.0:1.
+- Dark: `textMuted` on `canvas` at 8.2:1.
+
+Both clear the 4.5:1 floor with margin; `textMuted` on `panel` is the next
+pair to watch if a future change shifts either value.
+
+### 2.2 Spacing
+
+4px base. Touch targets (44px floor, 07 §6) compose from these.
+
+| Step | px | | Step | px |
+|---|---|---|---|---|
+| 0 | 0 | | 7 | 32 |
+| 1 | 4 | | 8 | 40 |
+| 2 | 8 | | 9 | 48 |
+| 3 | 12 | | 10 | 64 |
+| 4 | 16 | | 11 | 80 |
+| 5 | 20 | | 12 | 96 |
+| 6 | 24 | | | |
+
+### 2.3 Radius
+
+| Step | Value | Used for |
+|---|---|---|
+| 0 | 0 | hairlines, dividers |
+| 1 | 4px | chips, small controls |
+| 2 | 8px | panels |
+| 3 | 12px | hero panels, raised panels |
+| 4 | 16px | large surfaces (reserved) |
+| pill | 9999 | pills, the theme toggle, link buttons |
+
+### 2.4 Typography
+
+System font stack (no web font fetch, no FOUT). Numbers use `tabular-nums` so
+columns of metrics align without decimal noise (07 §5).
+
+| Token | Value |
+|---|---|
+| `fontFamily.sans` | `system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif` |
+| `fontFamily.mono` | `ui-monospace, SFMono-Regular, Menlo, Consolas, monospace` |
+
+Font size (px): `xs` 11, `sm` 13, `body` 15, `md` 16, `lg` 18, `xl` 22, `2xl`
+28, `3xl` 36.
+
+Font weight: `regular` 400, `medium` 500, `semibold` 600, `bold` 700. A fifth
+weight is a deliberate change.
+
+Line height: `tight` 1.2, `normal` 1.4, `relaxed` 1.6.
+
+### 2.5 Layout
+
+| Token | Value | Why |
+|---|---|---|
+| `contentMaxWidth` | 1280 | the centered content column (07 §3) |
+| `sidePaddingDesktop` | 24 | spacing.6 |
+| `sidePaddingTablet` | 20 | spacing.5 |
+| `sidePaddingMobile` | 16 | spacing.4 |
+| `sidePaddingSmall` | 12 | spacing.3 |
+| `touchTargetMin` | 44 | the touch-target floor (07 §6) |
+| `rosterCardBreakpoint` | 768 | table swaps to cards below this (NFR-05) |
+| `playerTwoColumnBreakpoint` | 1024 | player detail goes two-up at this |
+| `focusRingWidth` | 2 | the gold focus ring (07 §6) |
+| `focusRingOffset` | 2 | ring offset so it clears the element edge |
+
+Breakpoints are read through `useWindowDimensions` into the `breakpointFor`
+helper; no CSS media queries scattered through components (07 §3).
+
+### 2.6 Motion
+
+| Token | Value |
+|---|---|
+| `fast` | 120ms |
+| `normal` | 180ms |
+| `slow` | 240ms |
+| `ease` | `cubic-bezier(0.4, 0, 0.2, 1)` |
+
+Data tools answer questions, they don't perform (07 §1): the scale is
+intentionally narrow and a screen adding its own curve is a PR that gets sent
+back.
+
+### 2.7 Z-index
+
+| Token | Value |
+|---|---|
+| `base` | 0 |
+| `raised` | 1 |
+| `sticky` | 10 |
+| `overlay` | 100 |
+| `toast` | 1000 |
+
+### 2.8 Theme control
+
+Light or dark; the user can override the system preference and the choice
+persists in `localStorage` under `tch.theme` (the same storage surface the
+spec already blesses for saved tags, CON-06). `ThemeProvider` tracks
+`prefers-color-scheme` only while the user has not pinned a choice, mirrors
+the choice to `Appearance.setColorScheme` for RN components that read it, and
+paints the document root so the body underneath matches the canvas on
+overscroll.
 
 ## 3. Layout
 
