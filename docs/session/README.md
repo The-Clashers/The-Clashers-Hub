@@ -5,4 +5,4 @@ One file per session, copied from [_template.md](_template.md), named
 
 | Date | Session | Log |
 |---|---|---|
-<!-- | 10-20-2026 | 01 | [10-20-2026-session-01](./10-20-2026-session-01.md) | -->
+| 10-20-2026 | 01 | [10-20-2026-session-01](./10-20-2026-session-01.md) |
