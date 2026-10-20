@@ -1,6 +1,6 @@
 # The Clashers Hub: Session Notes
 
-One file per lab session, named `session-NN.md` (session-08.md,
+One file per lab session, named `datetoday-session-NN.md` (10/20/2026-session-01.md,
 session-09.md, ...). Start each one from [_template.md](_template.md):
 copy it, fill in what applies, delete what does not. Write it during
 or right after the session; these notes are the raw material for the
