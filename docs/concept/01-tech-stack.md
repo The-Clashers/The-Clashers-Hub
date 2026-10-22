@@ -81,6 +81,8 @@ scope, never a credit card.
   src/engines/     pure analysis modules + unit tests (05)
   src/api/         typed client for our own /api routes
   api/             Vercel serverless functions (the proxy tier)
+  server/          tier code shared by the functions: upstream client, TTL cache, error contract
+  scripts/         dev runners: local api server, mock upstream, tier verification
   fixtures/        anonymized game-API payloads for tests
   docs/concept/    this folder, the decision record
 ```
@@ -94,9 +96,12 @@ Exact paths are decided in milestone M0; the hard boundaries are `src/engines`
 - **Branches + PRs.** `main` is always deployable; every change goes through a
   PR. Required checks: typecheck, lint, unit tests, build (CI config in M0).
   No direct pushes to `main` once two or more people are committing.
-- **Local dev.** `npm install && npm run dev`: the game API key is optional
-  for local development: without it, the app runs against `fixtures/` so
-  teammates without the key still get a working UI.
+- **Local dev.** `npm install && npm run dev:api && npm run dev`: the first command
+  runs the api tier locally on port 8788 (loading `.env`, never committed) and the
+  Vite dev server proxies `/api/*` to it, same-origin exactly like the deploy. The
+  game API key is optional for local development: without it, the tier can point
+  at the mock upstream (`scripts/mock-upstream.mjs`) so teammates without the key
+  still get working data.
 - **Preview deploys.** Vercel gives every PR a preview URL; design review
   happens on the preview, not on screenshots.
 - **Env vars.** Exactly two, both server-side only: `COC_API_TOKEN` and

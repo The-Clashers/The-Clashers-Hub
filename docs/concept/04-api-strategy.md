@@ -95,7 +95,7 @@ JSON contract:
 |---|---|---|
 | 404 / invalid tag | `404 { "error": "not_found", "tag": "..." }` | "No clan/player with this tag" + tag-correction hint |
 | 429 | `503 { "error": "upstream_busy", "retryAfter": 30 }` | auto-retry with backoff + "trying again" toast |
-| 403 on warlog (private) | `200 { "private": true }` | designed private-log notice |
+| 403 on warlog (private) | `200 { "private": true, "age": N }` | designed private-log notice |
 | 5xx / network | `502 { "error": "upstream_unreachable" }` | error state with manual retry |
 | our own validation | `400 { "error": "bad_request", "detail": ... }` | developer-facing; should never surface in normal use |
 
