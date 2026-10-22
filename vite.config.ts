@@ -7,6 +7,13 @@ import react from '@vitejs/plugin-react';
 // twins, mirroring how a native bundler would pick them.
 export default defineConfig({
   plugins: [react()],
+  server: {
+    // Local dev proxies /api to the tier's dev server (npm run dev:api),
+    // same-origin exactly like the deploy.
+    proxy: {
+      '/api': 'http://localhost:8788',
+    },
+  },
   resolve: {
     alias: [{ find: /^react-native$/, replacement: 'react-native-web' }],
     extensions: [
