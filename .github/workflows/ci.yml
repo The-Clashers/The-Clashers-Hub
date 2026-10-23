@@ -1,0 +1,113 @@
+# CI for The Clashers Hub (T-M0-4). Covers NFR-04, NFR-08, SR-06.
+#
+# Runs on every pull request targeting main. The verify job is the merge
+# gate: typecheck, ESLint, unit tests, production build, and the key-
+# absence scan of the built bundle. The preview-deploy job is an explicit
+# in-workflow path to a Vercel preview; it skips cleanly when the Vercel
+# secrets are not configured, because Vercel also auto-deploys previews
+# once the project is linked to the repo.
+#
+# Free-tier only (GitHub Actions on a public repo). One concurrent run per
+# branch; stale runs on the same branch are cancelled.
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  verify:
+    name: typecheck, lint, test, build, key-absence scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      # The build already runs tsc --noEmit twice (client + server configs)
+      # before `vite build`; running it again as the typecheck step above
+      # fails fast, before lint and tests, on a type error. The build step
+      # itself produces the production client bundle under dist/.
+      - name: Production build
+        run: npm run build
+
+      # Key-absence scan (NFR-04, AC-06). COC_API_TOKEN is intentionally NOT
+      # passed to the build step above; the client bundle must not contain
+      # the key. The secret is handed only to this scan step so the script
+      # can also grep for the token value, not just the env var name. When
+      # the secret is not configured, the scan still passes by checking the
+      # env var name (the primary defense) and reports that the value check
+      # was skipped.
+      - name: Key-absence scan of the built bundle
+        run: npm run scan:secrets
+        env:
+          COC_API_TOKEN: ${{ secrets.COC_API_TOKEN }}
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          retention-days: 7
+
+  preview-deploy:
+    name: Vercel preview deploy
+    needs: verify
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 10
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Skip when Vercel is not wired
+        run: |
+          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_ORG_ID" ] || [ -z "$VERCEL_PROJECT_ID" ]; then
+            echo "Vercel secrets (VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID) are not configured on this repo."
+            echo "Vercel auto-deploys a preview for every PR once the project is linked in the Vercel dashboard."
+            echo "Add the three secrets to also drive preview deploys from this workflow; see docs/session/10-23-2026-session-07.md."
+            echo "Skipping the explicit preview-deploy job."
+            exit 0
+          fi
+
+      - name: Deploy preview to Vercel
+        if: ${{ env.VERCEL_TOKEN != '' }}
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod=false'
+          github-comment: true
+          working-directory: ./
