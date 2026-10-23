@@ -13,17 +13,20 @@ import { internalError, jsonResponse } from '../server/contract';
 
 const PORT = Number(process.env.PORT ?? 8788);
 
-type Handler = (request: Request) => Promise<Response>;
+// The api files export a plain function via nodeHandler (server/
+// vercel-adapter.ts): called with a Request and no res, it passes the
+// Request straight to the web-standard handler, which is exactly this dev
+// server's call shape; called Node-style with (req, res) it bridges. The
+// platform makes the Node-style call, so local dev and deploy run the same
+// entry point either way.
+type Adapter = (req: unknown, res?: unknown) => Promise<Response | void>;
 
-// The api files export the Vercel web-standard shape (a default object with
-// a fetch method), so the dev server calls the same entry point the platform
-// does: defaultExport.fetch(request).
-const routes: Array<{ match: RegExp; handler: Handler }> = [
-  { match: /^\/api\/search$/, handler: apiSearch.fetch },
-  { match: /^\/api\/player\/[^/]+$/, handler: apiPlayer.fetch },
-  { match: /^\/api\/clan\/[^/]+\/warlog$/, handler: apiWarlog.fetch },
-  { match: /^\/api\/clan\/[^/]+\/war$/, handler: apiWar.fetch },
-  { match: /^\/api\/clan\/[^/]+$/, handler: apiClan.fetch },
+const routes: Array<{ match: RegExp; handler: Adapter }> = [
+  { match: /^\/api\/search$/, handler: apiSearch },
+  { match: /^\/api\/player\/[^/]+$/, handler: apiPlayer },
+  { match: /^\/api\/clan\/[^/]+\/warlog$/, handler: apiWarlog },
+  { match: /^\/api\/clan\/[^/]+\/war$/, handler: apiWar },
+  { match: /^\/api\/clan\/[^/]+$/, handler: apiClan },
 ];
 
 function toWebRequest(incoming: IncomingMessage): Request {
@@ -56,9 +59,9 @@ const server = createServer((incoming, outgoing) => {
     const path = new URL(request.url).pathname;
     const route = routes.find((candidate) => candidate.match.test(path));
     try {
-      const response = route
+      const response = (route
         ? await route.handler(request)
-        : jsonResponse(404, { error: 'not_found', detail: `unknown route: ${path}` });
+        : jsonResponse(404, { error: 'not_found', detail: `unknown route: ${path}` })) as Response;
       await sendResponse(outgoing, response);
     } catch (error) {
       console.error('[dev-server]', error);

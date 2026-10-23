@@ -253,6 +253,20 @@ async function serve(definition: RouteDefinition): Promise<Response> {
 // ---------- tag helpers ----------
 
 export function tagFromPath(url: URL, segmentIndex: number): string {
+  // The platform's generated route for a dynamic segment rewrites the
+  // request to the function file and hands the segment over as a `tag`
+  // query param (/api/clan/:tag becomes /api/clan/[tag]?tag=:tag in the
+  // routing manifest), while local dev and the platform simulator keep it
+  // in the path. The query param wins when present so the deployed dynamic
+  // routes resolve; the path is the fallback for the local shapes.
+  const fromQuery = url.searchParams.get('tag');
+  if (fromQuery !== null) {
+    try {
+      return decodeURIComponent(fromQuery);
+    } catch {
+      return fromQuery;
+    }
+  }
   // Leading '/' produces an empty first segment; strip it so index 2 is the
   // tag for /api/clan/:tag and /api/player/:tag alike.
   const segments = url.pathname.replace(/^\//, '').split('/');

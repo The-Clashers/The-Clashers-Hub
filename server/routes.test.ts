@@ -8,6 +8,11 @@ describe('tagFromPath', () => {
     expect(tagFromPath(new URL('http://x/api/clan/%23AB12CD/war'), 2)).toBe('#AB12CD');
   });
 
+  it('prefers the tag query param the platform passes on dynamic routes', () => {
+    expect(tagFromPath(new URL('http://x/api/clan/[tag]?tag=%23AB12CD'), 2)).toBe('#AB12CD');
+    expect(tagFromPath(new URL('http://x/api/player/[tag]?tag=XY99&limit=5'), 2)).toBe('XY99');
+  });
+
   it('returns an empty string for a missing segment', () => {
     expect(tagFromPath(new URL('http://x/api/clan/'), 2)).toBe('');
   });
