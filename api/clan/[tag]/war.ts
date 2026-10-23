@@ -1,6 +1,13 @@
 // GET /api/clan/:tag/war. Thin adapter: the platform runs this file as the
 // function; all logic lives in server/.
+//
+// Web-standard fetch export (see api/search.ts for why the object form is
+// load bearing on Vercel).
 
 import { handleWar } from '../../../server/routes';
 
-export default handleWar;
+export default {
+  async fetch(request: Request): Promise<Response> {
+    return handleWar(request);
+  },
+};

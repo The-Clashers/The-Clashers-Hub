@@ -4,23 +4,26 @@
 // Started by scripts/dev-api.mjs, not run directly.
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import handleSearch from '../api/search';
-import handleClan from '../api/clan/[tag]';
-import handlePlayer from '../api/player/[tag]';
-import handleWar from '../api/clan/[tag]/war';
-import handleWarlog from '../api/clan/[tag]/warlog';
+import apiSearch from '../api/search';
+import apiClan from '../api/clan/[tag]';
+import apiPlayer from '../api/player/[tag]';
+import apiWar from '../api/clan/[tag]/war';
+import apiWarlog from '../api/clan/[tag]/warlog';
 import { internalError, jsonResponse } from '../server/contract';
 
 const PORT = Number(process.env.PORT ?? 8788);
 
 type Handler = (request: Request) => Promise<Response>;
 
+// The api files export the Vercel web-standard shape (a default object with
+// a fetch method), so the dev server calls the same entry point the platform
+// does: defaultExport.fetch(request).
 const routes: Array<{ match: RegExp; handler: Handler }> = [
-  { match: /^\/api\/search$/, handler: handleSearch },
-  { match: /^\/api\/player\/[^/]+$/, handler: handlePlayer },
-  { match: /^\/api\/clan\/[^/]+\/warlog$/, handler: handleWarlog },
-  { match: /^\/api\/clan\/[^/]+\/war$/, handler: handleWar },
-  { match: /^\/api\/clan\/[^/]+$/, handler: handleClan },
+  { match: /^\/api\/search$/, handler: apiSearch.fetch },
+  { match: /^\/api\/player\/[^/]+$/, handler: apiPlayer.fetch },
+  { match: /^\/api\/clan\/[^/]+\/warlog$/, handler: apiWarlog.fetch },
+  { match: /^\/api\/clan\/[^/]+\/war$/, handler: apiWar.fetch },
+  { match: /^\/api\/clan\/[^/]+$/, handler: apiClan.fetch },
 ];
 
 function toWebRequest(incoming: IncomingMessage): Request {
