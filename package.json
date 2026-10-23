@@ -2,7 +2,6 @@
   "name": "the-clashers-hub",
   "private": true,
   "version": "0.1.0",
-  "type": "module",
   "scripts": {
     "dev": "vite",
     "dev:api": "node scripts/dev-api.mjs",
