@@ -7,10 +7,11 @@ import { ThemeToggle } from '../components/ThemeToggle';
 // The home screen now reads every visual value from the theme tokens, so it
 // is also the first non-review consumer of the wired base styles. The screen
 // itself stays a placeholder for the search flow (that lands in M1); the only
-// surface added here is a link to /tokens so a reviewer can find the token
-// review screen from the entry route.
+// surfaces added here are links to /tokens (the T-M0-2 review surface) and
+// /hello (the T-M0-5 smoke surface) so a reviewer can find them from the
+// entry route.
 //
-// The link is a Pressable + useNavigate instead of react-router's <Link> so
+// Each link is a Pressable + useNavigate instead of react-router's <Link> so
 // the styling stays inside the RN paradigm (the design language allows the
 // router's link handling as the one DOM exception, but here we do not need
 // it; a Pressable with accessibilityRole="link" maps to ARIA on web and keeps
@@ -39,23 +40,39 @@ export default function HomeScreen() {
 
           <View style={[base.panelRaised, styles.linkPanel]}>
             <Text style={base.caption}>
-              T-M0-2 ships the design tokens and the base theme.
+              M0 review surfaces. The token canvas and the live-data smoke
+              screen both stay reachable from here until the real screens
+              land in their milestones.
             </Text>
-            <Pressable
-              accessibilityRole="link"
-              accessibilityLabel="Open the design token review screen"
-              accessibilityHint="Opens /tokens, the design token review surface."
-              onPress={() => navigate('/tokens')}
-              style={({ pressed }) => [
-                styles.link,
-                pressed && styles.linkPressed,
-              ]}
-            >
-              <Text style={styles.linkText}>Review the tokens</Text>
-              <Text style={styles.linkArrow} aria-hidden>
-                {' ->'}
-              </Text>
-            </Pressable>
+            <View style={styles.linkRow}>
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel="Open the live-data smoke screen"
+                accessibilityHint="Opens /hello, a hardcoded clan tag rendered from live data through the tier."
+                onPress={() => navigate('/hello')}
+                style={({ pressed }) => [
+                  styles.link,
+                  pressed && styles.linkPressed,
+                ]}
+              >
+                <Text style={styles.linkText}>Hello, clan</Text>
+                <Text style={styles.linkArrow} aria-hidden>
+                  {' ->'}
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel="Open the design token review screen"
+                accessibilityHint="Opens /tokens, the design token review surface."
+                onPress={() => navigate('/tokens')}
+                style={[styles.link, styles.linkSecondary]}
+              >
+                <Text style={[styles.linkText, styles.linkTextSecondary]}>Review the tokens</Text>
+                <Text style={[styles.linkArrow, styles.linkTextSecondary]} aria-hidden>
+                  {' ->'}
+                </Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </View>
@@ -80,6 +97,11 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     linkPanel: {
       gap: t.spacing[3],
     },
+    linkRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: t.spacing[3],
+    },
     link: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -97,11 +119,19 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     linkPressed: {
       backgroundColor: c.accentPressed,
     },
+    linkSecondary: {
+      backgroundColor: c.panelRaised,
+      borderWidth: 1,
+      borderColor: c.panelBorderStrong,
+    },
     linkText: {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.body,
       fontWeight: t.fontWeight.semibold,
       color: c.textOnAccent,
+    },
+    linkTextSecondary: {
+      color: c.textPrimary,
     },
     linkArrow: {
       fontFamily: t.fontFamily.sans,
