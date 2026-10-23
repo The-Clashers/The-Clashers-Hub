@@ -16,6 +16,15 @@ import { lightTheme, type ThemeTokens } from './tokens';
 // `baseStyles` is the light-theme default, kept for stories and tooling that
 // render outside the provider.
 
+// RN Web reads a numeric lineHeight as pixels, not as a ratio: `lineHeight:
+// 1.2` compiles to `line-height: 1.2px`, which collapses the line box and
+// stacks sibling texts on top of each other. The tokens keep the design
+// ratios; this helper is the one place that turns a ratio into the pixel
+// value the platform actually wants.
+function lineBox(ratio: number, size: number): number {
+  return Math.round(ratio * size);
+}
+
 export function createBaseStyles(t: ThemeTokens) {
   const c = t.colors;
   return StyleSheet.create({
@@ -81,7 +90,7 @@ export function createBaseStyles(t: ThemeTokens) {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize['3xl'],
       fontWeight: t.fontWeight.bold,
-      lineHeight: t.lineHeight.tight,
+      lineHeight: lineBox(t.lineHeight.tight, t.fontSize['3xl']),
       color: c.textPrimary,
     },
 
@@ -89,7 +98,7 @@ export function createBaseStyles(t: ThemeTokens) {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize['2xl'],
       fontWeight: t.fontWeight.bold,
-      lineHeight: t.lineHeight.tight,
+      lineHeight: lineBox(t.lineHeight.tight, t.fontSize['2xl']),
       color: c.textPrimary,
     },
 
@@ -97,7 +106,7 @@ export function createBaseStyles(t: ThemeTokens) {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.xl,
       fontWeight: t.fontWeight.semibold,
-      lineHeight: t.lineHeight.tight,
+      lineHeight: lineBox(t.lineHeight.tight, t.fontSize.xl),
       color: c.textPrimary,
     },
 
@@ -105,7 +114,7 @@ export function createBaseStyles(t: ThemeTokens) {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.lg,
       fontWeight: t.fontWeight.regular,
-      lineHeight: t.lineHeight.normal,
+      lineHeight: lineBox(t.lineHeight.normal, t.fontSize.lg),
       color: c.textSecondary,
     },
 
@@ -113,7 +122,7 @@ export function createBaseStyles(t: ThemeTokens) {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.body,
       fontWeight: t.fontWeight.regular,
-      lineHeight: t.lineHeight.normal,
+      lineHeight: lineBox(t.lineHeight.normal, t.fontSize.body),
       color: c.textPrimary,
     },
 
@@ -121,7 +130,7 @@ export function createBaseStyles(t: ThemeTokens) {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.body,
       fontWeight: t.fontWeight.semibold,
-      lineHeight: t.lineHeight.normal,
+      lineHeight: lineBox(t.lineHeight.normal, t.fontSize.body),
       color: c.textPrimary,
     },
 
@@ -129,7 +138,7 @@ export function createBaseStyles(t: ThemeTokens) {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.sm,
       fontWeight: t.fontWeight.regular,
-      lineHeight: t.lineHeight.normal,
+      lineHeight: lineBox(t.lineHeight.normal, t.fontSize.sm),
       color: c.textSecondary,
     },
 
@@ -140,7 +149,7 @@ export function createBaseStyles(t: ThemeTokens) {
       // uppercase + tracking is set by the consumer via textTransform and
       // letterSpacing; we keep the base font and color here so a micro label
       // still reads on either theme.
-      lineHeight: t.lineHeight.normal,
+      lineHeight: lineBox(t.lineHeight.normal, t.fontSize.xs),
       color: c.textMuted,
     },
 
@@ -150,7 +159,7 @@ export function createBaseStyles(t: ThemeTokens) {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize['2xl'],
       fontWeight: t.fontWeight.bold,
-      lineHeight: t.lineHeight.tight,
+      lineHeight: lineBox(t.lineHeight.tight, t.fontSize['2xl']),
       color: c.textPrimary,
       fontVariant: ['tabular-nums'],
     },
@@ -159,7 +168,7 @@ export function createBaseStyles(t: ThemeTokens) {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.xs,
       fontWeight: t.fontWeight.medium,
-      lineHeight: t.lineHeight.normal,
+      lineHeight: lineBox(t.lineHeight.normal, t.fontSize.xs),
       color: c.textMuted,
     },
 

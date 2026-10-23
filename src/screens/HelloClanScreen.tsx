@@ -21,13 +21,14 @@ import { fetchClan, ClanFetchError } from '../api/clan';
 // over.
 
 // The hardcoded tag. Picked for three properties that make the smoke test
-// stable: it is a well-known clan (so it is unlikely to vanish), it is
-// populated (so members > 0 reads as a real number, not a confusing zero),
-// and its war log is public (so a later session can probe the warlog route
-// against the same tag without surprises). Changing this is a one-line
-// edit; the tag is canonical (leading #, uppercase) so the tier's
-// normalization is a no-op on it.
-const HARDCODED_CLAN_TAG = '#G88CYQP';
+// stable: it is our own clan (so it exists as long as the project does and
+// the whole team tests against it), it is populated (47 members, so the
+// members count reads as a real number, not a confusing zero), and its war
+// log is public (verified live: the warlog route answers 200 against it, so
+// a later session can probe that route on the same tag without surprises).
+// Changing this is a one-line edit; the tag is canonical (leading #,
+// uppercase) so the tier's normalization is a no-op on it.
+const HARDCODED_CLAN_TAG = '#2JPCYP98L';
 
 const CLAN_QUERY_KEY = ['clan', HARDCODED_CLAN_TAG] as const;
 const CLAN_STALE_TIME_MS = 180_000;
