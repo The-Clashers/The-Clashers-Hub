@@ -6,7 +6,6 @@
 //
 // Usage: node scripts/platform-sim.mjs   (listens on 8789)
 
-import { createServer } from 'node:http';
 import { build } from 'esbuild';
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
