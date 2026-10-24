@@ -12,6 +12,15 @@
         height: 100%;
         margin: 0;
       }
+      /* The app root is a flex child (appRoot uses flex: 1 so the screen
+         chain has a bounded height), which only stretches when #root is a
+         flex column. Without this the appRoot collapses to content height,
+         the virtualized list gets no scroll container, and every item
+         renders at once. */
+      #root {
+        display: flex;
+        flex-direction: column;
+      }
     </style>
   </head>
   <body>
