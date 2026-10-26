@@ -5,6 +5,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { useTheme, createBaseStyles } from '../theme';
 import { ThemeToggle } from '../components/ThemeToggle';
 import TagInput from '../components/TagInput';
+import Dropdown from '../components/Dropdown';
 import {
   fetchSearchPage,
   SearchFetchError,
@@ -25,10 +26,10 @@ import { LOCATION_FILTERS } from '../api/locations';
 //
 // Two behaviors are deliberate and load-bearing:
 //
-// - Filters apply on submit, not while they are tapped. Every distinct
+// - Filters apply on submit, not while they are picked. Every distinct
 //   filter combination is a distinct cache key on the tier, so live
-//   re-searching on every tap would burn upstream calls the TTL cache cannot
-//   absorb. A "changed since the last search" hint keeps that honest.
+//   re-searching on every change would burn upstream calls the TTL cache
+//   cannot absorb. A "changed since the last search" hint keeps that honest.
 // - The FlatList owns the page scrolling (the header and filter row stay
 //   put) because virtualization needs the list to be the scroll container.
 
@@ -207,35 +208,39 @@ export default function SearchScreen() {
               <Text style={styles.validationHint}>Type a clan name first.</Text>
             ) : null}
 
-            <View style={styles.filterStack}>
-              <FilterGroup
-                label="Minimum members"
-                options={MEMBER_OPTIONS}
-                selected={minMembers}
-                onSelect={setMinMembers}
-                styles={styles}
-              />
-              <FilterGroup
-                label="Minimum clan level"
-                options={LEVEL_OPTIONS}
-                selected={minClanLevel}
-                onSelect={setMinClanLevel}
-                styles={styles}
-              />
-              <FilterGroup
-                label="War frequency"
-                options={FREQUENCY_OPTIONS}
-                selected={warFrequency}
-                onSelect={setWarFrequency}
-                styles={styles}
-              />
-              <FilterGroup
-                label="Location"
-                options={LOCATION_OPTIONS}
-                selected={locationId}
-                onSelect={setLocationId}
-                styles={styles}
-              />
+            <View style={styles.filterGrid}>
+              <View style={styles.filterCell}>
+                <Dropdown
+                  label="Minimum members"
+                  options={MEMBER_OPTIONS}
+                  value={minMembers}
+                  onSelect={setMinMembers}
+                />
+              </View>
+              <View style={styles.filterCell}>
+                <Dropdown
+                  label="Minimum clan level"
+                  options={LEVEL_OPTIONS}
+                  value={minClanLevel}
+                  onSelect={setMinClanLevel}
+                />
+              </View>
+              <View style={styles.filterCell}>
+                <Dropdown
+                  label="War frequency"
+                  options={FREQUENCY_OPTIONS}
+                  value={warFrequency}
+                  onSelect={setWarFrequency}
+                />
+              </View>
+              <View style={styles.filterCell}>
+                <Dropdown
+                  label="Location"
+                  options={LOCATION_OPTIONS}
+                  value={locationId}
+                  onSelect={setLocationId}
+                />
+              </View>
             </View>
             {dirty ? (
               <Text style={styles.dirtyHint}>
@@ -284,7 +289,9 @@ export default function SearchScreen() {
             ) : (
               <>
                 <View style={styles.resultsMeta}>
-                  <Text style={base.caption}>{items.length} clans</Text>
+                  <Text style={base.caption}>
+                    {items.length === 1 ? '1 clan' : `${items.length} clans`}
+                  </Text>
                   <Text style={base.caption}>fetched {firstPageAge}s ago</Text>
                 </View>
                 <FlatList
@@ -341,47 +348,6 @@ export default function SearchScreen() {
             </View>
           </View>
         </View>
-      </View>
-    </View>
-  );
-}
-
-// ---------- filter chips ----------
-
-interface FilterGroupProps<V> {
-  label: string;
-  options: ReadonlyArray<{ label: string; value: V }>;
-  selected: V;
-  onSelect: (value: V) => void;
-  styles: ReturnType<typeof createStyles>;
-}
-
-function FilterGroup<V>({ label, options, selected, onSelect, styles }: FilterGroupProps<V>) {
-  return (
-    <View style={styles.filterGroup}>
-      <Text style={styles.filterLabel}>{label}</Text>
-      <View style={styles.chipRow}>
-        {options.map((option) => {
-          const isSelected = option.value === selected;
-          return (
-            <Pressable
-              key={option.label}
-              accessibilityRole="button"
-              accessibilityLabel={`${label}: ${option.label}`}
-              accessibilityState={{ selected: isSelected }}
-              onPress={() => onSelect(option.value)}
-              style={({ pressed }) => [
-                styles.filterChip,
-                isSelected && styles.filterChipSelected,
-                pressed && styles.filterChipPressed,
-              ]}
-            >
-              <Text style={[styles.filterChipText, isSelected && styles.filterChipTextSelected]}>
-                {option.label}
-              </Text>
-            </Pressable>
-          );
-        })}
       </View>
     </View>
   );
@@ -744,61 +710,20 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontSize: t.fontSize.sm,
       color: c.warning,
     },
-    // The filter groups sit side by side on wide screens (each group is a
-    // label above its chip row) and wrap to one per column on narrow ones,
-    // so the results list keeps a fair share of the viewport.
-    filterStack: {
+    // The four filter dropdowns wrap on their own: two per row on a phone,
+    // one row of four from tablet up. flexBasis drives the break, so no
+    // breakpoint JS and no media queries; cells grow to share the row.
+    filterGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      alignItems: 'flex-start',
-      columnGap: t.spacing[8],
-      rowGap: t.spacing[4],
+      columnGap: t.spacing[3],
+      rowGap: t.spacing[3],
     },
-    filterGroup: {
-      gap: t.spacing[2],
-    },
-    filterLabel: {
-      fontFamily: t.fontFamily.sans,
-      fontSize: t.fontSize.xs,
-      fontWeight: t.fontWeight.medium,
-      color: c.textMuted,
-      textTransform: 'uppercase',
-      letterSpacing: 0.6,
-    },
-    chipRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: t.spacing[2],
-    },
-    filterChip: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: t.layout.touchTargetMin,
-      paddingHorizontal: t.spacing[4],
-      paddingVertical: t.spacing[2],
-      borderRadius: t.radius.pill,
-      borderWidth: 1,
-      borderColor: c.panelBorderStrong,
-      backgroundColor: c.panelRaised,
-      outlineColor: c.focusRing,
-      outlineOffset: t.layout.focusRingOffset,
-    },
-    filterChipSelected: {
-      backgroundColor: c.accent,
-      borderColor: c.accent,
-    },
-    filterChipPressed: {
-      opacity: 0.7,
-    },
-    filterChipText: {
-      fontFamily: t.fontFamily.sans,
-      fontSize: t.fontSize.sm,
-      fontWeight: t.fontWeight.medium,
-      color: c.textPrimary,
-    },
-    filterChipTextSelected: {
-      color: c.textOnAccent,
-      fontWeight: t.fontWeight.semibold,
+    filterCell: {
+      flexGrow: 1,
+      flexShrink: 1,
+      flexBasis: 140,
+      minWidth: 0,
     },
     dirtyHint: {
       fontFamily: t.fontFamily.sans,

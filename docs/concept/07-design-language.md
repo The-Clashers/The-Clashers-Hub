@@ -155,7 +155,8 @@ overscroll.
 | Component | Purpose |
 |---|---|
 | `AppShell` | top bar (logo, tag-lookup shortcut) + content + footer |
-| `SearchBar` + `FilterRow` | home screen query controls |
+| `SearchBar` + `FilterRow` | home screen query controls; the filters render as `Dropdown`s |
+| `Dropdown` | select-style control built on RN primitives: button trigger, portaled `listbox`, keyboard-complete (arrows, Enter, Escape, Home/End) |
 | `TagInput` | the ONE owner of tag normalization ([03 §2](./03-features-list.md)) |
 | `ClanCard` | search result row: badge, level, members, location |
 | `StatChip` | label + value pair used on every header |

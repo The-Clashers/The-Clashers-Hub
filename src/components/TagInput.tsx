@@ -115,7 +115,12 @@ export default function TagInput({ label = 'Player tag', onNavigate, children }:
       ) : null}
       <View style={styles.footnoteRow}>
         <Text style={base.caption}>Tag-lookup shortcut, golden path B.</Text>
-        <Text style={styles.counter}>{remaining}</Text>
+        {/* The counter only speaks near the ceiling. Real tags are 3 to 9
+            characters, so an always-on countdown is noise; ten from the
+            limit it becomes useful. */}
+        {remaining <= 10 ? (
+          <Text style={styles.counter}>{remaining} left</Text>
+        ) : null}
       </View>
       {children}
     </View>
