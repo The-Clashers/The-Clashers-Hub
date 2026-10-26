@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useTheme, createBaseStyles } from '../theme';
 import { ThemeToggle } from '../components/ThemeToggle';
+import TagInput from '../components/TagInput';
 import {
   fetchSearchPage,
   SearchFetchError,
@@ -241,6 +242,10 @@ export default function SearchScreen() {
                 Changed since the last search. Press Search to apply.
               </Text>
             ) : null}
+          </View>
+
+          <View style={[base.panel, styles.tagPanel]}>
+            <TagInput />
           </View>
 
           <View style={styles.resultsArea}>
@@ -799,6 +804,14 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.sm,
       color: c.info,
+    },
+    // The tag-lookup panel sits between the search panel and the results.
+    // It is the entry point for golden path B (paste a tag, land on the
+    // player). Quiet chrome: a flat panel, not raised, so the search panel
+    // stays the primary surface.
+    tagPanel: {
+      marginTop: t.spacing[4],
+      padding: t.spacing[4],
     },
 
     // results
