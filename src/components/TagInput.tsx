@@ -74,7 +74,11 @@ export default function TagInput({ label = 'Player tag', onNavigate, children }:
     }
   };
 
-  const showError = !result.ok && touched && result.reason !== 'empty';
+  // `touched` alone gates the hint: before the first submit the box stays
+  // quiet, after a rejected submit every reason shows, empty included. That
+  // mirrors the name input one panel up ("Type a clan name first.") so both
+  // inputs on the entry route behave the same.
+  const showError = !result.ok && touched;
   const remaining = 21 - draft.length; // '#' + 20 max
 
   return (
