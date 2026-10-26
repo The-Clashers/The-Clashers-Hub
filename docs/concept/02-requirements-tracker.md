@@ -85,7 +85,7 @@ FR-18 are the team's original additions beyond the lab's example set.
 | ID | The system shall... | Feature | Priority | Status |
 |---|---|---|---|---|
 | FR-01 | allow a visitor to search clans by name, with filters for minimum members, minimum clan level, war frequency, and location, with paginated results | F-01, F-02 | P0 | Draft |
-| FR-02 | look up any player directly by pasting a player tag, with or without the # prefix | F-03 | P0 | Draft |
+| FR-02 | look up any player, or any clan, directly by pasting its tag, with or without the # prefix | F-03 | P0 | Draft |
 | FR-03 | display a clan detail screen with an identity header (badge, level, description, location, requirements) plus the full roster | F-04 | P0 | Draft |
 | FR-04 | provide a roster table with sortable columns (role, Town Hall, trophies, donations given and received, XP level), tapping a row opens that player | F-05 | P0 | Draft |
 | FR-05 | compute a donation balance per member against a configurable target ratio (default 1:1), flag members below target, and order them worst-first | F-05, F-07 | P0 | Draft |
@@ -158,7 +158,7 @@ SR-08 to SR-19.
 
 | ID | System requirement | Status |
 |---|---|---|
-| SR-13 | The tag box on the home screen accepts a tag with or without the # prefix, normalizes it (uppercase, prepend #) in exactly one component, and routes to /player/:tag with the tag URL-encoded | Draft |
+| SR-13 | The tag box on the home screen accepts a tag with or without the # prefix, normalizes it (uppercase, prepend #) in exactly one component, and routes to /player/:tag or /clan/:tag, whichever target the box's dropdown selected, with the tag URL-encoded | Draft |
 | SR-14 | The player screen fetches GET /api/player/:tag (300 s TTL) and computes the rushed analysis client-side: overall percentage, per-category breakdown, top-deficit list, with super-troop levels normalized against their base troop and entries lacking a maxLevel skipped with a footnote | Draft |
 | SR-15 | The player screen renders the hero grid (level versus maximum, equipment where the API exposes it) and the achievements list with progress rails and stars, all from the single player response | Draft |
 | SR-16 | The progression grid renders entirely from the same single GET /api/player/:tag response: unit icons resolve through the bundled static icon map with the placeholder fallback, and maxed-for-Town-Hall indicators come from the bundled Town Hall cap reference tables; no request beyond the player fetch is made | Draft |

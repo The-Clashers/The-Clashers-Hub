@@ -157,7 +157,7 @@ overscroll.
 | `AppShell` | top bar (logo, tag-lookup shortcut) + content + footer |
 | `SearchBar` + `FilterRow` | home screen query controls; the filters render as `Dropdown`s |
 | `Dropdown` | select-style control built on RN primitives: button trigger, portaled `listbox`, keyboard-complete (arrows, Enter, Escape, Home/End) |
-| `TagInput` | the ONE owner of tag normalization ([03 §2](./03-features-list.md)) |
+| `TagInput` | the ONE owner of tag normalization ([03 §2](./03-features-list.md)); its Player/Clan target dropdown picks whether a tag opens /player/:tag or /clan/:tag |
 | `ClanCard` | search result row: badge, level, members, location |
 | `StatChip` | label + value pair used on every header |
 | `RatioFlag` | donation-balance chip (good/warn/dash states) |

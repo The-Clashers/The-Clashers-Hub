@@ -10,7 +10,7 @@ cross-reference the tracker in [02](./02-requirements-tracker.md).
 |---|---|---|---|---|
 | F-01 | Clan search: name + filters (min members, min clan level, war frequency, location) | P0 | FR-01 | filters are optional; empty name = browse top clans |
 | F-02 | Search results: virtualized card list, badge, level, members, location, war frequency; cursor pagination | P0 | FR-01 | |
-| F-03 | Tag lookup: paste-a-tag box on the home screen (accepts `#ABC123` or `ABC123`, normalized) | P0 | FR-02 | the only way to reach a player without a clan |
+| F-03 | Tag lookup: paste-a-tag box on the home screen (accepts `#ABC123` or `ABC123`, normalized) with a Player/Clan target dropdown | P0 | FR-02 | the only way to reach a player without a clan (players have no name search); the direct way to a clan by tag, complementing the name search |
 | F-04 | Clan detail: header + stats + roster | P0 | FR-03 | tabs: Roster / War / Log |
 | F-05 | Roster table: sortable, tap-through to player; donation flags inline; "needs attention" sort toggle | P0 | FR-04, FR-05 | switches to cards below 768px |
 | F-06 | Player detail: profile + rushed analysis + achievements + heroes | P0 | FR-06, FR-07, FR-08, FR-09 | the analysis centerpiece |
