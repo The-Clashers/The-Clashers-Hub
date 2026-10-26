@@ -2,35 +2,96 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigate } from 'react-router';
 import { useTheme, createBaseStyles } from '../theme';
-import { normalizeTagInput, playerRouteFor, type NormalizeTagResult } from '../lib/tag';
+import Dropdown, { type DropdownOption } from './Dropdown';
+import {
+  lookupRouteFor,
+  normalizeTagInput,
+  type NormalizeTagResult,
+  type TagLookupTarget,
+} from '../lib/tag';
 
 // The tag lookup box (T-M1-2, FR-02, SR-13). The ONE component that owns
 // tag normalization: it accepts a tag with or without the # prefix, runs
 // the rule from src/lib/tag.ts (uppercase, prepend #, validate), and
-// routes to /player/:tag with the tag URL-encoded. No other component
+// routes to the detail screen of whichever target its dropdown selected,
+// /player/:tag or /clan/:tag, with the tag URL-encoded. No other component
 // does normalization; the rule itself lives in lib/tag.ts so it is
 // unit-testable without rendering React.
 //
-// The box sits on the search screen today, where the URL map puts it
-// (docs/concept/03-features-list.md section 2: the entry route is search,
-// filter row, recent searches, tag-lookup box). When F-13 (recent
-// searches) lands, the box stays the owner of normalization; the recent
-// list just feeds it tags.
+// The target dropdown exists because the game API draws a hard line the UI
+// must not blur: there is no player search by name, so a player is
+// reachable by tag only, while a clan is reachable both by name (the
+// search bar above) and by tag (this box). The dropdown defaults to
+// Player, which keeps golden path B exactly what it was: paste a tag,
+// press Go, land on the player. Selecting Clan points the same box at
+// /clan/:tag.
 //
-// The box is purely client-side: no fetch happens here. The player screen
-// owns the fetch (and the four state-matrix states that come with it).
+// The box is purely client-side: no fetch happens here. The player and
+// clan screens own their fetches (and the four state-matrix states that
+// come with them).
 
-/** The reason keys the UI surfaces next to the input. Sentences live here
- * so the wording stays consistent and the unit test can assert the key. */
-const REASON_COPY: Record<Exclude<NormalizeTagResult, { ok: true }>['reason'], string> = {
-  empty: 'Type a player tag first.',
+/** The two things the box can look up. Labels are short because the
+ * dropdown trigger sits in the label row, not the input row. */
+const TARGET_OPTIONS: ReadonlyArray<DropdownOption<TagLookupTarget>> = [
+  { value: 'player', label: 'Player' },
+  { value: 'clan', label: 'Clan' },
+];
+
+/** Per-target copy. Sentences live here so the wording stays consistent
+ * and the target switch rewrites the whole box in one lookup. The
+ * placeholder is shared and kept short on purpose: the input is 242 px
+ * wide at the 360 px compatibility floor (NFR-05) and a longer sentence
+ * truncates mid-word there; the accessibility hint carries the full
+ * instruction instead. */
+const PLACEHOLDER = 'Paste a tag, # optional';
+
+const TARGET_COPY: Record<
+  TagLookupTarget,
+  {
+    inputLabel: string;
+    inputHint: string;
+    empty: string;
+    buttonLabel: string;
+    buttonHint: string;
+    footnote: string;
+  }
+> = {
+  player: {
+    inputLabel: 'Player tag',
+    inputHint: 'Paste a player tag and press Go. The # prefix is optional.',
+    empty: 'Type a player tag first.',
+    buttonLabel: 'Look up player',
+    buttonHint: 'Normalizes the tag and opens the player detail screen.',
+    footnote: 'Player tag shortcut, golden path B.',
+  },
+  clan: {
+    inputLabel: 'Clan tag',
+    inputHint: 'Paste a clan tag and press Go. The # prefix is optional.',
+    empty: 'Type a clan tag first.',
+    buttonLabel: 'Look up clan',
+    buttonHint: 'Normalizes the tag and opens the clan detail screen.',
+    footnote: 'Clan tag shortcut, opens the clan directly.',
+  },
+};
+
+/** The reject reasons the normalizer can produce. */
+type TagRejectReason = Exclude<NormalizeTagResult, { ok: true }>['reason'];
+
+/** Reason copy that does not depend on the target. The empty case does,
+ * so it lives in TARGET_COPY and this table skips it. */
+const REASON_COPY: Record<Exclude<TagRejectReason, 'empty'>, string> = {
   too_short: 'Tags are at least three characters.',
   too_long: 'Tags are at most twenty characters.',
   bad_chars: 'Tags use letters and numbers only.',
 };
 
+function reasonCopy(target: TagLookupTarget, reason: TagRejectReason): string {
+  if (reason === 'empty') return TARGET_COPY[target].empty;
+  return REASON_COPY[reason];
+}
+
 export interface TagInputProps {
-  /** Optional caption shown above the input; defaults to "Player tag". */
+  /** Optional caption shown left of the target dropdown; defaults to "Look up by tag". */
   label?: string;
   /** Override navigation in tests; defaults to react-router's useNavigate. */
   onNavigate?: (route: string) => void;
@@ -38,29 +99,34 @@ export interface TagInputProps {
   children?: ReactNode;
 }
 
-export default function TagInput({ label = 'Player tag', onNavigate, children }: TagInputProps) {
+export default function TagInput({ label = 'Look up by tag', onNavigate, children }: TagInputProps) {
   const { theme } = useTheme();
   const base = useMemo(() => createBaseStyles(theme), [theme]);
   const styles = useMemo(() => createStyles(theme), [theme]);
   const navigate = useNavigate();
   const go = onNavigate ?? ((route: string) => navigate(route));
 
+  const [target, setTarget] = useState<TagLookupTarget>('player');
   const [draft, setDraft] = useState('');
   const [result, setResult] = useState<NormalizeTagResult>({ ok: false, reason: 'empty' });
   const [touched, setTouched] = useState(false);
+
+  const copy = TARGET_COPY[target];
 
   const submit = () => {
     setTouched(true);
     const next = normalizeTagInput(draft);
     setResult(next);
     if (next.ok) {
-      go(playerRouteFor(next.tag));
+      go(lookupRouteFor(target, next.tag));
     }
   };
 
   // Clear the validation hint as soon as the user fixes whatever was wrong,
   // so the box does not nag between keystrokes. The next submit re-runs the
-  // rule and re-shows a hint if the input is still invalid.
+  // rule and re-shows a hint if the input is still invalid. Switching the
+  // target does not clear anything: the tag alphabet is shared, so a draft
+  // that was invalid for a player is invalid for a clan too.
   const handleChange = (text: string) => {
     setDraft(text);
     if (!touched) return;
@@ -83,16 +149,25 @@ export default function TagInput({ label = 'Player tag', onNavigate, children }:
 
   return (
     <View style={styles.wrap} accessibilityRole="search">
-      <Text style={styles.label}>{label}</Text>
+      <View style={styles.targetRow}>
+        <Text style={styles.label}>{label}</Text>
+        <Dropdown
+          label="Look up"
+          hideLabel
+          options={TARGET_OPTIONS}
+          value={target}
+          onSelect={setTarget}
+        />
+      </View>
       <View style={styles.row}>
         <TextInput
           value={draft}
           onChangeText={handleChange}
           onSubmitEditing={submit}
-          placeholder="Paste a player tag, with or without #"
+          placeholder={PLACEHOLDER}
           placeholderTextColor={theme.colors.textMuted}
-          accessibilityLabel="Player tag"
-          accessibilityHint="Paste a player tag and press Go. The # prefix is optional."
+          accessibilityLabel={copy.inputLabel}
+          accessibilityHint={copy.inputHint}
           autoCapitalize="characters"
           autoCorrect={false}
           maxLength={21}
@@ -100,8 +175,8 @@ export default function TagInput({ label = 'Player tag', onNavigate, children }:
         />
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Look up player"
-          accessibilityHint="Normalizes the tag and opens the player detail screen."
+          accessibilityLabel={copy.buttonLabel}
+          accessibilityHint={copy.buttonHint}
           onPress={submit}
           style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
         >
@@ -110,11 +185,11 @@ export default function TagInput({ label = 'Player tag', onNavigate, children }:
       </View>
       {showError ? (
         <Text style={styles.error} accessibilityRole="alert">
-          {REASON_COPY[result.reason]}
+          {reasonCopy(target, result.reason)}
         </Text>
       ) : null}
       <View style={styles.footnoteRow}>
-        <Text style={base.caption}>Tag-lookup shortcut, golden path B.</Text>
+        <Text style={base.caption}>{copy.footnote}</Text>
         {/* The counter only speaks near the ceiling. Real tags are 3 to 9
             characters, so an always-on countdown is noise; ten from the
             limit it becomes useful. */}
@@ -135,7 +210,17 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     wrap: {
       gap: t.spacing[2],
     },
+    // The label row: what the box does on the left, which tag kind it wants
+    // on the right. The dropdown is the method selector, so it sits with the
+    // label, above the input row it governs.
+    targetRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: t.spacing[3],
+    },
     label: {
+      flexShrink: 1,
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.xs,
       fontWeight: t.fontWeight.medium,

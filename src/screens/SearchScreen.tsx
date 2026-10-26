@@ -6,6 +6,7 @@ import { useTheme, createBaseStyles } from '../theme';
 import { ThemeToggle } from '../components/ThemeToggle';
 import TagInput from '../components/TagInput';
 import Dropdown from '../components/Dropdown';
+import { clanRouteFor } from '../lib/tag';
 import {
   fetchSearchPage,
   SearchFetchError,
@@ -80,10 +81,6 @@ function filtersEqual(a: SearchFilters, b: SearchFilters): boolean {
     a.warFrequency === b.warFrequency &&
     a.locationId === b.locationId
   );
-}
-
-function clanHref(tag: string): string {
-  return `/clan/${encodeURIComponent(tag)}`;
 }
 
 // The client staleTime mirrors the tier's 60 s search TTL (SR-08) so the two
@@ -171,7 +168,6 @@ export default function SearchScreen() {
             <View style={styles.headerText}>
               <Text style={base.micro}>The Clashers Hub</Text>
               <Text style={base.display}>Search a clan</Text>
-              <Text style={base.subtitle}>Live data, no login. Filters are optional.</Text>
             </View>
             <ThemeToggle />
           </View>
@@ -300,7 +296,7 @@ export default function SearchScreen() {
                   renderItem={({ item }) => (
                     <ClanCard
                       clan={item}
-                      onPress={() => navigate(clanHref(item.tag))}
+                      onPress={() => navigate(clanRouteFor(item.tag))}
                       styles={styles}
                     />
                   )}

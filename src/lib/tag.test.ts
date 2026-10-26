@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  clanRouteFor,
   encodeTagForRoute,
+  lookupRouteFor,
   normalizeTagInput,
   playerRouteFor,
   type NormalizeTagResult,
@@ -69,5 +71,30 @@ describe('playerRouteFor', () => {
 
   it('keeps the hash out of the path so the router never sees a fragment', () => {
     expect(playerRouteFor('#ABC')).not.toContain('#');
+  });
+});
+
+describe('clanRouteFor', () => {
+  it('builds /clan/<encoded tag> with the hash encoded', () => {
+    expect(clanRouteFor('#2CJPGCLUC')).toBe('/clan/%232CJPGCLUC');
+  });
+
+  it('keeps the hash out of the path so the router never sees a fragment', () => {
+    expect(clanRouteFor('#ABC')).not.toContain('#');
+  });
+});
+
+describe('lookupRouteFor', () => {
+  it('routes the player target to the player screen', () => {
+    expect(lookupRouteFor('player', '#ABC123')).toBe('/player/%23ABC123');
+  });
+
+  it('routes the clan target to the clan screen', () => {
+    expect(lookupRouteFor('clan', '#ABC123')).toBe('/clan/%23ABC123');
+  });
+
+  it('agrees with the single-purpose builders for both targets', () => {
+    expect(lookupRouteFor('player', '#JGYCPCUJ')).toBe(playerRouteFor('#JGYCPCUJ'));
+    expect(lookupRouteFor('clan', '#2CJPGCLUC')).toBe(clanRouteFor('#2CJPGCLUC'));
   });
 });
