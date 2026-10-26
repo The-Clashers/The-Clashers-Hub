@@ -52,10 +52,15 @@ of the semester touches nothing but this app.
 ## 4. Facts that shaped the UX (and one trap we avoid)
 
 - **There is no player search by name.** Players are fetchable by exact tag
-  only. Our navigation is therefore clan-first (search clan → tap member), plus
-  the paste-a-tag box ([F-03](./03-features-list.md)). We never promise name-based player search.
+  only, so the paste-a-tag box ([F-03](./03-features-list.md)) is the only
+  direct route to a player. Clans are the flexible ones: searchable by name
+  through `GET /clans` and fetchable by exact tag through `GET /clans/{tag}`,
+  so the search bar takes both and a leading `#` is what says "tag, not
+  name" (bare tags and names share the same alphabet). We never promise
+  name-based player search.
 - **Tags start with `#`** and must be URL-encoded (`%23`). Exactly one
-  component owns normalization; exactly one layer owns encoding.
+  module owns the tag rule and its wording; exactly one layer owns
+  encoding.
 - **`memberList` is complete.** The roster screen needs no per-member fetches:
   donations, trophies, and XP all arrive with the clan call. This is why the
   clan screen is one cached request, not fifty.

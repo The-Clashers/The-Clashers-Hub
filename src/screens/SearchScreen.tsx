@@ -5,6 +5,8 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { useTheme, createBaseStyles } from '../theme';
 import { ThemeToggle } from '../components/ThemeToggle';
 import TagInput from '../components/TagInput';
+import Dropdown from '../components/Dropdown';
+import { clanRouteFor, normalizeTagInput, TAG_REJECT_COPY } from '../lib/tag';
 import {
   fetchSearchPage,
   SearchFetchError,
@@ -15,20 +17,23 @@ import {
 } from '../api/search';
 import { LOCATION_FILTERS } from '../api/locations';
 
-// The search screen (T-M1-1, FR-01, SR-08). A visitor types a clan name,
-// optionally narrows it with the filter row (minimum members, minimum clan
-// level, war frequency, location), submits, and gets a virtualized card list
-// that pages through the upstream cursor as it scrolls. Every screen state
-// the design language requires is here: loading skeleton, error branches
-// with a next action, empty results with a relax-filters suggestion, and
-// the success list.
+// The search screen (T-M1-1, FR-01, SR-08). A visitor types a clan name
+// OR pastes a clan tag (the # prefix is what tells the two apart, since
+// names and bare tags share the same alphabet), optionally narrows a name
+// search with the filter row (minimum members, minimum clan level, war
+// frequency, location), submits, and gets a virtualized card list that
+// pages through the upstream cursor as it scrolls. A tag skips the listing
+// entirely and opens the clan detail screen directly, the same destination
+// the result cards link to. Every screen state the design language requires
+// is here: loading skeleton, error branches with a next action, empty
+// results with a relax-filters suggestion, and the success list.
 //
 // Two behaviors are deliberate and load-bearing:
 //
-// - Filters apply on submit, not while they are tapped. Every distinct
+// - Filters apply on submit, not while they are picked. Every distinct
 //   filter combination is a distinct cache key on the tier, so live
-//   re-searching on every tap would burn upstream calls the TTL cache cannot
-//   absorb. A "changed since the last search" hint keeps that honest.
+//   re-searching on every change would burn upstream calls the TTL cache
+//   cannot absorb. A "changed since the last search" hint keeps that honest.
 // - The FlatList owns the page scrolling (the header and filter row stay
 //   put) because virtualization needs the list to be the scroll container.
 
@@ -81,10 +86,6 @@ function filtersEqual(a: SearchFilters, b: SearchFilters): boolean {
   );
 }
 
-function clanHref(tag: string): string {
-  return `/clan/${encodeURIComponent(tag)}`;
-}
-
 // The client staleTime mirrors the tier's 60 s search TTL (SR-08) so the two
 // cache layers decay together, the same pairing the hello screen uses.
 const SEARCH_STALE_TIME_MS = 60_000;
@@ -102,7 +103,10 @@ export default function SearchScreen() {
   const [minClanLevel, setMinClanLevel] = useState<number | undefined>(undefined);
   const [warFrequency, setWarFrequency] = useState<WarFrequency | undefined>(undefined);
   const [locationId, setLocationId] = useState<number | undefined>(undefined);
-  const [emptyName, setEmptyName] = useState(false);
+  // The one hint line under the search bar: the empty prompt on a blank
+  // submit, or the tag rule's sentence when a # input is not a valid tag.
+  // Null when there is nothing to complain about.
+  const [searchHint, setSearchHint] = useState<string | null>(null);
   // null until the first submit: the screen starts in the idle state, not in
   // loading. The query is disabled while this is null.
   const [submitted, setSubmitted] = useState<SearchFilters | null>(null);
@@ -114,13 +118,28 @@ export default function SearchScreen() {
   const dirty = submitted !== null && !filtersEqual(submitted, draftFilters);
 
   const submit = () => {
-    const name = nameDraft.trim();
-    if (name.length < 1) {
-      setEmptyName(true);
+    const raw = nameDraft.trim();
+    if (raw.length < 1) {
+      setSearchHint('Type a clan name or tag first.');
       return;
     }
-    setEmptyName(false);
-    setSubmitted({ name, minMembers, minClanLevel, warFrequency, locationId });
+    // A leading # is the one honest way to say "this is a tag, not a name":
+    // bare tags and names share the [A-Z0-9] alphabet, so anything without
+    // the # is a name search. The tag goes through the same rule and route
+    // builder as every other tag in the app (lib/tag.ts, SR-13) and opens
+    // the clan detail screen directly, skipping the listing.
+    if (raw.startsWith('#')) {
+      const tag = normalizeTagInput(raw);
+      if (tag.ok) {
+        setSearchHint(null);
+        navigate(clanRouteFor(tag.tag));
+      } else {
+        setSearchHint(tag.reason === 'empty' ? 'Type a clan name or tag first.' : TAG_REJECT_COPY[tag.reason]);
+      }
+      return;
+    }
+    setSearchHint(null);
+    setSubmitted({ name: raw, minMembers, minClanLevel, warFrequency, locationId });
   };
 
   const clearFilters = () => {
@@ -170,7 +189,6 @@ export default function SearchScreen() {
             <View style={styles.headerText}>
               <Text style={base.micro}>The Clashers Hub</Text>
               <Text style={base.display}>Search a clan</Text>
-              <Text style={base.subtitle}>Live data, no login. Filters are optional.</Text>
             </View>
             <ThemeToggle />
           </View>
@@ -181,13 +199,22 @@ export default function SearchScreen() {
                 value={nameDraft}
                 onChangeText={(text) => {
                   setNameDraft(text);
-                  if (emptyName && text.trim().length > 0) setEmptyName(false);
+                  // Clear the hint as soon as the problem is fixed: a name
+                  // once the input is non-blank, a # input once it
+                  // normalizes to a valid tag. Mirrors the tag box's
+                  // clear-on-fix so both inputs behave the same.
+                  if (searchHint === null) return;
+                  const trimmed = text.trim();
+                  const fixed = trimmed.startsWith('#')
+                    ? normalizeTagInput(trimmed).ok
+                    : trimmed.length > 0;
+                  if (fixed) setSearchHint(null);
                 }}
                 onSubmitEditing={submit}
-                placeholder="Clan name"
+                placeholder="Clan name or #tag"
                 placeholderTextColor={theme.colors.textMuted}
-                accessibilityLabel="Clan name"
-                accessibilityHint="Type part of a clan name and press Search."
+                accessibilityLabel="Clan name or tag"
+                accessibilityHint="Type a clan name, or a clan tag starting with #, and press Search."
                 autoCapitalize="none"
                 autoCorrect={false}
                 maxLength={64}
@@ -196,46 +223,52 @@ export default function SearchScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Search clans"
-                accessibilityHint="Runs the search with the current name and filters."
+                accessibilityHint="Runs the search with the current name and filters, or opens the clan directly when the input is a #tag."
                 onPress={submit}
                 style={({ pressed }) => [styles.searchButton, pressed && styles.searchButtonPressed]}
               >
                 <Text style={styles.searchButtonText}>Search</Text>
               </Pressable>
             </View>
-            {emptyName ? (
-              <Text style={styles.validationHint}>Type a clan name first.</Text>
+            {searchHint !== null ? (
+              <Text style={styles.validationHint} accessibilityRole="alert">
+                {searchHint}
+              </Text>
             ) : null}
 
-            <View style={styles.filterStack}>
-              <FilterGroup
-                label="Minimum members"
-                options={MEMBER_OPTIONS}
-                selected={minMembers}
-                onSelect={setMinMembers}
-                styles={styles}
-              />
-              <FilterGroup
-                label="Minimum clan level"
-                options={LEVEL_OPTIONS}
-                selected={minClanLevel}
-                onSelect={setMinClanLevel}
-                styles={styles}
-              />
-              <FilterGroup
-                label="War frequency"
-                options={FREQUENCY_OPTIONS}
-                selected={warFrequency}
-                onSelect={setWarFrequency}
-                styles={styles}
-              />
-              <FilterGroup
-                label="Location"
-                options={LOCATION_OPTIONS}
-                selected={locationId}
-                onSelect={setLocationId}
-                styles={styles}
-              />
+            <View style={styles.filterGrid}>
+              <View style={styles.filterCell}>
+                <Dropdown
+                  label="Minimum members"
+                  options={MEMBER_OPTIONS}
+                  value={minMembers}
+                  onSelect={setMinMembers}
+                />
+              </View>
+              <View style={styles.filterCell}>
+                <Dropdown
+                  label="Minimum clan level"
+                  options={LEVEL_OPTIONS}
+                  value={minClanLevel}
+                  onSelect={setMinClanLevel}
+                />
+              </View>
+              <View style={styles.filterCell}>
+                <Dropdown
+                  label="War frequency"
+                  options={FREQUENCY_OPTIONS}
+                  value={warFrequency}
+                  onSelect={setWarFrequency}
+                />
+              </View>
+              <View style={styles.filterCell}>
+                <Dropdown
+                  label="Location"
+                  options={LOCATION_OPTIONS}
+                  value={locationId}
+                  onSelect={setLocationId}
+                />
+              </View>
             </View>
             {dirty ? (
               <Text style={styles.dirtyHint}>
@@ -253,8 +286,8 @@ export default function SearchScreen() {
               <View style={styles.statePanel}>
                 <Text style={base.title}>Find a clan</Text>
                 <Text style={base.body}>
-                  Type a clan name and press Search. Filters are optional and apply
-                  when you search.
+                  Type a clan name, or a clan tag starting with #, and press
+                  Search. Filters are optional and narrow name searches.
                 </Text>
               </View>
             ) : query.isPending ? (
@@ -284,7 +317,9 @@ export default function SearchScreen() {
             ) : (
               <>
                 <View style={styles.resultsMeta}>
-                  <Text style={base.caption}>{items.length} clans</Text>
+                  <Text style={base.caption}>
+                    {items.length === 1 ? '1 clan' : `${items.length} clans`}
+                  </Text>
                   <Text style={base.caption}>fetched {firstPageAge}s ago</Text>
                 </View>
                 <FlatList
@@ -293,7 +328,7 @@ export default function SearchScreen() {
                   renderItem={({ item }) => (
                     <ClanCard
                       clan={item}
-                      onPress={() => navigate(clanHref(item.tag))}
+                      onPress={() => navigate(clanRouteFor(item.tag))}
                       styles={styles}
                     />
                   )}
@@ -341,47 +376,6 @@ export default function SearchScreen() {
             </View>
           </View>
         </View>
-      </View>
-    </View>
-  );
-}
-
-// ---------- filter chips ----------
-
-interface FilterGroupProps<V> {
-  label: string;
-  options: ReadonlyArray<{ label: string; value: V }>;
-  selected: V;
-  onSelect: (value: V) => void;
-  styles: ReturnType<typeof createStyles>;
-}
-
-function FilterGroup<V>({ label, options, selected, onSelect, styles }: FilterGroupProps<V>) {
-  return (
-    <View style={styles.filterGroup}>
-      <Text style={styles.filterLabel}>{label}</Text>
-      <View style={styles.chipRow}>
-        {options.map((option) => {
-          const isSelected = option.value === selected;
-          return (
-            <Pressable
-              key={option.label}
-              accessibilityRole="button"
-              accessibilityLabel={`${label}: ${option.label}`}
-              accessibilityState={{ selected: isSelected }}
-              onPress={() => onSelect(option.value)}
-              style={({ pressed }) => [
-                styles.filterChip,
-                isSelected && styles.filterChipSelected,
-                pressed && styles.filterChipPressed,
-              ]}
-            >
-              <Text style={[styles.filterChipText, isSelected && styles.filterChipTextSelected]}>
-                {option.label}
-              </Text>
-            </Pressable>
-          );
-        })}
       </View>
     </View>
   );
@@ -706,6 +700,11 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     },
     nameInput: {
       flex: 1,
+      // minWidth 0 lets the input actually shrink: browsers size an empty
+      // text input by its intrinsic content width and flex items refuse to
+      // go below it, which pushed the Search button off the 360 px
+      // compatibility floor (NFR-05) with a horizontal scrollbar.
+      minWidth: 0,
       minHeight: t.layout.touchTargetMin,
       paddingHorizontal: t.spacing[4],
       paddingVertical: t.spacing[2],
@@ -744,61 +743,20 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontSize: t.fontSize.sm,
       color: c.warning,
     },
-    // The filter groups sit side by side on wide screens (each group is a
-    // label above its chip row) and wrap to one per column on narrow ones,
-    // so the results list keeps a fair share of the viewport.
-    filterStack: {
+    // The four filter dropdowns wrap on their own: two per row on a phone,
+    // one row of four from tablet up. flexBasis drives the break, so no
+    // breakpoint JS and no media queries; cells grow to share the row.
+    filterGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      alignItems: 'flex-start',
-      columnGap: t.spacing[8],
-      rowGap: t.spacing[4],
+      columnGap: t.spacing[3],
+      rowGap: t.spacing[3],
     },
-    filterGroup: {
-      gap: t.spacing[2],
-    },
-    filterLabel: {
-      fontFamily: t.fontFamily.sans,
-      fontSize: t.fontSize.xs,
-      fontWeight: t.fontWeight.medium,
-      color: c.textMuted,
-      textTransform: 'uppercase',
-      letterSpacing: 0.6,
-    },
-    chipRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: t.spacing[2],
-    },
-    filterChip: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: t.layout.touchTargetMin,
-      paddingHorizontal: t.spacing[4],
-      paddingVertical: t.spacing[2],
-      borderRadius: t.radius.pill,
-      borderWidth: 1,
-      borderColor: c.panelBorderStrong,
-      backgroundColor: c.panelRaised,
-      outlineColor: c.focusRing,
-      outlineOffset: t.layout.focusRingOffset,
-    },
-    filterChipSelected: {
-      backgroundColor: c.accent,
-      borderColor: c.accent,
-    },
-    filterChipPressed: {
-      opacity: 0.7,
-    },
-    filterChipText: {
-      fontFamily: t.fontFamily.sans,
-      fontSize: t.fontSize.sm,
-      fontWeight: t.fontWeight.medium,
-      color: c.textPrimary,
-    },
-    filterChipTextSelected: {
-      color: c.textOnAccent,
-      fontWeight: t.fontWeight.semibold,
+    filterCell: {
+      flexGrow: 1,
+      flexShrink: 1,
+      flexBasis: 140,
+      minWidth: 0,
     },
     dirtyHint: {
       fontFamily: t.fontFamily.sans,

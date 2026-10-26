@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  clanRouteFor,
   encodeTagForRoute,
   normalizeTagInput,
   playerRouteFor,
+  TAG_REJECT_COPY,
   type NormalizeTagResult,
 } from './tag';
 
@@ -69,5 +71,27 @@ describe('playerRouteFor', () => {
 
   it('keeps the hash out of the path so the router never sees a fragment', () => {
     expect(playerRouteFor('#ABC')).not.toContain('#');
+  });
+});
+
+describe('clanRouteFor', () => {
+  it('builds /clan/<encoded tag> with the hash encoded', () => {
+    expect(clanRouteFor('#2CJPGCLUC')).toBe('/clan/%232CJPGCLUC');
+  });
+
+  it('keeps the hash out of the path so the router never sees a fragment', () => {
+    expect(clanRouteFor('#ABC')).not.toContain('#');
+  });
+});
+
+describe('TAG_REJECT_COPY', () => {
+  it('words every rule-based reject reason (the empty prompt is per-box)', () => {
+    // The keys mirror the normalizer's non-empty reasons; the empty case is
+    // deliberately each box's own sentence, so it must NOT be in the table.
+    expect(Object.keys(TAG_REJECT_COPY).sort()).toEqual(['bad_chars', 'too_long', 'too_short']);
+    for (const sentence of Object.values(TAG_REJECT_COPY)) {
+      expect(sentence.length).toBeGreaterThan(0);
+      expect(sentence.endsWith('.')).toBe(true);
+    }
   });
 });

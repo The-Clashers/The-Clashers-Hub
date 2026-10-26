@@ -2,32 +2,41 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigate } from 'react-router';
 import { useTheme, createBaseStyles } from '../theme';
-import { normalizeTagInput, playerRouteFor, type NormalizeTagResult } from '../lib/tag';
+import { normalizeTagInput, playerRouteFor, TAG_REJECT_COPY, type NormalizeTagResult } from '../lib/tag';
 
-// The tag lookup box (T-M1-2, FR-02, SR-13). The ONE component that owns
-// tag normalization: it accepts a tag with or without the # prefix, runs
-// the rule from src/lib/tag.ts (uppercase, prepend #, validate), and
-// routes to /player/:tag with the tag URL-encoded. No other component
-// does normalization; the rule itself lives in lib/tag.ts so it is
-// unit-testable without rendering React.
+// The player tag lookup box (T-M1-2, FR-02, SR-13). The ONE component that
+// owns tag normalization: it accepts a tag with or without the # prefix, runs
+// the rule from src/lib/tag.ts (uppercase, prepend #, validate), and routes
+// to /player/:tag with the tag URL-encoded. No other component does
+// normalization; the rule itself lives in lib/tag.ts so it is unit-testable
+// without rendering React.
+//
+// The box is tag-only because the game API draws a hard line the UI must not
+// blur: there is no player search by name, so a tag is the only way to reach
+// a player directly. Clans are the flexible ones (name or tag), and the clan
+// search bar one panel up handles both; this box never needs a target
+// selector.
 //
 // The box sits on the search screen today, where the URL map puts it
 // (docs/concept/03-features-list.md section 2: the entry route is search,
-// filter row, recent searches, tag-lookup box). When F-13 (recent
-// searches) lands, the box stays the owner of normalization; the recent
-// list just feeds it tags.
+// filter row, recent searches, tag-lookup box). When F-13 (recent searches)
+// lands, the box stays the owner of normalization; the recent list just
+// feeds it tags.
 //
 // The box is purely client-side: no fetch happens here. The player screen
 // owns the fetch (and the four state-matrix states that come with it).
 
-/** The reason keys the UI surfaces next to the input. Sentences live here
- * so the wording stays consistent and the unit test can assert the key. */
-const REASON_COPY: Record<Exclude<NormalizeTagResult, { ok: true }>['reason'], string> = {
-  empty: 'Type a player tag first.',
-  too_short: 'Tags are at least three characters.',
-  too_long: 'Tags are at most twenty characters.',
-  bad_chars: 'Tags use letters and numbers only.',
-};
+/** This box's own empty prompt; the rule-based reasons share the copy in
+ * lib/tag.ts so the player box and the clan search bar say the same words
+ * for the same broken input. The placeholder is kept short on purpose: the
+ * input is 242 px wide at the 360 px compatibility floor (NFR-05) and a
+ * longer sentence truncates mid-word there; the accessibility hint carries
+ * the full instruction. */
+const EMPTY_COPY = 'Type a player tag first.';
+
+function reasonCopy(reason: Exclude<NormalizeTagResult, { ok: true }>['reason']): string {
+  return reason === 'empty' ? EMPTY_COPY : TAG_REJECT_COPY[reason];
+}
 
 export interface TagInputProps {
   /** Optional caption shown above the input; defaults to "Player tag". */
@@ -74,7 +83,11 @@ export default function TagInput({ label = 'Player tag', onNavigate, children }:
     }
   };
 
-  const showError = !result.ok && touched && result.reason !== 'empty';
+  // `touched` alone gates the hint: before the first submit the box stays
+  // quiet, after a rejected submit every reason shows, empty included. That
+  // mirrors the search bar one panel up, so both inputs on the entry route
+  // behave the same.
+  const showError = !result.ok && touched;
   const remaining = 21 - draft.length; // '#' + 20 max
 
   return (
@@ -85,7 +98,7 @@ export default function TagInput({ label = 'Player tag', onNavigate, children }:
           value={draft}
           onChangeText={handleChange}
           onSubmitEditing={submit}
-          placeholder="Paste a player tag, with or without #"
+          placeholder="Paste a player tag, # optional"
           placeholderTextColor={theme.colors.textMuted}
           accessibilityLabel="Player tag"
           accessibilityHint="Paste a player tag and press Go. The # prefix is optional."
@@ -106,12 +119,17 @@ export default function TagInput({ label = 'Player tag', onNavigate, children }:
       </View>
       {showError ? (
         <Text style={styles.error} accessibilityRole="alert">
-          {REASON_COPY[result.reason]}
+          {reasonCopy(result.reason)}
         </Text>
       ) : null}
       <View style={styles.footnoteRow}>
-        <Text style={base.caption}>Tag-lookup shortcut, golden path B.</Text>
-        <Text style={styles.counter}>{remaining}</Text>
+        <Text style={base.caption}>Player tag shortcut, golden path B.</Text>
+        {/* The counter only speaks near the ceiling. Real tags are 3 to 9
+            characters, so an always-on countdown is noise; ten from the
+            limit it becomes useful. */}
+        {remaining <= 10 ? (
+          <Text style={styles.counter}>{remaining} left</Text>
+        ) : null}
       </View>
       {children}
     </View>
@@ -141,6 +159,9 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     },
     input: {
       flex: 1,
+      // minWidth 0 lets the input shrink under its intrinsic empty width;
+      // without it the Go button pokes past the 360 px floor (NFR-05).
+      minWidth: 0,
       minHeight: t.layout.touchTargetMin,
       paddingHorizontal: t.spacing[4],
       paddingVertical: t.spacing[2],
