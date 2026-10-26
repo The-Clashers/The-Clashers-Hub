@@ -84,8 +84,8 @@ FR-18 are the team's original additions beyond the lab's example set.
 
 | ID | The system shall... | Feature | Priority | Status |
 |---|---|---|---|---|
-| FR-01 | allow a visitor to search clans by name, with filters for minimum members, minimum clan level, war frequency, and location, with paginated results | F-01, F-02 | P0 | Draft |
-| FR-02 | look up any player, or any clan, directly by pasting its tag, with or without the # prefix | F-03 | P0 | Draft |
+| FR-01 | allow a visitor to search clans by name or by clan tag, with filters for minimum members, minimum clan level, war frequency, and location (filters narrow name searches), with paginated results | F-01, F-02 | P0 | Draft |
+| FR-02 | look up any player directly by pasting a player tag, with or without the # prefix | F-03 | P0 | Draft |
 | FR-03 | display a clan detail screen with an identity header (badge, level, description, location, requirements) plus the full roster | F-04 | P0 | Draft |
 | FR-04 | provide a roster table with sortable columns (role, Town Hall, trophies, donations given and received, XP level), tapping a row opens that player | F-05 | P0 | Draft |
 | FR-05 | compute a donation balance per member against a configurable target ratio (default 1:1), flag members below target, and order them worst-first | F-05, F-07 | P0 | Draft |
@@ -158,7 +158,7 @@ SR-08 to SR-19.
 
 | ID | System requirement | Status |
 |---|---|---|
-| SR-13 | The tag box on the home screen accepts a tag with or without the # prefix, normalizes it (uppercase, prepend #) in exactly one component, and routes to /player/:tag or /clan/:tag, whichever target the box's dropdown selected, with the tag URL-encoded | Draft |
+| SR-13 | The tag rule lives in exactly one module (src/lib/tag.ts): the player box accepts a tag with or without the # prefix, normalizes it (uppercase, prepend #), and routes to /player/:tag with the tag URL-encoded; the clan search bar runs the same rule when its input starts with # and routes to /clan/:tag the same way | Draft |
 | SR-14 | The player screen fetches GET /api/player/:tag (300 s TTL) and computes the rushed analysis client-side: overall percentage, per-category breakdown, top-deficit list, with super-troop levels normalized against their base troop and entries lacking a maxLevel skipped with a footnote | Draft |
 | SR-15 | The player screen renders the hero grid (level versus maximum, equipment where the API exposes it) and the achievements list with progress rails and stars, all from the single player response | Draft |
 | SR-16 | The progression grid renders entirely from the same single GET /api/player/:tag response: unit icons resolve through the bundled static icon map with the placeholder fallback, and maxed-for-Town-Hall indicators come from the bundled Town Hall cap reference tables; no request beyond the player fetch is made | Draft |
@@ -283,7 +283,7 @@ roster with donation flags, tap through to a member.
 | ID | Task | Owner | Estimate | Covers |
 |---|---|---|---|---|
 | T-M1-1 | Search screen with the filter row and a virtualized results list with cursor pagination | Screens | 14 | FR-01, SR-08 |
-| T-M1-2 | Tag lookup box with normalization owned by one component | Screens | 4 | FR-02, SR-13 |
+| T-M1-2 | Tag lookup box with normalization owned by one module (lib/tag.ts) | Screens | 4 | FR-02, SR-13 |
 | T-M1-3 | Clan detail screen: identity header, stat chips, tab bar | Screens | 10 | FR-03, SR-10 |
 | T-M1-4 | Roster table: sortable columns, tap-through to the player, card switch below 768 px | Screens | 14 | FR-04, SR-11, NFR-05 |
 | T-M1-5 | Donation balance engine with table-driven tests at 90%+ coverage, inline flags, needs-attention sort | Engines | 12 | FR-05, SR-12, NFR-07 |
