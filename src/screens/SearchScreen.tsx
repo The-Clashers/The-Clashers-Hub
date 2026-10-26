@@ -6,7 +6,7 @@ import { useTheme, createBaseStyles } from '../theme';
 import { ThemeToggle } from '../components/ThemeToggle';
 import TagInput from '../components/TagInput';
 import Dropdown from '../components/Dropdown';
-import { clanRouteFor } from '../lib/tag';
+import { clanRouteFor, normalizeTagInput, TAG_REJECT_COPY } from '../lib/tag';
 import {
   fetchSearchPage,
   SearchFetchError,
@@ -17,13 +17,16 @@ import {
 } from '../api/search';
 import { LOCATION_FILTERS } from '../api/locations';
 
-// The search screen (T-M1-1, FR-01, SR-08). A visitor types a clan name,
-// optionally narrows it with the filter row (minimum members, minimum clan
-// level, war frequency, location), submits, and gets a virtualized card list
-// that pages through the upstream cursor as it scrolls. Every screen state
-// the design language requires is here: loading skeleton, error branches
-// with a next action, empty results with a relax-filters suggestion, and
-// the success list.
+// The search screen (T-M1-1, FR-01, SR-08). A visitor types a clan name
+// OR pastes a clan tag (the # prefix is what tells the two apart, since
+// names and bare tags share the same alphabet), optionally narrows a name
+// search with the filter row (minimum members, minimum clan level, war
+// frequency, location), submits, and gets a virtualized card list that
+// pages through the upstream cursor as it scrolls. A tag skips the listing
+// entirely and opens the clan detail screen directly, the same destination
+// the result cards link to. Every screen state the design language requires
+// is here: loading skeleton, error branches with a next action, empty
+// results with a relax-filters suggestion, and the success list.
 //
 // Two behaviors are deliberate and load-bearing:
 //
@@ -100,7 +103,10 @@ export default function SearchScreen() {
   const [minClanLevel, setMinClanLevel] = useState<number | undefined>(undefined);
   const [warFrequency, setWarFrequency] = useState<WarFrequency | undefined>(undefined);
   const [locationId, setLocationId] = useState<number | undefined>(undefined);
-  const [emptyName, setEmptyName] = useState(false);
+  // The one hint line under the search bar: the empty prompt on a blank
+  // submit, or the tag rule's sentence when a # input is not a valid tag.
+  // Null when there is nothing to complain about.
+  const [searchHint, setSearchHint] = useState<string | null>(null);
   // null until the first submit: the screen starts in the idle state, not in
   // loading. The query is disabled while this is null.
   const [submitted, setSubmitted] = useState<SearchFilters | null>(null);
@@ -112,13 +118,28 @@ export default function SearchScreen() {
   const dirty = submitted !== null && !filtersEqual(submitted, draftFilters);
 
   const submit = () => {
-    const name = nameDraft.trim();
-    if (name.length < 1) {
-      setEmptyName(true);
+    const raw = nameDraft.trim();
+    if (raw.length < 1) {
+      setSearchHint('Type a clan name or tag first.');
       return;
     }
-    setEmptyName(false);
-    setSubmitted({ name, minMembers, minClanLevel, warFrequency, locationId });
+    // A leading # is the one honest way to say "this is a tag, not a name":
+    // bare tags and names share the [A-Z0-9] alphabet, so anything without
+    // the # is a name search. The tag goes through the same rule and route
+    // builder as every other tag in the app (lib/tag.ts, SR-13) and opens
+    // the clan detail screen directly, skipping the listing.
+    if (raw.startsWith('#')) {
+      const tag = normalizeTagInput(raw);
+      if (tag.ok) {
+        setSearchHint(null);
+        navigate(clanRouteFor(tag.tag));
+      } else {
+        setSearchHint(tag.reason === 'empty' ? 'Type a clan name or tag first.' : TAG_REJECT_COPY[tag.reason]);
+      }
+      return;
+    }
+    setSearchHint(null);
+    setSubmitted({ name: raw, minMembers, minClanLevel, warFrequency, locationId });
   };
 
   const clearFilters = () => {
@@ -178,13 +199,22 @@ export default function SearchScreen() {
                 value={nameDraft}
                 onChangeText={(text) => {
                   setNameDraft(text);
-                  if (emptyName && text.trim().length > 0) setEmptyName(false);
+                  // Clear the hint as soon as the problem is fixed: a name
+                  // once the input is non-blank, a # input once it
+                  // normalizes to a valid tag. Mirrors the tag box's
+                  // clear-on-fix so both inputs behave the same.
+                  if (searchHint === null) return;
+                  const trimmed = text.trim();
+                  const fixed = trimmed.startsWith('#')
+                    ? normalizeTagInput(trimmed).ok
+                    : trimmed.length > 0;
+                  if (fixed) setSearchHint(null);
                 }}
                 onSubmitEditing={submit}
-                placeholder="Clan name"
+                placeholder="Clan name or #tag"
                 placeholderTextColor={theme.colors.textMuted}
-                accessibilityLabel="Clan name"
-                accessibilityHint="Type part of a clan name and press Search."
+                accessibilityLabel="Clan name or tag"
+                accessibilityHint="Type a clan name, or a clan tag starting with #, and press Search."
                 autoCapitalize="none"
                 autoCorrect={false}
                 maxLength={64}
@@ -193,15 +223,17 @@ export default function SearchScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Search clans"
-                accessibilityHint="Runs the search with the current name and filters."
+                accessibilityHint="Runs the search with the current name and filters, or opens the clan directly when the input is a #tag."
                 onPress={submit}
                 style={({ pressed }) => [styles.searchButton, pressed && styles.searchButtonPressed]}
               >
                 <Text style={styles.searchButtonText}>Search</Text>
               </Pressable>
             </View>
-            {emptyName ? (
-              <Text style={styles.validationHint}>Type a clan name first.</Text>
+            {searchHint !== null ? (
+              <Text style={styles.validationHint} accessibilityRole="alert">
+                {searchHint}
+              </Text>
             ) : null}
 
             <View style={styles.filterGrid}>
@@ -254,8 +286,8 @@ export default function SearchScreen() {
               <View style={styles.statePanel}>
                 <Text style={base.title}>Find a clan</Text>
                 <Text style={base.body}>
-                  Type a clan name and press Search. Filters are optional and apply
-                  when you search.
+                  Type a clan name, or a clan tag starting with #, and press
+                  Search. Filters are optional and narrow name searches.
                 </Text>
               </View>
             ) : query.isPending ? (
@@ -668,6 +700,11 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     },
     nameInput: {
       flex: 1,
+      // minWidth 0 lets the input actually shrink: browsers size an empty
+      // text input by its intrinsic content width and flex items refuse to
+      // go below it, which pushed the Search button off the 360 px
+      // compatibility floor (NFR-05) with a horizontal scrollbar.
+      minWidth: 0,
       minHeight: t.layout.touchTargetMin,
       paddingHorizontal: t.spacing[4],
       paddingVertical: t.spacing[2],

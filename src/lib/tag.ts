@@ -1,15 +1,15 @@
 // Tag input normalization for the browser side.
 //
 // SR-13 (docs/concept/02-requirements-tracker.md section 6.2) says: the tag
-// box accepts a tag with or without the # prefix, normalizes it (uppercase,
-// prepend #) in exactly one component, and routes to the tag's detail screen
-// with the tag URL-encoded. The game API has no search by player name, so a
-// player is reachable by tag only; a clan is reachable both ways, by name
-// through the search bar and by tag through this box. This module is the
-// "exactly one place" half: the pure normalization function the TagInput
-// component calls, plus the route builders for both targets.
+// rule lives in exactly one place, this module. The player box accepts a tag
+// with or without the # prefix, normalizes it (uppercase, prepend #), and
+// routes to /player/:tag with the tag URL-encoded. The game API has no
+// search by player name, so a tag is the only way to reach a player
+// directly; clans are the flexible ones, and the clan search bar takes a
+// name OR a #tag, using the same rule here and the same clan route builder
+// when the input is a tag.
 //
-// The component owns the input field and the navigation; this module owns the
+// The components own their inputs and the navigation; this module owns the
 // rule. Splitting them keeps the rule unit-testable without rendering React,
 // and keeps the navigation concern out of the rule (the rule does not care
 // where the tag goes).
@@ -30,18 +30,33 @@ const TAG_PATTERN = /^#[0-9A-Z]{3,20}$/;
 /**
  * The outcome of normalizing user input. `ok` carries the canonical tag;
  * `invalid` carries a short reason the UI can surface next to the input.
- * The reason is a key, not a sentence, so the component owns the wording.
+ * The reason is a key, not a sentence; the shared sentences for the
+ * rule-based reasons live in {@link TAG_REJECT_COPY}.
  */
 export type NormalizeTagResult =
   | { ok: true; tag: string }
   | { ok: false; reason: 'empty' | 'too_short' | 'too_long' | 'bad_chars' };
 
 /**
- * What the tag box looks up. Players and clans share the tag alphabet and the
- * normalization rule; only the route differs. The component owns the choice,
- * this type keeps the route builders honest.
+ * The reject reasons that describe the rule itself (length, alphabet), as
+ * opposed to `empty`, which only says the box was submitted blank. These
+ * are shared by every surface that takes a tag: the player box and the
+ * clan search bar's `#tag` branch, so the same broken input gets the same
+ * words wherever it was typed.
  */
-export type TagLookupTarget = 'player' | 'clan';
+export type TagRejectReason = Exclude<Exclude<NormalizeTagResult, { ok: true }>['reason'], 'empty'>;
+
+/**
+ * User-facing sentences for {@link TagRejectReason}. The `empty` case is
+ * deliberately absent: only the box knows what else it accepts (the clan
+ * bar also takes names), so each box words its own empty prompt and falls
+ * back to this table for everything else.
+ */
+export const TAG_REJECT_COPY: Record<TagRejectReason, string> = {
+  too_short: 'Tags are at least three characters.',
+  too_long: 'Tags are at most twenty characters.',
+  bad_chars: 'Tags use letters and numbers only.',
+};
 
 /**
  * Normalizes a raw tag the way SR-13 requires: trim, prepend `#` if the
@@ -96,19 +111,11 @@ export function playerRouteFor(tag: string): string {
 
 /**
  * Builds the clan route for a canonical tag, the same contract
- * {@link playerRouteFor} gives the player target: /clan/<encoded tag>. The
- * search result cards link through this too, so the clan URL is assembled
- * in exactly one place, the same way the player URL is.
+ * {@link playerRouteFor} gives the player target: /clan/<encoded tag>. Two
+ * callers share it so the clan URL is assembled in exactly one place, the
+ * same way the player URL is: the search result cards, and the clan search
+ * bar when its input is a #tag instead of a name.
  */
 export function clanRouteFor(tag: string): string {
   return `/clan/${encodeTagForRoute(tag)}`;
-}
-
-/**
- * The one route builder the tag box calls: maps the selected target to its
- * route. Both branches go through {@link encodeTagForRoute}, so the `#` is
- * always encoded no matter which screen the tag opens.
- */
-export function lookupRouteFor(target: TagLookupTarget, tag: string): string {
-  return target === 'player' ? playerRouteFor(tag) : clanRouteFor(tag);
 }

@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   clanRouteFor,
   encodeTagForRoute,
-  lookupRouteFor,
   normalizeTagInput,
   playerRouteFor,
+  TAG_REJECT_COPY,
   type NormalizeTagResult,
 } from './tag';
 
@@ -84,17 +84,14 @@ describe('clanRouteFor', () => {
   });
 });
 
-describe('lookupRouteFor', () => {
-  it('routes the player target to the player screen', () => {
-    expect(lookupRouteFor('player', '#ABC123')).toBe('/player/%23ABC123');
-  });
-
-  it('routes the clan target to the clan screen', () => {
-    expect(lookupRouteFor('clan', '#ABC123')).toBe('/clan/%23ABC123');
-  });
-
-  it('agrees with the single-purpose builders for both targets', () => {
-    expect(lookupRouteFor('player', '#JGYCPCUJ')).toBe(playerRouteFor('#JGYCPCUJ'));
-    expect(lookupRouteFor('clan', '#2CJPGCLUC')).toBe(clanRouteFor('#2CJPGCLUC'));
+describe('TAG_REJECT_COPY', () => {
+  it('words every rule-based reject reason (the empty prompt is per-box)', () => {
+    // The keys mirror the normalizer's non-empty reasons; the empty case is
+    // deliberately each box's own sentence, so it must NOT be in the table.
+    expect(Object.keys(TAG_REJECT_COPY).sort()).toEqual(['bad_chars', 'too_long', 'too_short']);
+    for (const sentence of Object.values(TAG_REJECT_COPY)) {
+      expect(sentence.length).toBeGreaterThan(0);
+      expect(sentence.endsWith('.')).toBe(true);
+    }
   });
 });

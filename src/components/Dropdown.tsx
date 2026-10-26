@@ -48,11 +48,6 @@ export interface DropdownOption<V> {
 interface DropdownProps<V> {
   /** Micro label above the control, e.g. "Minimum members". */
   label: string;
-  /** Render the label visually hidden instead of above the trigger, for
-   * inline use where the surrounding control already shows a label. The
-   * hidden text still names the control for screen readers, so the ARIA
-   * wiring (aria-labelledby) is identical either way. */
-  hideLabel?: boolean;
   /** Closed option set; convention is an "Any" (undefined) first option. */
   options: ReadonlyArray<DropdownOption<V>>;
   /** Currently selected value; should match one of the options. */
@@ -63,7 +58,6 @@ interface DropdownProps<V> {
 
 export default function Dropdown<V>({
   label,
-  hideLabel = false,
   options,
   value,
   onSelect,
@@ -266,7 +260,7 @@ export default function Dropdown<V>({
 
   return (
     <View style={styles.wrap}>
-      <Text nativeID={labelId} style={hideLabel ? styles.labelHidden : styles.label}>
+      <Text nativeID={labelId} style={styles.label}>
         {label}
       </Text>
       <Pressable
@@ -312,17 +306,6 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       color: c.textMuted,
       textTransform: 'uppercase',
       letterSpacing: 0.6,
-    },
-    // The same label, clipped to a single invisible pixel for inline use.
-    // position:absolute plus a 1x1 box keeps it out of layout entirely, and
-    // the text still reaches assistive tech, which is the point: hiding the
-    // label visually must not unname the control.
-    labelHidden: {
-      position: 'absolute',
-      width: 1,
-      height: 1,
-      opacity: 0,
-      overflow: 'hidden',
     },
     // The trigger reads as the same control family as the name input: input
     // chrome, 44px tall, no pill, value text left-aligned.
