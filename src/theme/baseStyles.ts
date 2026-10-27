@@ -80,6 +80,19 @@ export function createBaseStyles(t: ThemeTokens) {
       borderBottomColor: c.hairline,
     },
 
+    // The state matrix panel (06 section 3): the quiet panel every idle,
+    // empty, and error state renders on. The kit state components
+    // (EmptyState, ErrorState) compose it with their own layout styles.
+    statePanel: {
+      alignSelf: 'stretch',
+      gap: t.spacing[3],
+      padding: t.spacing[6],
+      borderRadius: t.radius[2],
+      borderWidth: 1,
+      borderColor: c.panelBorder,
+      backgroundColor: c.panel,
+    },
+
     divider: {
       height: 1,
       backgroundColor: c.hairline,

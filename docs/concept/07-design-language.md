@@ -158,6 +158,7 @@ overscroll.
 | `SearchBar` + `FilterRow` | home screen query controls; the search bar takes a clan name or a `#tag`, the filters render as `Dropdown`s |
 | `Dropdown` | select-style control built on RN primitives: button trigger, portaled `listbox`, keyboard-complete (arrows, Enter, Escape, Home/End) |
 | `TagInput` | the player tag box: /player/:tag routing, through the one tag module ([03 §2](./03-features-list.md)) |
+| `PillButton` | the one pill button: search, retry, and footer-link actions all render it; primary gold, secondary raised panel, link role with the trailing arrow for footer-style links |
 | `ClanCard` | search result row: badge, level, members, location |
 | `StatChip` | label + value pair used on every header |
 | `RatioFlag` | donation-balance chip (good/warn/dash states) |
@@ -171,7 +172,9 @@ overscroll.
 | `WarResultChip` | win/loss/tie pill |
 | `CompareRow` | metric row with both values + delta arrow |
 | `Legend` | the ONE chart legend pattern, all charts use it, no exceptions |
-| `Skeleton`, `EmptyState`, `ErrorState` | the state matrix ([06 §3](./06-data-flow-and-caching.md)), shared |
+| `SkeletonCard` | card-shaped loading skeleton, layout-matched to `ClanCard`; more shapes land with the screens that need them |
+| `EmptyState` | the idle and empty states of the state matrix ([06 §3](./06-data-flow-and-caching.md)): title, body, optional next action |
+| `ErrorState` | the error state of the matrix: tone dot, title, body, next action, `role=alert` |
 
 ## 5. Charts
 
