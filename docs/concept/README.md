@@ -18,6 +18,7 @@ doc here is incomplete ([08 §"Definition of done" #5](./08-roadmap.md)).
 | 06 | [Data flow & caching](./06-data-flow-and-caching.md) | Request lifecycle, cache layers, state matrix, the no-database decision |
 | 07 | [Design language](./07-design-language.md) | Tokens, layout rules, component kit, accessibility |
 | 08 | [Roadmap](./08-roadmap.md) | Milestones, team split, risk register, definition of done |
+| 09 | [Coding standards](./09-coding-standards.md) | The STD rules: naming, file placement, components, styles, state, errors, and the review checklist |
 
 ## Conventions
 
