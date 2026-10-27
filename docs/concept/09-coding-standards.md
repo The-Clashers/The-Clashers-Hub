@@ -18,8 +18,7 @@ paid down (section 10), not excused.
 
 Every rule carries an ID (STD-nn) so a review comment can cite the exact
 rule the way requirement reviews cite FR and SR IDs. The rules bind all new
-code immediately; the current search screen is the named exception until
-its split lands.
+code immediately.
 
 ## 1. Naming
 
@@ -75,8 +74,8 @@ nothing invented in a screen.
 | ID | Rule |
 |---|---|
 | STD-20 | Every color, spacing step, radius, font size, family, and weight comes from `src/theme/tokens.ts`. Raw hex exists in exactly one file in the repo: `tokens.ts`. A screen needing a value the tokens lack adds the token and the 07 section 2 row in the same PR. |
-| STD-21 | No magic pixel numbers. A bare number in a style needs one of two things: a name (a local constant or a token) or a comment saying why that exact size. The current offenders are named in section 10 so the fix is bounded. |
-| STD-22 | Shared chrome is used, not re-derived. The pill button, the focus ring, the 44 px touch target, and the panel pair exist as base styles or kit components. The current tree re-derives the pill button three times, the focus ring twelve times, and the touch target ten times; that is the debt being paid, not the pattern to follow. |
+| STD-21 | No magic pixel numbers. A bare number in a style needs one of two things: a name (a local constant or a token) or a comment saying why that exact size. The search screen's offenders were named and resolved in the session 18 split. |
+| STD-22 | Shared chrome is used, not re-derived. The pill button, the focus ring, the 44 px touch target, the panel pair, and the state panel exist as base styles or kit components. The search screen once re-derived the pill button three times, the focus ring twelve times, and the touch target ten times; the split collapsed them, and re-deriving them again is the pattern this rule exists to stop. |
 | STD-23 | Screen-specific styles live in that screen's (or component's) own `createStyles(theme)`, built once per theme with `useMemo`, keys in camelCase grouped by section with a short comment per group. |
 | STD-24 | Responsive behavior composes from flexbox the way the filter grid does (one flexBasis, wrapping cells, no breakpoint JS and no media queries). |
 | STD-25 | Dark mode is not a second stylesheet. The same style code runs against both themes because every value is a token; if a style needs to know which theme is active beyond what tokens give it, that is a design smell to raise in 07, not a workaround to hide in code. |
@@ -123,10 +122,10 @@ in a diff is a blocking review comment citing the STD row, not a nit.
 
 | Smell | This repo's shape | Fixed by |
 |---|---|---|
-| Long file | A 1018-line screen carrying a screen, seven child components, and a 345-line stylesheet | STD-07, STD-15, section 10 |
-| Duplicate code | Three pill-button styles, twelve focus-ring copies, a skeleton card that duplicates the card chrome | STD-22, kit components |
+| Long file | A screen that fetches, renders, and carries its own private component kit; the search screen's 1018-line shape was split in session 18, and the review surfaces still holding the pattern are bounded in section 10 | STD-07, STD-15, section 10 |
+| Duplicate code | The same pill button, focus ring, or panel chrome derived in several places instead of coming from the kit and base styles | STD-22, kit components |
 | Style prop threading | Whole stylesheets passed as props so children can paint | STD-13 |
-| Magic numbers | 48, 140, 200, 280, 88, 240, 0.6 floating in styles with no name or reason | STD-21, STD-28 |
+| Magic numbers | Bare pixel numbers floating in styles with no name or reason | STD-21, STD-28 |
 | God module | A screen that fetches, normalizes, computes, formats, and renders | STD-07, STD-09 |
 | Shotgun surgery | A rule change that must be edited in several files (tag wording once lived in two places) | STD-30, one module per rule |
 | Dead or stale comments | A comment describing yesterday's behavior | STD-29 |
@@ -144,39 +143,26 @@ locally, not just in CI, before the PR is opened.
 
 ## 10. Paying down the drift
 
-The standards above bind new code now. The existing tree carries known
-violations, inventoried here so the debt is visible and bounded rather than
-vague:
+The standards above bind new code now. The first and largest debt is
+paid; the rest is inventoried so it stays visible and bounded:
 
-- `SearchScreen.tsx` (1018 lines): seven reusable pieces trapped in the
-  screen file, style threading into every one of them, and the triplicated
-  pill button. The 07 section 4 inventory already names `ClanCard`,
-  `StatChip`, `Skeleton`, `EmptyState`, and `ErrorState` as shared kit;
-  the code has not delivered them yet.
-- `HelloClanScreen.tsx` (505 lines) and `TokenScreen.tsx` (591 lines): the
-  same threading pattern, at review-surface scale.
-- Magic numbers in the search styles: the 48 px badge slot, the 140 filter
-  flexBasis, the 200 and 280 px skeleton lines, the 88 and 240 px minimum
-  widths, the 0.6 letter-spacing, and one literal 9999 that should be
-  `t.radius.pill`.
+- The search screen split landed (session 18): `ClanCard`, `StatChip`,
+  `SkeletonCard`, `EmptyState`, `ErrorState`, and `PillButton` live in
+  `src/components/`, the style threading is deleted, the three pill
+  buttons are one, the magic numbers moved into the components that own
+  them as named constants, and the war frequency labels moved into
+  `lib/war-frequency.ts` so the filter dropdown and the card's War stat
+  read from one table. Behavior is unchanged; the golden path walkthrough
+  and the test suite are the proof. `SearchScreen.tsx` went from 1018
+  lines to 574.
+- `HelloClanScreen.tsx` (505 lines) and `TokenScreen.tsx` (591 lines)
+  keep the threading pattern; they are internal review surfaces, and
+  their cleanup rides the next card that touches each file, never a
+  dedicated card of their own.
+- Every later screen follows the standards outright; no screen inherits
+  an exemption.
 
-Pay-down policy, in priority order:
-
-1. The search screen split is its own card before T-M1-3 lands, because the
-   clan detail screen built on top of the current file would copy the exact
-   shape being paid down. The split moves the promoted pieces into
-   `src/components/`, deletes the threading, and collapses the three buttons
-   into one kit button. Behavior must not change; the golden path
-   walkthrough and the test suite are the proof.
-2. Every later screen follows the standards outright; no screen inherits an
-   exemption.
-3. `HelloClanScreen` and `TokenScreen` are internal review surfaces; their
-   cleanup rides the next card that touches each file, and never a dedicated
-   card of their own.
-4. Magic numbers resolve during the split (they move into the components
-   that own them, as named constants or tokens).
-
-Refactoring follows session 11's safe order: understand the behavior, make
-one focused change, run the tests, confirm the golden path on the preview
-deploy, commit. No big-bang rewrite; the working screen keeps working while
-its file gets smaller.
+Refactoring follows session 11's safe order: understand the behavior,
+make one focused change, run the tests, confirm the golden path on the
+preview deploy, commit. No big-bang rewrite; the working screen keeps
+working while its file gets smaller.
