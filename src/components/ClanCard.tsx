@@ -3,6 +3,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../theme';
 import StatChip from './StatChip';
 import { warFrequencyLabel } from '../lib/war-frequency';
+import { linkEnterActivation } from '../lib/link-activation';
 import type { SearchClanItem } from '../api/search';
 
 // The search result row (07 section 4): badge, name + tag, and the four
@@ -29,6 +30,9 @@ export default function ClanCard({ clan, onPress }: ClanCardProps) {
       accessibilityLabel={`${clan.name}, level ${clan.clanLevel}, ${clan.members} members`}
       accessibilityHint="Opens the clan detail screen."
       onPress={onPress}
+      // Enter activation for the keyboard golden path: the responder never
+      // calls onPress for role=link elements (lib/link-activation.ts).
+      onKeyDown={linkEnterActivation(onPress)}
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
     >
       {badgeUri ? (
