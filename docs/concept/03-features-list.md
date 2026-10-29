@@ -74,7 +74,9 @@ error (upstream busy / not found), empty
   location, requirements, war frequency), stat chips (members, win streak,
   war wins, points), tab bar, roster table.
 - **Roster:** columns role / TH / trophies / league / donations / received /
-  XP / war-preference; ratio flag chip per row; summary strip (average TH,
+  XP (war-preference is not in the clan response, and SR-09 forbids
+  per-member fetches, so it renders only where the player payload is
+  already in hand); ratio flag chip per row; summary strip (average TH,
   total donations, flagged count); needs-attention sort.
 - **Player detail:** header (name, tag, TH, league, XP, clan role), rushed
   panel (overall gauge + category bars + top-deficit list), progression grid

@@ -1,15 +1,33 @@
-import { useMemo } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import {
+  FlatList,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { useParams, useSearchParams, useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { useTheme, createBaseStyles } from '../theme';
+import { useTheme, createBaseStyles, breakpointFor } from '../theme';
 import { ThemeToggle } from '../components/ThemeToggle';
 import StatChip from '../components/StatChip';
 import ErrorState from '../components/ErrorState';
 import EmptyState from '../components/EmptyState';
 import PillButton from '../components/PillButton';
-import { fetchClan, ClanFetchError } from '../api/clan';
+import RosterTable from '../components/RosterTable';
+import RosterCard from '../components/RosterCard';
+import { fetchClan, ClanFetchError, type ClanMember } from '../api/clan';
 import { warFrequencyLabel } from '../lib/war-frequency';
+import { playerRouteFor } from '../lib/tag';
+import {
+  CLAN_ORDER,
+  nextRosterSortState,
+  sortRoster,
+  type RosterSortKey,
+  type RosterSortState,
+} from '../lib/roster-sort';
 
 // The clan detail screen (T-M1-3, FR-03, SR-10). The search result cards and
 // the search bar's #tag path both land here. The screen owns layout and the
@@ -17,18 +35,17 @@ import { warFrequencyLabel } from '../lib/war-frequency';
 // StatChip for the stat row, ErrorState for the contract's three failure
 // kinds, EmptyState for the designed "this tab lands later" placeholder,
 // PillButton for the retry and back-to-search actions, ThemeToggle for the
-// header. Every state the design language requires is designed (06 section
-// 3): a layout-matched loading skeleton, the contract's three error states
-// (not_found, busy, unreachable) plus bad_request, and the success state with
-// the identity block, the stat chips, and the tab bar.
+// header, RosterTable and RosterCard for the Roster tab (T-M1-4). Every
+// state the design language requires is designed (06 section 3): a
+// layout-matched loading skeleton, the contract's three error states
+// (not_found, busy, unreachable) plus bad_request, and the success state
+// with the identity block, the stat chips, the tab bar, and the roster.
 //
 // The tab bar reads `?tab=` from the URL (03 section 2 "Screens & URLs") so a
 // deep link to the War or Log tab is shareable (F-12). Roster is the default
-// when the param is absent or holds an unknown value. The tab content itself
-// is a designed placeholder for this card: the roster table lands in T-M1-4,
-// the War and Log views land in M3. The identity block and the stat chips
-// above the tabs are this card's full scope; the placeholders make clear what
-// lands where so the screen is reviewable end to end today.
+// when the param is absent or holds an unknown value. The War and Log tabs
+// keep their designed placeholders until M3; the Roster tab renders the real
+// roster from the same single clan fetch (SR-09).
 
 // ---------- tab bar ----------
 
@@ -52,6 +69,12 @@ function tabFromValue(raw: string | null): ClanTab {
 // The client staleTime mirrors the tier's 180 s clan TTL (SR-09) so the two
 // cache layers decay together, the same pairing the hello screen uses.
 const CLAN_STALE_TIME_MS = 180_000;
+
+// The roster region's height floor: small enough that the identity block
+// and stat row keep their room on a laptop, tall enough that the roster's
+// own scroll window stays usable (about six rows). Below it the page grows
+// instead, the same trade the search screen's results area makes.
+const ROSTER_REGION_MIN_HEIGHT = 320;
 
 export default function ClanScreen() {
   const { theme } = useTheme();
@@ -141,7 +164,11 @@ export default function ClanScreen() {
 
           {query.isSuccess ? (
             <View style={styles.tabContent}>
-              <TabPlaceholder tab={activeTab} />
+              {activeTab === 'roster' ? (
+                <RosterSection members={query.data.memberList ?? []} />
+              ) : (
+                <TabPlaceholder tab={activeTab} />
+              )}
             </View>
           ) : null}
 
@@ -400,26 +427,99 @@ function TabButton({ label, active, onPress, styles }: TabButtonProps) {
   );
 }
 
-// ---------- tab content placeholder ----------
+// ---------- roster tab (T-M1-4, FR-04, SR-11, NFR-05) ----------
 
-interface TabPlaceholderProps {
-  tab: ClanTab;
+// The card list keeps the search screen's virtualization tuning: cards are
+// the cheaper row, so a smaller initial window still fills a phone screen.
+const INITIAL_CARDS_TO_RENDER = 8;
+const CARDS_PER_BATCH = 12;
+
+interface RosterSectionProps {
+  members: ClanMember[];
 }
 
-function TabPlaceholder({ tab }: TabPlaceholderProps) {
-  // The tab content lands in later cards: the roster table in T-M1-4, the
-  // War and Log views in M3. The placeholder is designed (06 section 3
-  // "empty"): titled, explained, and pointing at the card that fills it, so
-  // the screen reads end to end today and a reviewer knows what is missing
-  // by design rather than by oversight.
-  if (tab === 'roster') {
+function RosterSection({ members }: RosterSectionProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createRosterStyles(theme), [theme]);
+  const navigate = useNavigate();
+  // Tap-through goes through the one tag module (SR-13) so the URL is
+  // built exactly like every other player link in the app.
+  const openMember = (tag: string) => {
+    navigate(playerRouteFor(tag));
+  };
+
+  // Sort is view state, not route state (the URL map documents only ?tab=),
+  // so it lives here in useState and resets when the visitor leaves the
+  // screen. The ordering rule itself is lib/roster-sort.ts, pure and tested.
+  const [sort, setSort] = useState<RosterSortState>(CLAN_ORDER);
+  // The presentation switch (NFR-05): a real table at 768 px and up, one
+  // card per member below it. Read through useWindowDimensions into the
+  // breakpoints helper, never CSS media queries (07 section 3).
+  const { width } = useWindowDimensions();
+  const breakpoint = breakpointFor(width);
+  const isCardPresentation = breakpoint === 'small' || breakpoint === 'mobile';
+
+  const sortedMembers = useMemo(() => sortRoster(members, sort), [members, sort]);
+
+  const handleColumnPress = (key: RosterSortKey) => {
+    setSort((previous) => nextRosterSortState(key, previous));
+  };
+
+  // A clan always carries at least one member in a healthy payload; an
+  // empty roster is the designed empty state, not an error (06 section 3).
+  if (sortedMembers.length === 0) {
     return (
       <EmptyState
-        title="Roster lands next"
-        body="The roster table (sortable columns, donation flags, tap-through to the player) is T-M1-4. The clan response already carries the full member list, so this tab reads from the same single fetch."
+        title="No members to show"
+        body="The clan data came back without any member rows. That is unusual for a live clan; heading back to search and reopening the clan usually clears it."
+        action={
+          <PillButton
+            label="Back to search"
+            role="link"
+            arrow
+            variant="secondary"
+            onPress={() => navigate('/')}
+          />
+        }
       />
     );
   }
+
+  if (isCardPresentation) {
+    return (
+      <FlatList
+        data={sortedMembers}
+        keyExtractor={(member) => member.tag}
+        renderItem={({ item }) => <RosterCard member={item} onPress={openMember} />}
+        initialNumToRender={INITIAL_CARDS_TO_RENDER}
+        maxToRenderPerBatch={CARDS_PER_BATCH}
+        contentContainerStyle={styles.rosterListContent}
+        style={styles.rosterList}
+      />
+    );
+  }
+
+  return (
+    <RosterTable
+      members={sortedMembers}
+      sort={sort}
+      onPressColumn={handleColumnPress}
+      onPressMember={openMember}
+    />
+  );
+}
+
+// ---------- tab content placeholder ----------
+
+interface TabPlaceholderProps {
+  tab: Exclude<ClanTab, 'roster'>;
+}
+
+function TabPlaceholder({ tab }: TabPlaceholderProps) {
+  // The War and Log views land in M3. The placeholder is designed (06
+  // section 3 "empty"): titled, explained, and pointing at the milestone
+  // that fills it, so the screen reads end to end today and a reviewer
+  // knows what is missing by design rather than by oversight.
   if (tab === 'war') {
     return (
       <EmptyState
@@ -437,6 +537,21 @@ function TabPlaceholder({ tab }: TabPlaceholderProps) {
 }
 
 // ---------- styles ----------
+
+// The roster section's own styles (STD-13): it builds them from the theme
+// like any component, never receives the screen's stylesheet as a prop.
+function createRosterStyles(t: ReturnType<typeof useTheme>['theme']) {
+  return StyleSheet.create({
+    // The card list's scroll container; the table presentation brings its
+    // own inside RosterTable.
+    rosterList: {
+      flex: 1,
+    },
+    rosterListContent: {
+      paddingBottom: t.spacing[6],
+    },
+  });
+}
 
 function createStyles(t: ReturnType<typeof useTheme>['theme']) {
   const c = t.colors;
@@ -615,8 +730,13 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontWeight: t.fontWeight.semibold,
     },
 
-    // tab content
+    // tab content: flexes to fill the screen's remaining height so the
+    // roster's FlatList can own scrolling (the search screen's resultsArea
+    // does the same), with a floor so the roster stays usable on short
+    // viewports; below the floor the page grows instead (NFR-05).
     tabContent: {
+      flex: 1,
+      minHeight: ROSTER_REGION_MIN_HEIGHT,
       marginTop: t.spacing[4],
     },
 
