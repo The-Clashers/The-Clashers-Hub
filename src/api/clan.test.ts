@@ -24,7 +24,24 @@ describe('fetchClan', () => {
     description: 'A clan of shadows and moonlight.',
     clanLevel: 11,
     members: 7,
-    memberList: [{ tag: '#YPCC8QYU2', name: 'Yeon' }],
+    memberList: [
+      {
+        tag: '#YPCC8QYU2',
+        name: 'Yeon',
+        role: 'coLeader',
+        expLevel: 189,
+        townHallLevel: 15,
+        trophies: 5312,
+        donations: 1043,
+        donationsReceived: 872,
+        clanRank: 2,
+        league: {
+          id: 29000022,
+          name: 'Legend League',
+          iconUrls: { small: 's.png', medium: 'm.png', large: 'l.png' },
+        },
+      },
+    ],
     badgeUrls: { small: 's.png', medium: 'm.png', large: 'l.png' },
     location: { id: 32000006, name: 'International', isCountry: false },
     requiredTrophies: 5000,
@@ -55,7 +72,23 @@ describe('fetchClan', () => {
       description: 'A clan of shadows and moonlight.',
       clanLevel: 11,
       members: 7,
-      memberList: [{ tag: '#YPCC8QYU2', name: 'Yeon' }],
+      memberList: [
+        {
+          tag: '#YPCC8QYU2',
+          name: 'Yeon',
+          role: 'coLeader',
+          expLevel: 189,
+          townHallLevel: 15,
+          trophies: 5312,
+          donations: 1043,
+          donationsReceived: 872,
+          clanRank: 2,
+          league: {
+            name: 'Legend League',
+            iconUrls: { small: 's.png', medium: 'm.png', large: 'l.png' },
+          },
+        },
+      ],
       badgeUrls: { small: 's.png', medium: 'm.png', large: 'l.png' },
       location: { id: 32000006, name: 'International', isCountry: false },
       requirements: {
@@ -98,6 +131,94 @@ describe('fetchClan', () => {
     expect(clan.warWinStreak).toBe(0);
     expect(clan.warWins).toBe(0);
     expect(clan.clanPoints).toBe(0);
+  });
+
+  it('degrades member rows whose optional fields are missing', async () => {
+    const fetchImpl = (async () =>
+      stubResponse(200, {
+        tag: '#X',
+        name: 'Sparse',
+        clanLevel: 1,
+        members: 1,
+        requiredTrophies: 0,
+        age: 0,
+        memberList: [{ tag: '#ONLYTAG' }],
+      })) as typeof fetch;
+
+    const clan = await fetchClan('#X', { fetchImpl });
+
+    expect(clan.memberList).toEqual([
+      {
+        tag: '#ONLYTAG',
+        name: '',
+        role: 'member',
+        expLevel: 0,
+        townHallLevel: 0,
+        trophies: 0,
+        donations: 0,
+        donationsReceived: 0,
+        league: undefined,
+      },
+    ]);
+  });
+
+  it('drops member rows that cannot be linked (no tag, or not objects)', async () => {
+    const fetchImpl = (async () =>
+      stubResponse(200, {
+        tag: '#X',
+        name: 'Junky',
+        clanLevel: 1,
+        members: 3,
+        requiredTrophies: 0,
+        age: 0,
+        memberList: [{ name: 'NoTag' }, 'a string', null, { tag: '#REAL', name: 'Real' }],
+      })) as typeof fetch;
+
+    const clan = await fetchClan('#X', { fetchImpl });
+
+    expect(clan.memberList?.map((member) => member.tag)).toEqual(['#REAL']);
+  });
+
+  it('parses an empty league object (unranked member) to undefined', async () => {
+    const fetchImpl = (async () =>
+      stubResponse(200, {
+        tag: '#X',
+        name: 'Unranked',
+        clanLevel: 1,
+        members: 1,
+        requiredTrophies: 0,
+        age: 0,
+        memberList: [
+          { tag: '#U1', league: {} },
+          { tag: '#U2', league: null },
+          { tag: '#U3', league: { name: 'Gold League' } },
+        ],
+      })) as typeof fetch;
+
+    const clan = await fetchClan('#X', { fetchImpl });
+
+    expect(clan.memberList?.map((member) => member.league?.name)).toEqual([
+      undefined,
+      undefined,
+      'Gold League',
+    ]);
+  });
+
+  it('keeps an empty memberList as an empty array, not undefined', async () => {
+    const fetchImpl = (async () =>
+      stubResponse(200, {
+        tag: '#X',
+        name: 'Empty',
+        clanLevel: 1,
+        members: 0,
+        requiredTrophies: 0,
+        age: 0,
+        memberList: [],
+      })) as typeof fetch;
+
+    const clan = await fetchClan('#X', { fetchImpl });
+
+    expect(clan.memberList).toEqual([]);
   });
 
   it('keeps requiredTrophies and warFrequency readable when only those are set', async () => {
