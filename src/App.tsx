@@ -8,7 +8,6 @@ import PlayersScreen from './screens/PlayersScreen';
 import ContributorsScreen from './screens/ContributorsScreen';
 import CompareScreen from './screens/CompareScreen';
 import TokenScreen from './screens/TokenScreen';
-import HelloClanScreen from './screens/HelloClanScreen';
 
 // The URL map is a product feature (shareable links), documented in the
 // feature list. The owner's nav revision splits the old entry route into
@@ -23,8 +22,10 @@ import HelloClanScreen from './screens/HelloClanScreen';
 // `#` stays hidden, re-attached in exactly one place, lib/tag.ts).
 // Compare gets its landing route here; the player and clan compare
 // sub-routes land with the compare screens themselves. The /tokens route
-// is a review surface for T-M0-2 and /hello is the T-M0-5 milestone smoke
-// surface; both stay in place for design QA on the preview deploy.
+// is a review surface for T-M0-2 and stays linked from the contributors
+// page (the owner's call); the /hello M0 smoke screen is gone, the real
+// /clan/:tag screen renders everything it used to render (the owner's
+// duplicate-surface note).
 export default function App() {
   return (
     <>
@@ -38,7 +39,6 @@ export default function App() {
         <Route path="/player/:tag" element={<PlayerScreen />} />
         <Route path="/compare" element={<CompareScreen />} />
         <Route path="/tokens" element={<TokenScreen />} />
-        <Route path="/hello" element={<HelloClanScreen />} />
       </Routes>
     </>
   );

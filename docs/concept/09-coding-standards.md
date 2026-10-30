@@ -155,10 +155,11 @@ paid; the rest is inventoried so it stays visible and bounded:
   read from one table. Behavior is unchanged; the golden path walkthrough
   and the test suite are the proof. `SearchScreen.tsx` went from 1018
   lines to 574.
-- `HelloClanScreen.tsx` (505 lines) and `TokenScreen.tsx` (591 lines)
-  keep the threading pattern; they are internal review surfaces, and
-  their cleanup rides the next card that touches each file, never a
-  dedicated card of their own.
+- `TokenScreen.tsx` (591 lines)
+  keeps the threading pattern; it is an internal review surface, and
+  its cleanup rides the next card that touches the file, never a
+  dedicated card of its own. (The M0 hello screen carried the same
+  debt until its retirement took the file with it.)
 - Every later screen follows the standards outright; no screen inherits
   an exemption.
 

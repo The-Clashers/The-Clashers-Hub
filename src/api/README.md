@@ -8,7 +8,7 @@ for the planned layout.
 
 | File | Calls | Used by |
 |---|---|---|
-| `clan.ts` | `GET /api/clan/:tag` | `screens/HelloClanScreen.tsx` |
+| `clan.ts` | `GET /api/clan/:tag` | `screens/ClanScreen.tsx` |
 | `search.ts` | `GET /api/search?name=…` (+ filters, cursor) | `screens/SearchScreen.tsx` |
 | `locations.ts` | nothing (bundled filter constants, ids verified live) | `screens/SearchScreen.tsx` |
 
