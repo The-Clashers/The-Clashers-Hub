@@ -14,7 +14,8 @@ import type { ClanMember } from '../api/clan';
 // top, the league line under it, then the sortable columns as the same
 // label-above-value StatChips every other header in the app uses. The
 // granularity mirrors ClanCard (one item per component); the screen's card
-// list owns the FlatList.
+// list owns the layout, which renders in page flow like the table does
+// (07 section 3): the browser scrollbar owns the scrolling.
 
 // The league icon slot (07 section 7): API icon in a fixed 24 px box so a
 // slow CDN load never reflows the card.
@@ -33,8 +34,8 @@ export interface RosterCardProps {
 export default function RosterCard({ member, onPress, verdict }: RosterCardProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const leagueName = member.league?.name ?? 'Unranked';
-  const leagueIcon = member.league?.iconUrls?.small;
+  const leagueName = member.leagueTier?.name ?? 'Unranked';
+  const leagueIcon = member.leagueTier?.iconUrls?.small;
   // The whole card is the link, the same contract the table rows and the
   // search result cards use: the label reads the member, the hint says
   // where the tap goes.

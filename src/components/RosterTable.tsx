@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../theme';
 import { clanRoleLabel } from '../lib/clan-role';
 import { linkEnterActivation } from '../lib/link-activation';
@@ -21,10 +21,12 @@ import type { ClanMember } from '../api/clan';
 // whole row, so a screen reader hears the member without cell roles
 // orphaned inside a link.
 //
-// The FlatList owns scrolling (the same deliberate choice the search screen
-// made): virtualization needs the list to be the scroll container, and a
-// 50-member roster is the normal case (07 section 3). The header row docks
-// sticky so the sort controls stay reachable while the roster scrolls.
+// The roster renders in page flow: the rows are plain children of the
+// table panel and the browser scrollbar owns the scrolling. A clan caps at
+// 50 members, so the whole table renders at once with no virtualization
+// and no inner scroll window that fights the page scroll (07 section 3);
+// the paginated search results and the M2 progression grid keep their
+// FlatLists, they are the lists that actually grow.
 
 // Column layouts. The two text columns (name, league) flex; the metric
 // columns take fixed widths so columns of tabular numbers line up without
@@ -50,11 +52,6 @@ const LEAGUE_ICON_SLOT = 24;
 // Micro-label tracking: the one-off 0.6 px tracking the design language
 // pairs with uppercase micro labels (StatChip keeps the same constant).
 const HEADER_LABEL_TRACKING = 0.6;
-
-// Enough roster rows to fill a laptop viewport before the first batch
-// render; a clan caps at 50 members, so the batches stay short.
-const INITIAL_ROWS_TO_RENDER = 12;
-const ROWS_PER_BATCH = 12;
 
 const SORT_ARROW: Record<RosterSortDirection, string> = {
   asc: '↑',
@@ -128,34 +125,24 @@ export default function RosterTable({
   const columns = showRatio ? [...BASE_COLUMNS, RATIO_COLUMN] : BASE_COLUMNS;
 
   return (
-    <View accessibilityRole="grid" accessibilityLabel="Clan roster" style={styles.grid}>
-      <FlatList
-        data={members}
-        keyExtractor={(member) => member.tag}
-        stickyHeaderIndices={[0]}
-        ListHeaderComponent={
-          <HeaderRow
-            styles={styles}
-            sort={sort}
-            onPressColumn={onPressColumn}
-            columns={columns}
-            sortDisabled={sortDisabled}
-          />
-        }
-        renderItem={({ item }) => (
-          <RosterRow
-            member={item}
-            styles={styles}
-            columns={columns}
-            verdict={verdictByTag?.get(item.tag)}
-            onPress={() => onPressMember(item.tag)}
-          />
-        )}
-        initialNumToRender={INITIAL_ROWS_TO_RENDER}
-        maxToRenderPerBatch={ROWS_PER_BATCH}
-        contentContainerStyle={styles.listContent}
-        style={styles.list}
+    <View accessibilityRole="grid" accessibilityLabel="Clan roster" style={styles.table}>
+      <HeaderRow
+        styles={styles}
+        sort={sort}
+        onPressColumn={onPressColumn}
+        columns={columns}
+        sortDisabled={sortDisabled}
       />
+      {members.map((member) => (
+        <RosterRow
+          key={member.tag}
+          member={member}
+          styles={styles}
+          columns={columns}
+          verdict={verdictByTag?.get(member.tag)}
+          onPress={() => onPressMember(member.tag)}
+        />
+      ))}
     </View>
   );
 }
@@ -227,8 +214,8 @@ interface RosterRowProps {
 }
 
 function RosterRow({ member, styles, columns, verdict, onPress }: RosterRowProps) {
-  const leagueName = member.league?.name ?? 'Unranked';
-  const leagueIcon = member.league?.iconUrls?.small;
+  const leagueName = member.leagueTier?.name ?? 'Unranked';
+  const leagueIcon = member.leagueTier?.iconUrls?.small;
   // The whole row is the link (FR-04 "tapping a row opens that player"),
   // so the label reads the full row for screen readers and the hint says
   // where it goes. Same contract as the search result cards.
@@ -325,27 +312,16 @@ function columnStyle(id: ColumnId, styles: ReturnType<typeof createStyles>) {
 function createStyles(t: ReturnType<typeof useTheme>['theme']) {
   const c = t.colors;
   return StyleSheet.create({
-    // The grid wrapper must flex to the bounded tab content so the
-    // ScrollView inside it becomes the scroll container (RN Views do not
-    // shrink by default; without this the roster overflows the region and
-    // the page scrolls instead, losing both virtualization and the sticky
-    // header).
-    grid: {
-      flex: 1,
-    },
-
-    // The table panel: the roster's scroll container, with the header
-    // docking over it.
-    list: {
-      flex: 1,
+    // The table panel: the header row and every body row as plain children
+    // in page flow. The browser scrollbar owns the scrolling (07 section 3),
+    // so the panel just draws its chrome around whatever height the rows
+    // add up to.
+    table: {
       backgroundColor: c.panelRaised,
       borderRadius: t.radius[2],
       borderWidth: 1,
       borderColor: c.panelBorder,
       overflow: 'hidden',
-    },
-    listContent: {
-      paddingBottom: t.spacing[2],
     },
 
     // header row
@@ -358,9 +334,6 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       backgroundColor: c.panel,
       borderBottomWidth: 1,
       borderBottomColor: c.panelBorder,
-      // Docked over the scrolling rows (stickyHeaderIndices), so it needs
-      // to win the paint order and be opaque.
-      zIndex: t.zIndex.sticky,
     },
     headerButton: {
       alignSelf: 'stretch',

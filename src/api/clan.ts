@@ -54,12 +54,25 @@ export interface ClanRequirements {
   warFrequency?: string;
 }
 
-/** The league object the game API nests inside each member row. Unranked
- * players carry an empty league object (or none), which parses to undefined
- * so the roster renders its own "Unranked" quiet value. */
-export interface ClanMemberLeague {
+/** The icon URLs the game API nests inside a league tier. Tier icons come in
+ * two sizes (`small` 125 px, `large` 326 px); the roster renders `small` in
+ * its 24 px slot. */
+export interface LeagueTierIconUrls {
+  small: string;
+  large: string;
+}
+
+/** The ranked-ladder tier the game API nests inside each member row as
+ * `leagueTier`. The 2025 ladder rework replaced the old trophy leagues
+ * (Bronze..Legend, the legacy `league` object the API still returns for
+ * compatibility) with a themed league set plus a rank number baked into the
+ * name ("Electro League 31", "Witch League 18"), which is what the game
+ * shows and what the roster's League column reads. Unranked members carry
+ * the "Unranked" tier; a missing or empty object parses to undefined so the
+ * roster renders its own "Unranked" quiet value. */
+export interface ClanMemberLeagueTier {
   name: string;
-  iconUrls?: ClanBadgeUrls;
+  iconUrls?: LeagueTierIconUrls;
 }
 
 /** One roster row (T-M1-4, FR-04). Only the fields the roster table reads:
@@ -80,8 +93,9 @@ export interface ClanMember {
   /** Position inside the clan, the API's own roster ordering; the sort's
    * primary tiebreak. Optional: a degraded payload may omit it. */
   clanRank?: number;
-  /** Undefined when the member is unranked. */
-  league?: ClanMemberLeague;
+  /** The ranked-ladder tier (new league set + rank). Undefined when the
+   * member carries no tier at all. The legacy `league` object is not read. */
+  leagueTier?: ClanMemberLeagueTier;
 }
 
 /** Shape of a successful /api/clan/:tag response, stripped to what we read. */
@@ -154,17 +168,17 @@ function toClanRequirements(parsed: unknown): ClanRequirements {
   };
 }
 
-function toClanMemberLeague(parsed: unknown): ClanMemberLeague | undefined {
+function toClanMemberLeagueTier(parsed: unknown): ClanMemberLeagueTier | undefined {
   if (!isRecord(parsed)) return undefined;
   const name = typeof parsed.name === 'string' ? parsed.name : '';
-  // Unranked members arrive as an empty league object (or none at all);
-  // without a name there is nothing to display, so the row renders its
-  // quiet "Unranked" value instead.
+  // A member without a tier (or with an empty object) has nothing to
+  // display, so the row renders its quiet "Unranked" value instead. The
+  // real Unranked tier arrives with a name and its own icon and renders
+  // like any other tier.
   if (name === '') return undefined;
   const iconUrls = isRecord(parsed.iconUrls)
     ? {
         small: String(parsed.iconUrls.small ?? ''),
-        medium: String(parsed.iconUrls.medium ?? ''),
         large: String(parsed.iconUrls.large ?? ''),
       }
     : undefined;
@@ -178,7 +192,7 @@ function toClanMember(parsed: unknown): ClanMember | null {
   // it is dropped rather than rendered as a blank unusable row. Everything
   // else degrades to defaults, the same tolerance the clan fields get.
   if (tag === '') return null;
-  const league = toClanMemberLeague(parsed.league);
+  const leagueTier = toClanMemberLeagueTier(parsed.leagueTier);
   return {
     tag,
     name: typeof parsed.name === 'string' ? parsed.name : '',
@@ -189,7 +203,7 @@ function toClanMember(parsed: unknown): ClanMember | null {
     donations: typeof parsed.donations === 'number' ? parsed.donations : 0,
     donationsReceived: typeof parsed.donationsReceived === 'number' ? parsed.donationsReceived : 0,
     clanRank: typeof parsed.clanRank === 'number' ? parsed.clanRank : undefined,
-    league,
+    leagueTier,
   };
 }
 
@@ -258,8 +272,10 @@ function classifyError(status: number, body: unknown): ClanFetchError {
  * response or throws {@link ClanFetchError} for any non-200 outcome.
  *
  * The tag is taken in canonical form (leading #, uppercase); the tier
- * normalizes again cheaply so a stray lowercase still resolves, but the
- * canonical form is what we display and what we put in the URL.
+ * normalizes again cheaply so a stray lowercase still resolves. The
+ * canonical form is what we display and what goes into the tier request
+ * path (`%23`-encoded there); the shareable browser URL carries the bare
+ * tag and is built by lib/tag.ts, not here.
  */
 export async function fetchClan(
   tag: ClanTag,

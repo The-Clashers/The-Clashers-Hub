@@ -35,10 +35,18 @@ describe('fetchClan', () => {
         donations: 1043,
         donationsReceived: 872,
         clanRank: 2,
+        // The 2025 ladder rework: the ranked tier (themed league name plus
+        // rank number) rides in leagueTier; the legacy league object still
+        // arrives but the roster does not read it.
         league: {
           id: 29000022,
           name: 'Legend League',
-          iconUrls: { small: 's.png', medium: 'm.png', large: 'l.png' },
+          iconUrls: { small: 'legacy-s.png', medium: 'legacy-m.png', large: 'legacy-l.png' },
+        },
+        leagueTier: {
+          id: 105000031,
+          name: 'Electro League 31',
+          iconUrls: { small: 'tier-s.png', large: 'tier-l.png' },
         },
       },
     ],
@@ -62,8 +70,9 @@ describe('fetchClan', () => {
 
     const clan = await fetchClan('#2JPCYP98L', { fetchImpl });
 
-    // The fetch URL encodes the # so the router sees one segment, not a
-    // fragment. This is the only place the encoding happens on the client.
+    // The tier request path encodes the # so the server route sees one
+    // segment, not a fragment. This encoding lives on the tier request only:
+    // the shareable browser URL carries the bare tag (lib/tag.ts).
     expect(requested).toBe('/api/clan/%232JPCYP98L');
 
     expect(clan).toEqual({
@@ -83,9 +92,11 @@ describe('fetchClan', () => {
           donations: 1043,
           donationsReceived: 872,
           clanRank: 2,
-          league: {
-            name: 'Legend League',
-            iconUrls: { small: 's.png', medium: 'm.png', large: 'l.png' },
+          // The ranked tier is what the roster reads; the legacy league
+          // object is not part of the parsed shape at all.
+          leagueTier: {
+            name: 'Electro League 31',
+            iconUrls: { small: 'tier-s.png', large: 'tier-l.png' },
           },
         },
       ],
@@ -157,7 +168,7 @@ describe('fetchClan', () => {
         trophies: 0,
         donations: 0,
         donationsReceived: 0,
-        league: undefined,
+        leagueTier: undefined,
       },
     ]);
   });
@@ -179,28 +190,35 @@ describe('fetchClan', () => {
     expect(clan.memberList?.map((member) => member.tag)).toEqual(['#REAL']);
   });
 
-  it('parses an empty league object (unranked member) to undefined', async () => {
+  it('parses tier shapes: empty or missing to undefined, named tiers as-is', async () => {
     const fetchImpl = (async () =>
       stubResponse(200, {
         tag: '#X',
-        name: 'Unranked',
+        name: 'Mixed tiers',
         clanLevel: 1,
-        members: 1,
+        members: 4,
         requiredTrophies: 0,
         age: 0,
         memberList: [
-          { tag: '#U1', league: {} },
-          { tag: '#U2', league: null },
-          { tag: '#U3', league: { name: 'Gold League' } },
+          { tag: '#U1', leagueTier: {} },
+          { tag: '#U2', leagueTier: null },
+          { tag: '#U3', leagueTier: { name: 'Witch League 18' } },
+          // The real Unranked tier carries a name and its own icon; it
+          // renders like any other tier, not as the quiet fallback.
+          {
+            tag: '#U4',
+            leagueTier: { name: 'Unranked', iconUrls: { small: 'u-s.png', large: 'u-l.png' } },
+          },
         ],
       })) as typeof fetch;
 
     const clan = await fetchClan('#X', { fetchImpl });
 
-    expect(clan.memberList?.map((member) => member.league?.name)).toEqual([
+    expect(clan.memberList?.map((member) => member.leagueTier)).toEqual([
       undefined,
       undefined,
-      'Gold League',
+      { name: 'Witch League 18', iconUrls: undefined },
+      { name: 'Unranked', iconUrls: { small: 'u-s.png', large: 'u-l.png' } },
     ]);
   });
 
