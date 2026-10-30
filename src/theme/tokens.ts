@@ -242,6 +242,10 @@ export const motion = {
   normal: 180,
   slow: 240,
   ease: 'cubic-bezier(0.4, 0, 0.2, 1)' as const,
+  // The one ambient motion in the product: the loading skeletons' quiet
+  // opacity loop. It is an affordance (data is on its way), not a
+  // performance, and it is paused entirely under prefers-reduced-motion.
+  pulse: 1200,
 } as const;
 
 // Z-index scale so panels, overlays, and the focus layer stack in a known
