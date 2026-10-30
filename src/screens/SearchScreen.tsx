@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigate, useSearchParams } from 'react-router';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useTheme, createBaseStyles } from '../theme';
@@ -26,15 +26,18 @@ import { LOCATION_FILTERS } from '../api/locations';
 // types a clan name OR pastes a clan tag (the # prefix is what tells the
 // two apart, since names and bare tags share the same alphabet),
 // optionally narrows a name search with the filter row (minimum members,
-// minimum clan level, war frequency, location), submits, and gets a
-// virtualized card list that pages through the upstream cursor as it
-// scrolls. A tag skips the listing entirely and opens the clan detail
-// screen directly, the same destination the result cards link to. The
-// nav lookup box hands name searches to this page through ?name=, which
-// the screen consumes once and then strips so a reload starts idle.
+// minimum clan level, war frequency, location), submits, and gets a card
+// list that pages through the upstream cursor as it scrolls. A tag skips
+// the listing entirely and opens the clan detail screen directly, the
+// same destination the result cards link to. The nav lookup box hands
+// name searches to this page through ?name=, which the screen consumes
+// once and then strips so a reload starts idle.
 //
 // The player tag lookup moved to /players (and the nav box); the brand
-// and the theme toggle moved to the NavBar.
+// and the theme toggle moved to the NavBar; the M0 review-surface links
+// (Hello clan, Review the tokens) retired from this screen's footer on
+// the owner's call, the tokens review now living on the contributors
+// page where design QA actually happens.
 //
 // The screen owns layout, composition, and the route's state; the pieces it
 // renders come from the shared kit (07 section 4): ClanCard, SkeletonCard,
@@ -49,8 +52,12 @@ import { LOCATION_FILTERS } from '../api/locations';
 //   filter combination is a distinct cache key on the tier, so live
 //   re-searching on every change would burn upstream calls the TTL cache
 //   cannot absorb. A "changed since the last search" hint keeps that honest.
-// - The FlatList owns the page scrolling (the header and filter row stay
-//   put) because virtualization needs the list to be the scroll container.
+// - The results render in page flow (the owner's call, the same scroll
+//   model the roster tab uses): the browser scrollbar owns the scrolling,
+//   the page grows as pages append, and a sentinel under the last card
+//   loads the next page when it nears the viewport. The page still lands
+//   30 clans at a time (the tier's page limit), so a first screenful
+//   costs one upstream call and the rest load a few more at the bottom.
 
 // ---------- filter option tables ----------
 
@@ -105,6 +112,10 @@ const SKELETON_CARD_COUNT = 6;
 // Two skeleton cards while the next page loads: enough to say "more of the
 // same is coming" without implying a page size.
 const SKELETON_FOOTER_CARD_COUNT = 2;
+
+// How far below the viewport the load-more sentinel starts pulling the
+// next page, the scroll-ahead the old list's onEndReachedThreshold bought.
+const SENTINEL_LOOKAHEAD = '400px 0px';
 
 // ---------- the screen ----------
 
@@ -244,6 +255,45 @@ export default function SearchScreen() {
       submitted.minClanLevel !== undefined ||
       submitted.warFrequency !== undefined ||
       submitted.locationId !== undefined);
+
+  // ---------- the load-more sentinel ----------
+
+  // The sentinel's DOM id. DOM access goes through nativeID +
+  // getElementById, the house pattern (refs on View fight the RN 0.88
+  // types; see Dropdown's note). The sentinel renders only in the success
+  // branch, under the last card; the observer is recreated whenever the
+  // pagination state moves, and IntersectionObserver fires on creation, so
+  // a bottom that stays in view keeps loading the next page until it
+  // leaves it, the same continuous contract the list's onEndReached kept.
+  const sentinelId = useId();
+  const {
+    hasNextPage,
+    isFetchingNextPage,
+    isFetchNextPageError,
+    fetchNextPage,
+  } = query;
+  useEffect(() => {
+    const node = document.getElementById(sentinelId);
+    if (node === null) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        if (hasNextPage && !isFetchingNextPage && !isFetchNextPageError) {
+          void fetchNextPage();
+        }
+      },
+      { rootMargin: SENTINEL_LOOKAHEAD },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [
+    sentinelId,
+    items.length,
+    hasNextPage,
+    isFetchingNextPage,
+    isFetchNextPageError,
+    fetchNextPage,
+  ]);
 
   return (
     <View style={base.appRoot}>
@@ -389,57 +439,23 @@ export default function SearchScreen() {
                   </Text>
                   <Text style={base.caption}>fetched {firstPageAge}s ago</Text>
                 </View>
-                <FlatList
-                  data={items}
-                  keyExtractor={(item) => item.tag}
-                  renderItem={({ item }) => (
-                    <ClanCard clan={item} onPress={() => navigate(clanRouteFor(item.tag))} />
-                  )}
-                  onEndReached={() => {
-                    if (query.hasNextPage && !query.isFetchingNextPage && !query.isFetchNextPageError) {
-                      void query.fetchNextPage();
-                    }
-                  }}
-                  onEndReachedThreshold={0.4}
-                  initialNumToRender={8}
-                  maxToRenderPerBatch={12}
-                  ListFooterComponent={
-                    <ResultsFooter
-                      hasNextPage={query.hasNextPage ?? false}
-                      isFetchingNextPage={query.isFetchingNextPage}
-                      isFetchNextPageError={query.isFetchNextPageError}
-                      failureReason={query.failureReason}
-                      onRetry={() => void query.fetchNextPage()}
-                    />
-                  }
-                  contentContainerStyle={styles.listContent}
-                  style={styles.list}
+                {/* The results render in page flow: each card is a plain
+                    child of the column, the browser scrollbar owns the
+                    scrolling, and the sentinel under the last card pulls
+                    the next page when it nears the viewport. */}
+                {items.map((item) => (
+                  <ClanCard key={item.tag} clan={item} onPress={() => navigate(clanRouteFor(item.tag))} />
+                ))}
+                <View nativeID={sentinelId} aria-hidden />
+                <ResultsFooter
+                  hasNextPage={query.hasNextPage ?? false}
+                  isFetchingNextPage={query.isFetchingNextPage}
+                  isFetchNextPageError={query.isFetchNextPageError}
+                  failureReason={query.failureReason}
+                  onRetry={() => void query.fetchNextPage()}
                 />
               </>
             )}
-          </View>
-
-          <View style={styles.footer}>
-            <Text style={base.caption}>
-              M0 review surfaces stay reachable from the entry route.
-            </Text>
-            <View style={styles.footerLinkRow}>
-              <PillButton
-                label="Hello, clan"
-                hint="Opens /hello, a hardcoded clan tag rendered from live data."
-                role="link"
-                arrow
-                onPress={() => navigate('/hello')}
-              />
-              <PillButton
-                label="Review the tokens"
-                hint="Opens /tokens, the design token review surface."
-                role="link"
-                arrow
-                variant="secondary"
-                onPress={() => navigate('/tokens')}
-              />
-            </View>
           </View>
         </View>
       </View>
@@ -679,22 +695,16 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       color: c.info,
     },
 
-    // results
+    // results: natural height. The cards render in page flow (the owner's
+    // call, the roster tab's scroll model), so this region grows as tall
+    // as the results run and the browser scrollbar owns the scrolling.
     resultsArea: {
-      flex: 1,
-      minHeight: 240,
       marginTop: t.spacing[5],
     },
     resultsMeta: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       marginBottom: t.spacing[2],
-    },
-    list: {
-      flex: 1,
-    },
-    listContent: {
-      paddingBottom: t.spacing[6],
     },
     skeletonWrap: {
       gap: t.spacing[3],
@@ -703,17 +713,6 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.sm,
       color: c.textMuted,
-    },
-
-    // footer (M0 review surfaces)
-    footer: {
-      marginTop: t.spacing[6],
-      gap: t.spacing[2],
-    },
-    footerLinkRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: t.spacing[3],
     },
   });
 }

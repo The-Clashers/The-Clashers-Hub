@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigate } from 'react-router';
-import { useTheme, createBaseStyles } from '../theme';
+import { useTheme } from '../theme';
 import { normalizeTagInput, playerRouteFor, TAG_REJECT_COPY, type NormalizeTagResult } from '../lib/tag';
 
 // The player tag lookup box (T-M1-2, FR-02, SR-13). The ONE component that
@@ -49,7 +49,6 @@ export interface TagInputProps {
 
 export default function TagInput({ label = 'Player tag', onNavigate, children }: TagInputProps) {
   const { theme } = useTheme();
-  const base = useMemo(() => createBaseStyles(theme), [theme]);
   const styles = useMemo(() => createStyles(theme), [theme]);
   const navigate = useNavigate();
   const go = onNavigate ?? ((route: string) => navigate(route));
@@ -122,15 +121,14 @@ export default function TagInput({ label = 'Player tag', onNavigate, children }:
           {reasonCopy(result.reason)}
         </Text>
       ) : null}
-      <View style={styles.footnoteRow}>
-        <Text style={base.caption}>Player tag shortcut, golden path B.</Text>
-        {/* The counter only speaks near the ceiling. Real tags are 3 to 9
-            characters, so an always-on countdown is noise; ten from the
-            limit it becomes useful. */}
-        {remaining <= 10 ? (
-          <Text style={styles.counter}>{remaining} left</Text>
-        ) : null}
-      </View>
+      {/* The counter only speaks near the ceiling. Real tags are 3 to 9
+          characters, so an always-on countdown is noise; ten from the
+          limit it becomes useful. The tag-shortcut caption that used to
+          share this row retired with the search screen's M0 footer
+          (the owner's call). */}
+      {remaining <= 10 ? (
+        <Text style={styles.counter}>{remaining} left</Text>
+      ) : null}
       {children}
     </View>
   );
@@ -199,12 +197,6 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.sm,
       color: c.warning,
-    },
-    footnoteRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      gap: t.spacing[3],
     },
     counter: {
       fontFamily: t.fontFamily.mono,

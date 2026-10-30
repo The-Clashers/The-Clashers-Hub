@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTheme, createBaseStyles } from '../theme';
 import ErrorState from '../components/ErrorState';
@@ -24,6 +25,11 @@ import {
 // own honest copy (the one failure mode a public, unauthenticated
 // endpoint really has), the unreachable branch with a retry, and the
 // success list. An empty list is a real answer and gets the empty state.
+//
+// The design token review (/tokens) moved here from the search screen's
+// retired M0 footer (the owner's call): it is a maintainer QA surface,
+// so it renders as a quiet footnote link under the list rather than a
+// button competing with the page's content.
 
 // Enough skeleton rows to fill the fold without implying a count.
 const SKELETON_ROWS = 5;
@@ -36,6 +42,7 @@ export default function ContributorsScreen() {
   const { theme } = useTheme();
   const base = useMemo(() => createBaseStyles(theme), [theme]);
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const navigate = useNavigate();
 
   const query = useQuery({
     queryKey: ['contributors'] as const,
@@ -104,6 +111,21 @@ export default function ContributorsScreen() {
               </Text>
             </View>
           )}
+
+          {/* The token review's new home (the owner's call): a quiet
+              footnote link, present in every state, because it is a
+              maintainer surface rather than a visitor action. */}
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel="Design token review"
+            accessibilityHint="Opens the design token review surface."
+            onPress={() => navigate('/tokens')}
+            style={({ pressed }) => [styles.qaLink, pressed && styles.qaLinkPressed]}
+          >
+            <Text style={styles.qaLinkText}>
+              Design token review {'\u2192'}
+            </Text>
+          </Pressable>
         </View>
       </View>
     </View>
@@ -240,6 +262,25 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontSize: t.fontSize.sm,
       color: c.textMuted,
       fontVariant: ['tabular-nums'],
+    },
+    // The QA footnote link: muted text with the kit's arrow, not a pill
+    // button, so it reads as fine print under the content instead of an
+    // action competing with it. The gold focus ring still applies.
+    qaLink: {
+      alignSelf: 'flex-start',
+      marginTop: t.spacing[4],
+      paddingVertical: t.spacing[1],
+      borderRadius: t.radius[1],
+      outlineColor: c.focusRing,
+      outlineOffset: t.layout.focusRingOffset,
+    },
+    qaLinkPressed: {
+      opacity: 0.7,
+    },
+    qaLinkText: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.sm,
+      color: c.textMuted,
     },
   });
 }
