@@ -9,10 +9,10 @@ cross-reference the tracker in [02](./02-requirements-tracker.md).
 | ID | Feature | Priority | Req | Notes |
 |---|---|---|---|---|
 | F-01 | Clan search: name or #tag + filters (min members, min clan level, war frequency, location) | P0 | FR-01 | a leading # routes straight to the clan by tag; filters are optional and narrow name searches; empty name = browse top clans; lives on `/clans`, and the nav lookup hands it names through `?name=` |
-| F-02 | Search results: virtualized card list, badge, level, members, location, war frequency; cursor pagination | P0 | FR-01 | |
+| F-02 | Search results: page-flow card list, badge, level, members, location, war frequency; cursor pagination, 30 per page with a sentinel loading more at the bottom | P0 | FR-01 | |
 | F-03 | Tag lookup: paste-a-tag box (accepts `#ABC123` or `ABC123`, normalized) | P0 | FR-02 | lives on `/players` and inside the nav/home lookup's player mode; the only way to reach a player without a clan; the game has no player search by name |
-| F-04 | Clan detail: two-column identity/stats card + roster | P0 | FR-03 | tabs: Roster / War / Log / Needs Attention; the nav's breadcrumbs locate the page |
-| F-05 | Roster table: sortable, tap-through to player; league rank beside the member; needs-attention view as its own tab | P0 | FR-04, FR-05 | switches to cards below 768px; the cards keep the six sorts through a "Sort by" dropdown and direction toggle (07 section 3) |
+| F-04 | Clan detail: stacked identity + stat-grid card + roster | P0 | FR-03 | tabs: Roster / War / Log / Needs Attention; the nav's breadcrumbs locate the page; the stat grid carries the war log's public/private status |
+| F-05 | Roster table: sortable, tap-through to player; # position column, league rank beside the name; needs-attention view as its own tab | P0 | FR-04, FR-05 | switches to cards below 768px; the cards keep the six sorts through a "Sort by" dropdown and direction toggle (07 section 3) |
 | F-06 | Player detail: profile + rushed analysis + achievements + heroes | P0 | FR-06, FR-07, FR-08, FR-09 | the analysis centerpiece |
 | F-07 | Donation balance: per-member flags + clan-level health summary | P0 | FR-05 | target ratio adjustable client-side |
 | F-08 | Current war view | P1 | FR-10 | standings + per-member table |
@@ -45,7 +45,7 @@ theme toggle, fixed in a thin row at the top like a tracker site.
 | `/clans` | Clan search | search bar (name or #tag), filter row, cursor-paginated results; `?name=` seeds a search once for the nav lookup |
 | `/players` | Player tag lookup | the tag box (F-03), tag-only, with the why explained |
 | `/contributors` | Contributors | the repo's contributor list, read live from GitHub |
-| `/clan/:tag` | Clan detail | two-column details card; breadcrumbs `Home › Clans › <name>`; tabs: Roster (default) / War / Log / Needs Attention; tab via `?tab=` |
+| `/clan/:tag` | Clan detail | stacked details card (identity, description, uniform stat grid); breadcrumbs `Home › Clans › <name>`; tabs: Roster (default) / War / Log / Needs Attention; tab via `?tab=` |
 | `/player/:tag` | Player detail | identity header, rushed analysis, heroes, achievements |
 | `/compare/players?a=:tag&b=:tag` | Player compare | P1 |
 | `/compare/clans?a=:tag&b=:tag` | Clan compare | P1 |
@@ -87,17 +87,20 @@ error (upstream busy / not found), empty
 
 - **Search:** bar + filters + results; handles "no results" with relaxed-filter
   suggestions.
-- **Clan detail:** two-column details card (the owner's layout): identity on
-  the left (badge, name, tag/level/location, description clamped to two
-  lines), a hairline divider, and the stat chips plus join requirements
-  centered on the right; stacked below 768 px. Breadcrumbs above the card
-  (`Home › Clans › <clan name>`) replace the old header and back button.
-- **Roster:** columns rank / member / role / TH / trophies / donations /
+- **Clan detail:** stacked details card (the owner's better-layout call): the
+  identity row (badge, name, tag/level/location), the description clamped to
+  two lines, a hairline divider, then a uniform stat grid of label-above-value
+  cells (four per row from tablet up, two below) carrying the vitals, the war
+  frequency, the war log's public/private status, and the join requirements.
+  Breadcrumbs above the card with a full spacing step of clearance (the
+  owner's spacing note) replace the old header and back button.
+- **Roster:** columns # / rank / name / role / TH / trophies / donations /
   received / XP (war-preference is not in the clan response, and SR-09 forbids
   per-member fetches, so it renders only where the player payload is
-  already in hand); the rank column reads the ranked-ladder tier
-  (`leagueTier`, the new themed league set) as its icon plus the rank number
-  parsed from the tier name, sitting beside the member the way the game
+  already in hand); the # column carries the member's position in the
+  current order (the owner's call); the rank column reads the ranked-ladder
+  tier (`leagueTier`, the new themed league set) as its icon plus the rank number
+  parsed from the tier name, sitting beside the name the way the game
   shows it; the six FR-04 sorts; the roster renders in page flow, the
   browser scrollbar owning the scrolling, no inner scroll window.
 - **Needs Attention tab:** the worst-first donation view with its own table
