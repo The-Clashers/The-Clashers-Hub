@@ -180,8 +180,8 @@ riskiest behaviors (private war logs, key hygiene).
 | ID | Given / When / Then | Verifies |
 |---|---|---|
 | AC-01 | Given a visitor on the search screen, when they type a clan name and submit, then matching clans render as result cards within 2 s from cache, or 5 s on a cold cache | UR-01, FR-01, NFR-02 |
-| AC-02 | Given a clan detail screen with the roster loaded, when the needs-attention toggle is switched on, then members below the donation target are re-ordered worst-first and every flagged row shows the ratio chip | UR-02, FR-05 |
-| AC-03 | Given the tag box on the home screen, when a player tag is pasted without the # prefix, then the app navigates to that player's detail screen and the rushed analysis renders | UR-03, FR-02, FR-07 |
+| AC-02 | Given a clan detail screen with the roster loaded, when the Needs Attention tab is opened, then members below the donation target are ordered worst-first and every row shows the ratio chip, donated, received, and war attacks left | UR-02, FR-05 |
+| AC-03 | Given the tag box (the players page or the nav lookup's player mode), when a player tag is pasted without the # prefix, then the app navigates to that player's detail screen and the rushed analysis renders | UR-03, FR-02, FR-07 |
 | AC-04 | Given the maxed-account fixture, when the rushed analysis runs, then the overall verdict reads maxed with an empty top-deficit list; given a fixture with an active super troop, the normalized level is used | UR-03, FR-07 |
 | AC-05 | Given a clan whose war log is private, when the Log tab opens, then the designed private-log notice is displayed instead of an error state | UR-04, FR-11 |
 | AC-06 | Given the production client bundle, when it is scanned for the API key string, then there are zero occurrences | NFR-04 |

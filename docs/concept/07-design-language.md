@@ -144,10 +144,23 @@ overscroll.
 ## 3. Layout
 
 - Centered content column, max width 1280, side padding from the spacing scale.
-- **Clan detail header:** compact and horizontal. The identity block (badge
-  48, name, tag, level, location, description clamped to two lines) reads
-  left to right, and the stat chips and join requirements merge into one
-  inline details band under it, short height (the owner's layout call).
+- **Global nav bar:** a thin fixed row at the top like a tracker site (the
+  owner's layout): brand, the lookup box (its small icon dropdown picks
+  player or clan), the page links (Home, Players, Clans, Contributors), and
+  the theme toggle. One row at 48 px from 1024 px up; below that a two-row
+  90 px stack (brand + links + toggle, then the lookup full width) so the
+  lookup never squeezes. Fixed, not sticky: a sticky bar is constrained to
+  its containing block, which is exactly viewport-height here. The bar is
+  the compact exception the tab strip already records (07 section 6): the
+  row heights are compact by the owner's call, while every pressable keeps
+  the 44 px floor, keyboard focus, and the gold ring.
+- **Clan detail card:** two columns (the owner's layout from the uploaded
+  wireframe). Identity on the left (badge 48, name, tag/level/location
+  line, description clamped to two lines), a hairline divider, and the
+  stat chips plus join requirements centered on the right; stacked below
+  768 px. Breadcrumbs (`Home › Clans › <clan name>`) sit above the card
+  instead of a screen header, and carry the back path the removed
+  back-to-search button used to.
 - **Roster table ↔ cards:** ≥ 768px a real sortable table; below, one card per
   member with the same columns stacked and a "Sort by" dropdown plus direction
   toggle riding above the list, because FR-04's six sorts carry no width
@@ -155,7 +168,14 @@ overscroll.
   presentations. The roster renders in page flow in both presentations: the
   browser scrollbar owns the scrolling, no inner scroll window boxing the
   list to the viewport (a clan caps at 50 members, the lists that actually
-  grow keep their FlatLists).
+  grow keep their FlatLists). The league column is gone: the rank (tier icon
+  plus the number parsed from the tier name) sits in its own narrow column
+  beside the member, the way the game shows it.
+- **Needs Attention tab ↔ cards:** the worst-first donation view renders its
+  own table (number, rank, name, role, donated, received, ratio, attacks
+  left) with the same 768 px switch to cards. No sort controls: the row
+  order is the engine's judgment. Attacks left reads the current-war
+  endpoint and dashes when there is no war to count.
 - **Player detail:** ≥ 1024px two columns (identity + analysis); stacked below.
 - Breakpoints come from `useWindowDimensions` into a shared `breakpoints`
   helper, no CSS media queries scattered through components; RN paradigm is
@@ -169,15 +189,19 @@ overscroll.
 
 | Component | Purpose |
 |---|---|
-| `AppShell` | top bar (logo, tag-lookup shortcut) + content + footer |
-| `SearchBar` + `FilterRow` | home screen query controls; the search bar takes a clan name or a `#tag`, the filters render as `Dropdown`s |
+| `NavBar` | the thin fixed row every page renders: brand, `LookupSearch`, the page links, the theme toggle, plus the in-flow spacer that reserves its height |
+| `LookupSearch` + `LookupModePicker` | the one search box (nav-thin and hero-sized): the mode picker is the small icon dropdown that says player or clan; player mode is tag-only, clan mode takes a name or `#tag` |
+| `Breadcrumbs` | the location line detail screens render instead of a header: `Home › Clans › <name>`, WAI-ARIA breadcrumb pattern |
+| `SearchBar` + `FilterRow` | clans page query controls; the search bar takes a clan name or a `#tag`, the filters render as `Dropdown`s |
 | `Dropdown` | select-style control built on RN primitives: button trigger, portaled `listbox`, keyboard-complete (arrows, Enter, Escape, Home/End) |
 | `TagInput` | the player tag box: /player/:tag routing, through the one tag module ([03 §2](./03-features-list.md)) |
 | `PillButton` | the one pill button: search, retry, and footer-link actions all render it; primary gold, secondary raised panel, link role with the trailing arrow for footer-style links |
 | `ClanCard` | search result row: badge, level, members, location |
-| `StatChip` | label + value pair used on headers; the clan detail header is the recorded exception, it uses the compact inline details band (07 §3) |
+| `StatChip` | label + value pair used on headers and cards |
 | `RatioFlag` | donation-balance chip: shows the member's `ratio : 1` (one decimal), good/warn/dash states |
+| `LeagueRank` | the rank cell the roster and attention tables share: tier icon plus the rank number parsed from the tier name, dash when unranked |
 | `RosterTable` / `RosterCard` | the clan roster, table & card presentations |
+| `AttentionTable` / `AttentionCard` | the Needs Attention tab's worst-first view, table & card presentations |
 | `ProgressRail` | achievement value/target bar with star markers |
 | `CategoryBars` | rushed per-category horizontal bars |
 | `Gauge` | overall rushed % dial (the flagship number) |
@@ -213,9 +237,11 @@ overscroll.
 - Contrast ≥ 4.5:1 checked against the token pairs during M0 review; muted
   text on panels is the pair most likely to fail, so it's verified first.
 - Touch targets ≥ 44px on the card presentation (phone web is a real target).
-  One recorded exception: the clan detail tab strip runs compact
-  (padding-driven, ~34 px buttons, the owner's call to shave its height); it
-  stays keyboard-focusable with the visible gold ring.
+  Two recorded exceptions, both the owner's call to shave chrome height: the
+  clan detail tab strip runs compact (padding-driven, ~34 px buttons); the
+  nav bar's own rows run thin (48 px desktop / 90 px stacked). Both stay
+  keyboard-focusable with the visible gold ring, and every pressable inside
+  them keeps the 44 px floor.
 
 ## 7. Imagery
 
