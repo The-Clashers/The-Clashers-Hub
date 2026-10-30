@@ -30,6 +30,9 @@ const clan = {
   clanPoints: 41230,
   members: 2,
   warFrequency: 'always',
+  // Surfaced on the clan detail card as the war log status chip; the mock
+  // keeps it public so the card and the warlog route agree locally.
+  isWarLogPublic: true,
   memberList: [
     {
       tag: '#MOCKPLAY',

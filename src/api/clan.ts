@@ -10,14 +10,15 @@
 //
 // The full game API payload has 20+ fields; we model only the ones the hello
 // screen and the M1 clan detail screen (F-04 / SR-10) read: the identity
-// block (badge, name, tag, level, description, location, requirements) and
-// the stat chips (members, win streak, war wins, points). A field the app
-// does not read stays untyped on purpose so a payload change upstream never
-// breaks the build, only the screen that needs the new field. The roster
-// rows (memberList) are typed here as ClanMember since T-M1-4: the roster
-// tab reads them from this same single fetch (SR-09), so the member shape
-// is part of this client's contract, parsed with the same tolerance for
-// missing optional fields the rest of the response gets.
+// block (badge, name, tag, level, description, location, requirements),
+// the stat chips (members, win streak, war wins, points), and the war
+// log's visibility. A field the app does not read stays untyped on purpose
+// so a payload change upstream never breaks the build, only the screen
+// that needs the new field. The roster rows (memberList) are typed here as
+// ClanMember since T-M1-4: the roster tab reads them from this same single
+// fetch (SR-09), so the member shape is part of this client's contract,
+// parsed with the same tolerance for missing optional fields the rest of
+// the response gets.
 
 /** Clan tag in canonical form: leading #, uppercase, matches server/tags.ts. */
 export type ClanTag = string;
@@ -117,6 +118,12 @@ export interface ClanResponse {
   warWins: number;
   /** Total clan trophies (clanPoints in the game API). */
   clanPoints: number;
+  /** Whether the clan's war log is public. The game API's isWarLogPublic:
+   * a public log anyone can read, a private one the warlog route answers
+   * 403 for. The detail card surfaces it as the clan's war log status so a
+   * visitor knows before opening the Log tab whether there is anything to
+   * read. False when a degraded payload omits it. */
+  isWarLogPublic: boolean;
   /** Seconds since the upstream fetch; injected by the tier on every 200. */
   age: number;
 }
@@ -234,6 +241,7 @@ function toClanResponse(parsed: unknown): ClanResponse {
   const warWinStreak = typeof parsed.warWinStreak === 'number' ? parsed.warWinStreak : 0;
   const warWins = typeof parsed.warWins === 'number' ? parsed.warWins : 0;
   const clanPoints = typeof parsed.clanPoints === 'number' ? parsed.clanPoints : 0;
+  const isWarLogPublic = typeof parsed.isWarLogPublic === 'boolean' ? parsed.isWarLogPublic : false;
   return {
     tag,
     name,
@@ -247,6 +255,7 @@ function toClanResponse(parsed: unknown): ClanResponse {
     warWinStreak,
     warWins,
     clanPoints,
+    isWarLogPublic,
     age,
   };
 }
