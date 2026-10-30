@@ -11,16 +11,19 @@ import {
 import { useParams, useSearchParams, useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTheme, createBaseStyles, breakpointFor } from '../theme';
-import { ThemeToggle } from '../components/ThemeToggle';
+import Breadcrumbs from '../components/Breadcrumbs';
 import ErrorState from '../components/ErrorState';
 import EmptyState from '../components/EmptyState';
 import PillButton from '../components/PillButton';
 import RosterTable from '../components/RosterTable';
 import RosterCard from '../components/RosterCard';
+import AttentionTable from '../components/AttentionTable';
+import AttentionCard from '../components/AttentionCard';
 import SkeletonCard from '../components/Skeleton';
 import SkeletonBlock, { useSkeletonPulse } from '../components/SkeletonBlock';
 import Dropdown from '../components/Dropdown';
 import { fetchClan, ClanFetchError, type ClanMember } from '../api/clan';
+import { attacksLeftFor, fetchCurrentWar } from '../api/war';
 import { busyRetryDelayMs, shouldRetryBusy } from '../lib/busy-retry';
 import { warFrequencyLabel } from '../lib/war-frequency';
 import { canonicalTagFromRoute, playerRouteFor } from '../lib/tag';
@@ -43,22 +46,29 @@ import {
 } from '../lib/donation-balance';
 
 // The clan detail screen (T-M1-3, FR-03, SR-10). The search result cards and
-// the search bar's #tag path both land here. The screen owns layout and the
-// route's state; the pieces it renders come from the shared kit (07 section 4):
-// ErrorState for the contract's three failure kinds, EmptyState for the
-// designed "this tab lands later" placeholder, PillButton for the retry and
-// back-to-search actions, ThemeToggle for the header, RosterTable and
-// RosterCard for the Roster tab (T-M1-4). Every state the design language
-// requires is designed (06 section 3): a layout-matched loading skeleton,
-// the contract's three error states (not_found, busy, unreachable) plus
-// bad_request, and the success state with the compact horizontal identity
-// block and its details band, the tab bar, and the roster.
+// the nav lookup's #tag path both land here. The screen owns layout and the
+// route's state; the pieces it renders come from the shared kit (07 section
+// 4): ErrorState for the contract's three failure kinds, EmptyState for the
+// designed "this tab lands later" placeholder, PillButton for the retry
+// action, RosterTable and RosterCard for the Roster tab (T-M1-4),
+// AttentionTable and AttentionCard for the Needs Attention tab. The brand
+// and the theme toggle live in the NavBar since the nav revision, so this
+// screen starts with breadcrumbs instead of a header: Home > Clans >
+// <clan name>, the location line that also says where the back path goes
+// (the owner's call; the back-to-search button retired with it).
 //
-// The tab bar reads `?tab=` from the URL (03 section 2 "Screens & URLs") so a
-// deep link to the War or Log tab is shareable (F-12). Roster is the default
-// when the param is absent or holds an unknown value. The War and Log tabs
-// keep their designed placeholders until M3; the Roster tab renders the real
-// roster from the same single clan fetch (SR-09).
+// The clan details card renders two columns (the owner's layout from the
+// uploaded wireframe): the identity (badge, name, tag/level/location,
+// description) on the left, the stat chips and join requirements centered
+// on the right, stacked below 768 px.
+//
+// The tab bar reads `?tab=` from the URL (03 section 2 "Screens & URLs") so
+// a deep link to the War, Log, or Needs Attention tab is shareable (F-12).
+// Roster is the default when the param is absent or holds an unknown value.
+// The War and Log tabs keep their designed placeholders until M3; the
+// Roster tab renders the real roster from the same single clan fetch
+// (SR-09); the Needs Attention tab renders the worst-first donation view
+// with its own table and the war-attacks column (the owner's layout).
 //
 // The route param carries the bare tag (shareable URLs carry no `#` and no
 // `%23`, see src/lib/tag.ts), canonicalized back through the tag module so
@@ -66,26 +76,32 @@ import {
 
 // ---------- tab bar ----------
 
-/** The three tabs the clan detail screen renders, in order. */
-type ClanTab = 'roster' | 'war' | 'log';
+/** The four tabs the clan detail screen renders, in order. */
+type ClanTab = 'roster' | 'war' | 'log' | 'attention';
 
 const TABS: ReadonlyArray<{ id: ClanTab; label: string }> = [
   { id: 'roster', label: 'Roster' },
   { id: 'war', label: 'War' },
   { id: 'log', label: 'Log' },
+  { id: 'attention', label: 'Needs Attention' },
 ];
 
 /** Maps a raw ?tab= value to a known tab, defaulting to Roster. Unknown
  * values fall back to the default so a stale or typo'd deep link still lands
  * on a real tab instead of an empty content area. */
 function tabFromValue(raw: string | null): ClanTab {
-  if (raw === 'war' || raw === 'log') return raw;
+  if (raw === 'war' || raw === 'log' || raw === 'attention') return raw;
   return 'roster';
 }
 
 // The client staleTime mirrors the tier's 180 s clan TTL (SR-09) so the two
 // cache layers decay together, the same pairing the hello screen uses.
 const CLAN_STALE_TIME_MS = 180_000;
+
+// The war fetch mirrors the tier's 120 s war TTL (04 section 5). It only
+// runs while the Needs Attention tab is open (the attacks-left column is
+// its only reader today); the M3 war view will reuse the same cache entry.
+const WAR_STALE_TIME_MS = 120_000;
 
 export default function ClanScreen() {
   const { theme } = useTheme();
@@ -132,6 +148,20 @@ export default function ClanScreen() {
     },
   });
 
+  // The current war, fetched only while the Needs Attention tab is open:
+  // the attacks-left column is its only reader today, and a clan that is
+  // not in a war makes this a wasted upstream call on every visit. A
+  // failure here never breaks the tab, the column renders dashes and the
+  // note line says why (the state matrix belongs to the clan fetch; the
+  // war fetch is supplementary).
+  const warQuery = useQuery({
+    queryKey: ['war', tag] as const,
+    queryFn: () => fetchCurrentWar(tag),
+    enabled: query.isSuccess && activeTab === 'attention',
+    staleTime: WAR_STALE_TIME_MS,
+    retry: (failureCount) => failureCount < 1,
+  });
+
   // True while the first load is auto-retrying a busy answer: the skeleton
   // stays up and its caption switches to the "one moment" note (06
   // section 3), so a throttled demo reads as a slow fetch, not an error.
@@ -153,17 +183,34 @@ export default function ClanScreen() {
     setSearchParams(updated, { replace: true });
   };
 
+  // The attacks-left lookup the Needs Attention tab renders: the parsed
+  // projection from api/war.ts, null (the dash) for everything the war
+  // payload cannot answer.
+  const war = warQuery.data;
+  const attacksLeft = (memberTag: string) => attacksLeftFor(war, memberTag);
+  const warNote =
+    warQuery.isError
+      ? 'War data did not load, so attacks left shows a dash for now.'
+      : war !== undefined && war.state !== 'inWar' && war.state !== 'preparation'
+        ? 'The clan is not in a war right now, so attacks left shows a dash.'
+        : null;
+
+  // The breadcrumb's current crumb: the clan name once it is in hand, the
+  // tag from the URL until then (and on error), which keeps the trail
+  // layout-stable through the loading state.
+  const currentCrumb = query.data?.name ?? tag;
+
   return (
     <View style={base.appRoot}>
       <View style={base.screen}>
         <View style={[base.contentColumn, styles.column]}>
-          <View style={styles.header}>
-            <View style={styles.headerText}>
-              <Text style={base.micro}>Clan</Text>
-              <Text style={base.display}>{query.data?.name ?? 'Clan detail'}</Text>
-            </View>
-            <ThemeToggle />
-          </View>
+          <Breadcrumbs
+            crumbs={[
+              { label: 'Home', route: '/' },
+              { label: 'Clans', route: '/clans' },
+              { label: currentCrumb },
+            ]}
+          />
 
           {query.isPending ? (
             <ClanLoading busyRetrying={busyRetrying} />
@@ -174,7 +221,7 @@ export default function ClanScreen() {
                   <ClanError
                     error={query.error as ClanFetchError | Error}
                     onRetry={() => void query.refetch()}
-                    onSearch={() => navigate('/')}
+                    onSearch={() => navigate('/clans')}
                     isRetrying={query.isFetching}
                     tag={tag}
                   />
@@ -201,6 +248,12 @@ export default function ClanScreen() {
                 <View style={styles.tabContent}>
                   {activeTab === 'roster' ? (
                     <RosterSection members={query.data.memberList ?? []} />
+                  ) : activeTab === 'attention' ? (
+                    <AttentionSection
+                      members={query.data.memberList ?? []}
+                      attacksLeft={attacksLeft}
+                      warNote={warNote}
+                    />
                   ) : (
                     <TabPlaceholder tab={activeTab} />
                   )}
@@ -210,14 +263,6 @@ export default function ClanScreen() {
           )}
 
           <View style={styles.footer}>
-            <PillButton
-              label="Back to search"
-              role="link"
-              arrow
-              variant="secondary"
-              onPress={() => navigate('/')}
-              hint="Returns to the clan search screen."
-            />
             {query.isSuccess ? (
               <Text style={base.caption}>fetched {query.data.age}s ago</Text>
             ) : null}
@@ -228,7 +273,7 @@ export default function ClanScreen() {
   );
 }
 
-// ---------- success: compact horizontal identity + details band ----------
+// ---------- success: two-column details card ----------
 
 interface ClanSuccessProps {
   clan: Awaited<ReturnType<typeof fetchClan>>;
@@ -237,34 +282,42 @@ interface ClanSuccessProps {
 }
 
 function ClanSuccess({ clan, base, styles }: ClanSuccessProps) {
-  // The identity block is horizontal and short (the owner's layout call):
-  // badge, name, tag/level/location line on the left to right, description
-  // clamped to two lines under it. Everything F-04's identity block
-  // requires stays, arranged as one compact band instead of stacked blocks.
+  // The two-column details card (the owner's layout from the uploaded
+  // wireframe): identity on the left (badge, name, the tag/level/location
+  // line, description clamped to two lines), a hairline divider, and the
+  // stat chips plus join requirements centered on the right, stacked below
+  // 768 px where the columns would squeeze each other. Every F-04 datum
+  // survives, arranged as two columns instead of one horizontal band.
   // The badge is an API icon (07 section 7) in the 48 px slot, rendered
   // through RN Image so a slow CDN load never reflows the block; a missing
   // badge gets a quiet block instead, never a broken-image glyph.
+  const { width } = useWindowDimensions();
+  const twoColumns = breakpointFor(width) === 'tablet' || breakpointFor(width) === 'desktop';
   const badgeUri = clan.badgeUrls?.medium || clan.badgeUrls?.small;
   const locationName = clan.location?.name ?? 'No location';
-  // The details band: the stat chips and the join requirements merged into
-  // one left-to-right row of inline label-value chips. Trophies and TH read
-  // as the join requirements they are ("Trophies req", "TH req") so the
-  // band needs no group headings to stay honest.
+  // The details column: the stat chips and the join requirements as one
+  // centered wrap of inline label-value chips, in the wireframe's order
+  // (requirements first, then the war stats, Points last). Trophies and TH
+  // read as the join requirements they are ("Trophies req", "TH req") so
+  // the column needs no group headings to stay honest.
   const details: ReadonlyArray<{ label: string; value: string }> = [
-    { label: 'Members', value: String(clan.members) },
-    { label: 'Win streak', value: String(clan.warWinStreak) },
-    { label: 'War wins', value: String(clan.warWins) },
-    { label: 'Points', value: String(clan.clanPoints) },
     { label: 'Trophies req', value: String(clan.requirements.requiredTrophies) },
     ...(clan.requirements.requiredTownhallLevel !== undefined
       ? [{ label: 'TH req', value: `TH ${clan.requirements.requiredTownhallLevel}` }]
       : []),
     { label: 'War', value: warFrequencyLabel(clan.requirements.warFrequency) },
+    { label: 'Members', value: String(clan.members) },
+    { label: 'Win streak', value: String(clan.warWinStreak) },
+    { label: 'War wins', value: String(clan.warWins) },
+    { label: 'Points', value: String(clan.clanPoints) },
   ];
 
   return (
-    <View style={styles.successWrap} accessibilityLabel={`${clan.name} clan detail`}>
-      <View style={styles.identity}>
+    <View
+      style={[styles.successWrap, twoColumns ? styles.detailColumns : styles.detailStacked]}
+      accessibilityLabel={`${clan.name} clan detail`}
+    >
+      <View style={twoColumns ? styles.identityColumn : styles.identityStacked}>
         {badgeUri ? (
           <Image
             source={{ uri: badgeUri }}
@@ -297,15 +350,19 @@ function ClanSuccess({ clan, base, styles }: ClanSuccessProps) {
         </View>
       </View>
 
-      <View style={styles.detailsRow}>
-        {details.map((detail) => (
-          <View key={detail.label} style={styles.detailChip}>
-            <Text style={styles.detailChipLabel}>{detail.label}</Text>
-            <Text style={styles.detailChipValue} numberOfLines={1}>
-              {detail.value}
-            </Text>
-          </View>
-        ))}
+      {twoColumns ? <View style={styles.columnDivider} aria-hidden /> : null}
+
+      <View style={styles.statsColumn}>
+        <View style={styles.detailsRow}>
+          {details.map((detail) => (
+            <View key={detail.label} style={styles.detailChip}>
+              <Text style={styles.detailChipLabel}>{detail.label}</Text>
+              <Text style={styles.detailChipValue} numberOfLines={1}>
+                {detail.value}
+              </Text>
+            </View>
+          ))}
+        </View>
       </View>
     </View>
   );
@@ -324,9 +381,9 @@ interface ClanLoadingProps {
 // would hold only the header's height and the page would visibly grow and
 // reflow the moment data landed (the layout-matched rule, 06 section 3).
 // Every size here mirrors a real element; if the success layout changes,
-// this follows in the same PR. The identity half mirrors the compact
-// horizontal look: badge 48, one-line name, meta line, two-line
-// description inside the identity column, then the inline details band.
+// this follows in the same PR. The detail half mirrors the two-column
+// card: the identity skeleton on the left (badge 48, one-line name, meta
+// line, two-line description) and the centered chips wrap on the right.
 
 // The identity block's fixed badge slot (the success state renders the
 // API badge at this size, 07 section 7).
@@ -350,16 +407,18 @@ function ClanLoading({ busyRetrying }: ClanLoadingProps) {
   const pulse = useSkeletonPulse();
   // The same presentation switch the roster itself uses (NFR-05): table
   // rows at 768 px and up, cards below it, so the skeleton holds the exact
-  // shape the data will fill on this viewport.
+  // shape the data will fill on this viewport. The detail card's two
+  // columns follow the same line.
   const { width } = useWindowDimensions();
   const breakpoint = breakpointFor(width);
   const isCardPresentation = breakpoint === 'small' || breakpoint === 'mobile';
+  const twoColumns = breakpoint === 'tablet' || breakpoint === 'desktop';
 
   return (
     <>
       <View style={[base.panelRaised, styles.detailPanel]}>
         <View
-          style={styles.identityWrap}
+          style={[styles.identityWrap, twoColumns ? styles.identityWrapColumns : null]}
           accessibilityRole="progressbar"
           accessibilityLabel="Loading clan"
         >
@@ -381,7 +440,7 @@ function ClanLoading({ busyRetrying }: ClanLoadingProps) {
             </View>
           </View>
           <View style={styles.detailsRow}>
-            {[0, 1, 2, 3, 4, 5].map((index) => (
+            {[0, 1, 2, 3, 4, 5, 6].map((index) => (
               <View key={index} style={styles.detailChip}>
                 <SkeletonBlock
                   width={SKELETON_DETAIL_WIDTH}
@@ -401,7 +460,7 @@ function ClanLoading({ busyRetrying }: ClanLoadingProps) {
 
       {/* The tab bar's own shape, so the pills do not pop in after data. */}
       <View style={styles.tabBar} aria-hidden>
-        {['roster', 'war', 'log'].map((id) => (
+        {['roster', 'war', 'log', 'attention'].map((id) => (
           <View key={id} style={styles.tabCell}>
             <SkeletonBlock width="55%" height={theme.fontSize.sm} pulse={pulse} />
           </View>
@@ -452,12 +511,12 @@ function ClanError({ error, onRetry, onSearch, isRetrying, tag }: ClanErrorProps
   // The contract (04 section 6) gives the clan route four real states:
   // not_found, upstream_busy, upstream_unreachable, and bad_request (a
   // malformed tag). Each gets its own copy and a next action, never a dead
-  // end (06 section 3). The retry action is shared; the back-to-search
-  // action sits in the screen footer for every state, so the not_found
-  // branch surfaces "search by name" as its own primary action since retry
-  // cannot fix a retired tag. The not_found body carries the tag-correction
-  // hint the state matrix asks for: what a well-formed tag looks like, so a
-  // typo'd URL can be fixed by hand.
+  // end (06 section 3). The retry action is shared; the not_found branch
+  // surfaces "search clans" as its own primary action since retry cannot
+  // fix a retired tag, and the breadcrumbs above already carry the way
+  // back. The not_found body carries the tag-correction hint the state
+  // matrix asks for: what a well-formed tag looks like, so a typo'd URL
+  // can be fixed by hand.
   if (error instanceof ClanFetchError) {
     const result = error.result;
     if (result.kind === 'not_found') {
@@ -585,12 +644,9 @@ interface RosterCardSortBarProps {
   sort: RosterSortState;
   /** The one setter both controls drive; the lib rules decide the next state. */
   onChange: (next: RosterSortState) => void;
-  /** While the needs-attention view owns the row order, the column sort is
-   * not in effect, so both controls disable rather than lie about it. */
-  disabled: boolean;
 }
 
-function RosterCardSortBar({ sort, onChange, disabled }: RosterCardSortBarProps) {
+function RosterCardSortBar({ sort, onChange }: RosterCardSortBarProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createSortBarStyles(theme), [theme]);
   // "Clan order" is the dropdown's reset option; it maps to the null key.
@@ -603,22 +659,18 @@ function RosterCardSortBar({ sort, onChange, disabled }: RosterCardSortBarProps)
           options={SORT_OPTIONS}
           value={selection}
           onSelect={(next) => onChange(rosterSortForSelection(next, sort))}
-          disabled={disabled}
         />
       </View>
       <PillButton
         label={sort.direction === 'asc' ? 'Ascending' : 'Descending'}
         onPress={() => onChange(flipRosterSortDirection(sort))}
         variant="secondary"
-        disabled={disabled || sort.key === null}
+        disabled={sort.key === null}
         hint="Flips the sort direction of the picked column."
       />
     </View>
   );
 }
-
-// Preset target ratios are gone: the donation ratio is a free two-number
-// input now (see DonationRatioInput), so this space holds no chip list.
 
 interface RosterSectionProps {
   members: ClanMember[];
@@ -635,14 +687,9 @@ function RosterSection({ members }: RosterSectionProps) {
   // Sort is view state, not route state (the URL map documents only ?tab=),
   // so it lives here in useState and resets when the visitor leaves the
   // screen. The ordering rule itself is lib/roster-sort.ts, pure and tested.
+  // The needs-attention view is its own tab now, so the roster's sort is
+  // always in effect and its controls never disable.
   const [sort, setSort] = useState<RosterSortState>(CLAN_ORDER);
-  // The needs-attention toggle (FR-05, SR-12, AC-02). When on, the roster
-  // re-orders worst-first by donation deficit and every flagged row shows
-  // the RatioFlag chip. The target is adjustable client-side (SR-12): the
-  // engine is a pure function, so changing the target is a re-call with the
-  // same members, no refetch.
-  const [needsAttention, setNeedsAttention] = useState(false);
-  const [target, setTarget] = useState<DonationTarget>(DEFAULT_DONATION_TARGET);
   // The presentation switch (NFR-05): a real table at 768 px and up, one
   // card per member below it. Read through useWindowDimensions into the
   // breakpoints helper, never CSS media queries (07 section 3).
@@ -650,30 +697,7 @@ function RosterSection({ members }: RosterSectionProps) {
   const breakpoint = breakpointFor(width);
   const isCardPresentation = breakpoint === 'small' || breakpoint === 'mobile';
 
-  // The donation balance is computed from the same members the roster
-  // already holds (SR-09: one fetch, no per-member requests). Pure, so it
-  // re-computes locally when the target changes without any refetch (SR-12).
-  const balance = useMemo(
-    () => computeDonationBalance(members, target),
-    [members, target],
-  );
-
-  const sortedMembers = useMemo(() => {
-    if (needsAttention) {
-      return sortNeedsAttention(members, target);
-    }
-    return sortRoster(members, sort);
-  }, [members, sort, needsAttention, target]);
-
-  // A verdict lookup by tag so each row finds its chip in O(n) without the
-  // table re-indexing. Built once per balance change.
-  const verdictByTag = useMemo(() => {
-    const map = new Map<string, DonationVerdict>();
-    for (const verdict of balance.verdicts) {
-      map.set(verdict.member.tag, verdict);
-    }
-    return map;
-  }, [balance]);
+  const sortedMembers = useMemo(() => sortRoster(members, sort), [members, sort]);
 
   const handleColumnPress = (key: RosterSortKey) => {
     setSort((previous) => nextRosterSortState(key, previous));
@@ -692,7 +716,95 @@ function RosterSection({ members }: RosterSectionProps) {
             role="link"
             arrow
             variant="secondary"
-            onPress={() => navigate('/')}
+            onPress={() => navigate('/clans')}
+          />
+        }
+      />
+    );
+  }
+
+  return isCardPresentation ? (
+    // The card presentation has no column headers, so the sort rides in
+    // the bar above the list. The cards render in page flow like the
+    // table rows: the browser scrollbar owns the scrolling (07 section
+    // 3), so the roster runs as long as it runs instead of boxing the
+    // visitor into a four-card inner scroll window.
+    <>
+      <RosterCardSortBar sort={sort} onChange={setSort} />
+      {sortedMembers.map((member) => (
+        <RosterCard key={member.tag} member={member} onPress={openMember} />
+      ))}
+    </>
+  ) : (
+    <RosterTable
+      members={sortedMembers}
+      sort={sort}
+      onPressColumn={handleColumnPress}
+      onPressMember={openMember}
+    />
+  );
+}
+
+// ---------- needs attention tab (FR-05, SR-12, AC-02) ----------
+
+interface AttentionSectionProps {
+  members: ClanMember[];
+  /** Attacks each member still holds in the current war; null renders the
+   * dash. Owned by the screen (the war query lives beside the clan query). */
+  attacksLeft: (memberTag: string) => number | null;
+  /** The quiet line explaining why attacks left may show dashes; null when
+   * the war data says something worth showing. */
+  warNote: string | null;
+}
+
+function AttentionSection({ members, attacksLeft, warNote }: AttentionSectionProps) {
+  const { theme } = useTheme();
+  const navigate = useNavigate();
+  const openMember = (tag: string) => {
+    navigate(playerRouteFor(tag));
+  };
+
+  // The tab is a fresh view per visit: the target (and the ratio boxes'
+  // drafts inside the input) start from the 1:1 default every time the
+  // visitor opens the tab, because the boxes only mount here and a draft
+  // pair cannot be re-derived from the float target without lying (the
+  // same call session 24 made, now scoped to the tab).
+  const [target, setTarget] = useState<DonationTarget>(DEFAULT_DONATION_TARGET);
+
+  // The donation balance is computed from the same members the roster
+  // holds (SR-09: one fetch, no per-member requests). Pure, so it
+  // re-computes locally when the target changes without any refetch (SR-12).
+  const balance = useMemo(() => computeDonationBalance(members, target), [members, target]);
+
+  // Worst-first order from the engine, the tab's whole point (FR-05).
+  const ordered = useMemo(() => sortNeedsAttention(members, target), [members, target]);
+
+  // A verdict lookup by tag so each row finds its chip in O(n) without the
+  // table re-indexing. Built once per balance change.
+  const verdictByTag = useMemo(() => {
+    const map = new Map<string, DonationVerdict>();
+    for (const verdict of balance.verdicts) {
+      map.set(verdict.member.tag, verdict);
+    }
+    return map;
+  }, [balance]);
+
+  const { width } = useWindowDimensions();
+  const breakpoint = breakpointFor(width);
+  const isCardPresentation = breakpoint === 'small' || breakpoint === 'mobile';
+
+  if (ordered.length === 0) {
+    return (
+      <EmptyState
+        title="No members to show"
+        body="The clan data came back without any member rows. That is unusual for a live clan; heading back to search and reopening the clan usually clears it."
+        action={
+          <PillButton
+            label="Back to search"
+            role="link"
+            arrow
+            variant="secondary"
+            onPress={() => navigate('/clans')}
           />
         }
       />
@@ -701,102 +813,59 @@ function RosterSection({ members }: RosterSectionProps) {
 
   return (
     <>
-      <DonationControlBar
-        needsAttention={needsAttention}
-        onToggleNeedsAttention={() => setNeedsAttention((previous) => !previous)}
-        onSelectTarget={setTarget}
-        summary={balance.summary}
-      />
+      <AttentionControls summary={balance.summary} onSelectTarget={setTarget} />
+      {warNote !== null ? <Text style={attentionNoteStyle(theme)}>{warNote}</Text> : null}
       {isCardPresentation ? (
-        // The card presentation has no column headers, so the sort rides in
-        // the bar above the list. The cards render in page flow like the
-        // table rows: the browser scrollbar owns the scrolling (07 section
-        // 3), so the roster runs as long as it runs instead of boxing the
-        // visitor into a four-card inner scroll window. While the
-        // needs-attention view owns the row order, the sort controls
-        // disable instead of pretending to work.
-        <>
-          <RosterCardSortBar sort={sort} onChange={setSort} disabled={needsAttention} />
-          {sortedMembers.map((member) => (
-            <RosterCard
-              key={member.tag}
-              member={member}
-              onPress={openMember}
-              verdict={needsAttention ? verdictByTag.get(member.tag) : undefined}
-            />
-          ))}
-        </>
+        ordered.map((member, index) => (
+          <AttentionCard
+            key={member.tag}
+            member={member}
+            position={index + 1}
+            verdict={verdictByTag.get(member.tag)}
+            attacksLeft={attacksLeft(member.tag)}
+            onPress={openMember}
+          />
+        ))
       ) : (
-        <RosterTable
-          members={sortedMembers}
-          sort={sort}
-          onPressColumn={handleColumnPress}
+        <AttentionTable
+          members={ordered}
+          verdictByTag={verdictByTag}
+          attacksLeft={attacksLeft}
           onPressMember={openMember}
-          verdictByTag={needsAttention ? verdictByTag : undefined}
-          sortDisabled={needsAttention}
         />
       )}
     </>
   );
 }
 
-// ---------- donation control bar ----------
+// ---------- attention controls ----------
 
-interface DonationControlBarProps {
-  needsAttention: boolean;
-  onToggleNeedsAttention: () => void;
-  onSelectTarget: (target: DonationTarget) => void;
+interface AttentionControlsProps {
   summary: ReturnType<typeof computeDonationBalance>['summary'];
+  onSelectTarget: (target: DonationTarget) => void;
 }
 
-// The bar builds its own styles (STD-13, paid down from the threading the
-// session 22 log flagged): a component's stylesheet is its own, never a
-// prop on the caller's roster sheet.
-function DonationControlBar({
-  needsAttention,
-  onToggleNeedsAttention,
-  onSelectTarget,
-  summary,
-}: DonationControlBarProps) {
+// The controls row the Needs Attention tab renders above its table: the
+// donation ratio's two number boxes (the target, SR-12) and the health
+// readout. The needs-attention switch is gone with the toggle era, the
+// tab itself is the switch now, so the boxes are always live here and the
+// disable-not-hide dance retired with them.
+function AttentionControls({ summary, onSelectTarget }: AttentionControlsProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createDonationBarStyles(theme), [theme]);
   const healthText =
     summary.healthShare === null
       ? '\u2014'
       : `${Math.round(summary.healthShare * 100)}% at target`;
+  const flaggedText =
+    summary.membersWithData === 0
+      ? 'no donation data'
+      : `${summary.flagged} flagged of ${summary.membersWithData}`;
   return (
     <View style={styles.controlBar}>
-      <Pressable
-        accessibilityRole="switch"
-        accessibilityLabel="Needs attention"
-        accessibilityHint="Re-orders the roster worst-first by donation deficit and shows the ratio chip on flagged members."
-        // aria-checked directly, not accessibilityState: react-native-web
-        // 0.20 does not map accessibilityState onto aria attributes, so the
-        // switch would never announce its state (the Dropdown's trigger uses
-        // aria-expanded directly for the same reason). The switch is what
-        // tells a screen reader the sort controls are paused.
-        aria-checked={needsAttention}
-        onPress={onToggleNeedsAttention}
-        style={({ pressed }) => [
-          styles.toggle,
-          needsAttention && styles.toggleOn,
-          pressed && styles.togglePressed,
-        ]}
-      >
-        <Text style={[styles.toggleLabel, needsAttention && styles.toggleLabelOn]}>
-          Needs attention
-        </Text>
-      </Pressable>
-      <DonationRatioInput
-        onSelectTarget={onSelectTarget}
-        // The boxes stay mounted and disable while the needs-attention view
-        // is off (the disable-not-hide rule the sort controls already
-        // follow): mounted, their draft values never reset on a toggle, so
-        // what the boxes show is always the ratio the engine runs with.
-        disabled={!needsAttention}
-        styles={styles}
-      />
-      {needsAttention ? <Text style={styles.healthLabel}>{healthText}</Text> : null}
+      <DonationRatioInput onSelectTarget={onSelectTarget} styles={styles} />
+      <Text style={styles.healthLabel}>{healthText}</Text>
+      <Text style={styles.healthLabel}>{flaggedText}</Text>
     </View>
   );
 }
@@ -805,21 +874,18 @@ function DonationControlBar({
 
 interface DonationRatioInputProps {
   onSelectTarget: (target: DonationTarget) => void;
-  /** While the needs-attention view is off the ratio has no visible effect,
-   * so the boxes dim and stop taking input instead of pretending to work. */
-  disabled: boolean;
   styles: ReturnType<typeof createDonationBarStyles>;
 }
 
 // The donation ratio input: two number boxes, "__ : __", the target ratio
-// written as given : received (SR-12's adjustable target). This replaces the
-// preset chip row (0.5 / 1:1 / 1.5 / 2.0) on the owner's call: a free
+// written as given : received (SR-12's adjustable target). This replaces
+// the preset chip row (0.5 / 1:1 / 1.5 / 2.0) on the owner's call: a free
 // two-number ratio says exactly what the visitor means ("1 : 2" is give
 // half, "3 : 2" is give 1.5x) without reading a legend of decimals. The
 // drafts start at "1"/"1", mirroring DEFAULT_DONATION_TARGET's 1:1; the
 // parsed pair is the only writer of the target, so the boxes never drift
 // from what the engine runs with.
-function DonationRatioInput({ onSelectTarget, disabled, styles }: DonationRatioInputProps) {
+function DonationRatioInput({ onSelectTarget, styles }: DonationRatioInputProps) {
   const [givenDraft, setGivenDraft] = useState('1');
   const [receivedDraft, setReceivedDraft] = useState('1');
 
@@ -848,8 +914,7 @@ function DonationRatioInput({ onSelectTarget, disabled, styles }: DonationRatioI
           accessibilityHint="How many troops the member should give. The roster re-computes locally, no refetch."
           keyboardType="numeric"
           maxLength={3}
-          editable={!disabled}
-          style={[styles.ratioInput, disabled && styles.ratioInputDisabled]}
+          style={styles.ratioInput}
         />
         <Text style={styles.ratioColon} aria-hidden>
           :
@@ -864,8 +929,7 @@ function DonationRatioInput({ onSelectTarget, disabled, styles }: DonationRatioI
           accessibilityHint="For every this many troops received. Must be at least one."
           keyboardType="numeric"
           maxLength={3}
-          editable={!disabled}
-          style={[styles.ratioInput, disabled && styles.ratioInputDisabled]}
+          style={styles.ratioInput}
         />
       </View>
     </View>
@@ -883,7 +947,7 @@ function parseRatioSide(raw: string): number | null {
 // ---------- tab content placeholder ----------
 
 interface TabPlaceholderProps {
-  tab: Exclude<ClanTab, 'roster'>;
+  tab: Exclude<ClanTab, 'roster' | 'attention'>;
 }
 
 function TabPlaceholder({ tab }: TabPlaceholderProps) {
@@ -936,9 +1000,8 @@ function createSortBarStyles(t: ReturnType<typeof useTheme>['theme']) {
   });
 }
 
-// The donation control bar's own styles (STD-13, paid down from the
-// stylesheet threading session 22 flagged). Quiet chrome: a flat row, not
-// a raised panel, so the roster keeps the visual weight.
+// The attention controls' own styles (STD-13). Quiet chrome: a flat row,
+// not a raised panel, so the attention table keeps the visual weight.
 function createDonationBarStyles(t: ReturnType<typeof useTheme>['theme']) {
   const c = t.colors;
   return StyleSheet.create({
@@ -949,36 +1012,6 @@ function createDonationBarStyles(t: ReturnType<typeof useTheme>['theme']) {
       columnGap: t.spacing[4],
       rowGap: t.spacing[2],
       marginBottom: t.spacing[3],
-    },
-    toggle: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: t.layout.touchTargetMin,
-      paddingHorizontal: t.spacing[5],
-      paddingVertical: t.spacing[2],
-      borderRadius: t.radius.pill,
-      borderWidth: 1,
-      borderColor: c.panelBorderStrong,
-      backgroundColor: c.panelRaised,
-      outlineColor: c.focusRing,
-      outlineOffset: t.layout.focusRingOffset,
-    },
-    toggleOn: {
-      backgroundColor: c.accent,
-      borderColor: c.accent,
-    },
-    togglePressed: {
-      opacity: 0.7,
-    },
-    toggleLabel: {
-      fontFamily: t.fontFamily.sans,
-      fontSize: t.fontSize.body,
-      fontWeight: t.fontWeight.semibold,
-      color: c.textPrimary,
-    },
-    toggleLabelOn: {
-      color: c.textOnAccent,
     },
     // The "Donation ratio" two-number box. Label whispers on top, the
     // "__ : __" row speaks under it, the same label-value rhythm every
@@ -1015,11 +1048,6 @@ function createDonationBarStyles(t: ReturnType<typeof useTheme>['theme']) {
       outlineColor: c.focusRing,
       outlineOffset: t.layout.focusRingOffset,
     },
-    // Dimmed, not hidden, while the needs-attention view is off: the same
-    // disabled treatment the Dropdown's trigger gets.
-    ratioInputDisabled: {
-      opacity: 0.5,
-    },
     ratioColon: {
       fontFamily: t.fontFamily.mono,
       fontSize: t.fontSize.md,
@@ -1034,13 +1062,26 @@ function createDonationBarStyles(t: ReturnType<typeof useTheme>['theme']) {
   });
 }
 
+// The war note under the controls: a quiet caption, not an error state,
+// because the war fetch is supplementary to the tab (the clan fetch owns
+// the state matrix).
+function attentionNoteStyle(t: ReturnType<typeof useTheme>['theme']) {
+  const c = t.colors;
+  return StyleSheet.create({
+    note: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.sm,
+      color: c.textMuted,
+      marginBottom: t.spacing[3],
+    },
+  }).note;
+}
+
 // The loading skeleton's own styles (STD-13, the RosterSection pattern).
 // Each block mirrors the success element it stands in for; the mirror is
 // the point (layout-matched, 06 section 3), so a change to the success
-// layout is a change here in the same PR. Updated with the compact
-// horizontal look: the requirements and stat rows merged into the one
-// inline details band, the badge shrank to its 48 px slot, and the tab
-// strip mirrors the compact real one.
+// layout is a change here in the same PR. Updated with the two-column
+// detail card: identity left, centered chips right, four tab cells.
 function createClanLoadingStyles(t: ReturnType<typeof useTheme>['theme']) {
   const c = t.colors;
   return StyleSheet.create({
@@ -1052,10 +1093,18 @@ function createClanLoadingStyles(t: ReturnType<typeof useTheme>['theme']) {
     identityWrap: {
       gap: t.spacing[4],
     },
+    // Mirrors the two-column card: identity left, chips right.
+    identityWrapColumns: {
+      flexDirection: 'row',
+      columnGap: t.spacing[6],
+      alignItems: 'flex-start',
+    },
     identity: {
       flexDirection: 'row',
       alignItems: 'flex-start',
       gap: t.spacing[4],
+      flex: 1.5,
+      minWidth: 0,
     },
     identityText: {
       flex: 1,
@@ -1063,13 +1112,16 @@ function createClanLoadingStyles(t: ReturnType<typeof useTheme>['theme']) {
       minWidth: 0,
     },
 
-    // Mirrors the inline details band: one left-to-right row of
-    // single-line chips.
+    // Mirrors the centered chips wrap on the right of the two-column card.
     detailsRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
+      alignItems: 'center',
+      alignContent: 'center',
+      justifyContent: 'center',
       columnGap: t.spacing[2],
       rowGap: t.spacing[2],
+      flex: 1,
     },
     detailChip: {
       flexDirection: 'row',
@@ -1144,32 +1196,46 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     column: {
       flex: 1,
     },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      justifyContent: 'space-between',
-      gap: t.spacing[4],
-      marginBottom: t.spacing[6],
-    },
-    headerText: {
-      flex: 1,
-      gap: t.spacing[2],
-    },
     detailPanel: {
       gap: t.spacing[5],
     },
 
-    // success: compact horizontal identity block. The band keeps every
-    // F-04 datum but reads left to right at a short height instead of
-    // stacking (the owner's layout call): badge and text side by side,
-    // details as one inline chip row under it.
+    // success: the two-column details card. The identity (badge, name,
+    // tag/level/location, description) takes the left, the stat chips and
+    // join requirements center on the right (the owner's layout from the
+    // uploaded wireframe, "make them centered"); below 768 px the columns
+    // stack, identity first.
     successWrap: {
       gap: t.spacing[4],
     },
-    identity: {
+    detailColumns: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      columnGap: t.spacing[6],
+    },
+    detailStacked: {
+      flexDirection: 'column',
+      gap: t.spacing[5],
+    },
+    identityColumn: {
+      flex: 1.5,
+      minWidth: 0,
+    },
+    identityStacked: {
       flexDirection: 'row',
       alignItems: 'flex-start',
       gap: t.spacing[4],
+    },
+    columnDivider: {
+      width: 1,
+      alignSelf: 'stretch',
+      backgroundColor: c.hairline,
+    },
+    statsColumn: {
+      flex: 1,
+      minWidth: 0,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     identityText: {
       flex: 1,
@@ -1228,11 +1294,14 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       color: c.textMuted,
     },
 
-    // details band: stats and join requirements as one left-to-right row
-    // of inline label-value chips, short height
+    // details column: stats and join requirements as one centered wrap of
+    // inline label-value chips
     detailsRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
+      alignItems: 'center',
+      alignContent: 'center',
+      justifyContent: 'center',
       columnGap: t.spacing[2],
       rowGap: t.spacing[2],
     },
@@ -1311,11 +1380,12 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       marginTop: t.spacing[4],
     },
 
-    // footer
+    // footer: the fetch age only. The back-to-search button retired with
+    // the breadcrumbs, which carry the way back (the owner's call).
     footer: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
+      justifyContent: 'flex-end',
       flexWrap: 'wrap',
       gap: t.spacing[3],
       marginTop: t.spacing[6],
