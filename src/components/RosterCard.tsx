@@ -2,8 +2,10 @@ import { useMemo } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../theme';
 import StatChip from './StatChip';
+import RatioFlag from './RatioFlag';
 import { clanRoleLabel } from '../lib/clan-role';
 import { linkEnterActivation } from '../lib/link-activation';
+import type { DonationVerdict } from '../lib/donation-balance';
 import type { ClanMember } from '../api/clan';
 
 // The roster's card presentation (07 section 4), one card per member,
@@ -22,9 +24,13 @@ export interface RosterCardProps {
   member: ClanMember;
   /** Fired with the member's tag when the card is tapped (FR-04). */
   onPress: (tag: string) => void;
+  /** The member's donation verdict from the balance engine. When set, the
+   * card renders the RatioFlag chip below the stat row. Undefined when
+   * needs-attention is off. */
+  verdict?: DonationVerdict;
 }
 
-export default function RosterCard({ member, onPress }: RosterCardProps) {
+export default function RosterCard({ member, onPress, verdict }: RosterCardProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const leagueName = member.league?.name ?? 'Unranked';
@@ -76,6 +82,11 @@ export default function RosterCard({ member, onPress }: RosterCardProps) {
         <StatChip label="Received" value={String(member.donationsReceived)} />
         <StatChip label="XP" value={String(member.expLevel)} />
       </View>
+      {verdict ? (
+        <View style={styles.ratioRow}>
+          <RatioFlag verdict={verdict} />
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -148,6 +159,10 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       flexWrap: 'wrap',
       columnGap: t.spacing[5],
       rowGap: t.spacing[2],
+    },
+    ratioRow: {
+      marginTop: t.spacing[3],
+      alignSelf: 'flex-start',
     },
   });
 }
