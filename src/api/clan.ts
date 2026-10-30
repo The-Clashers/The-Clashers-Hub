@@ -14,9 +14,10 @@
 // the stat chips (members, win streak, war wins, points). A field the app
 // does not read stays untyped on purpose so a payload change upstream never
 // breaks the build, only the screen that needs the new field. The roster
-// (memberList) is opaque here on purpose: T-M1-4 owns the roster table and
-// its own typed shape, this client only carries the array reference
-// through so the roster tab can read it from the same single fetch (SR-09).
+// rows (memberList) are typed here as ClanMember since T-M1-4: the roster
+// tab reads them from this same single fetch (SR-09), so the member shape
+// is part of this client's contract, parsed with the same tolerance for
+// missing optional fields the rest of the response gets.
 
 /** Clan tag in canonical form: leading #, uppercase, matches server/tags.ts. */
 export type ClanTag = string;
@@ -53,6 +54,36 @@ export interface ClanRequirements {
   warFrequency?: string;
 }
 
+/** The league object the game API nests inside each member row. Unranked
+ * players carry an empty league object (or none), which parses to undefined
+ * so the roster renders its own "Unranked" quiet value. */
+export interface ClanMemberLeague {
+  name: string;
+  iconUrls?: ClanBadgeUrls;
+}
+
+/** One roster row (T-M1-4, FR-04). Only the fields the roster table reads:
+ * identity (tag, name), the sortable columns (role, Town Hall, trophies,
+ * donations, received, XP), and the league display column. The raw role
+ * string is kept as-is; lib/clan-role.ts owns its label and sort rank. */
+export interface ClanMember {
+  tag: string;
+  name: string;
+  /** Raw API role string ("leader" | "coLeader" | "admin" | "member"). */
+  role: string;
+  /** XP level, the sortable XP column. */
+  expLevel: number;
+  townHallLevel: number;
+  trophies: number;
+  donations: number;
+  donationsReceived: number;
+  /** Position inside the clan, the API's own roster ordering; the sort's
+   * primary tiebreak. Optional: a degraded payload may omit it. */
+  clanRank?: number;
+  /** Undefined when the member is unranked. */
+  league?: ClanMemberLeague;
+}
+
 /** Shape of a successful /api/clan/:tag response, stripped to what we read. */
 export interface ClanResponse {
   tag: string;
@@ -60,10 +91,9 @@ export interface ClanResponse {
   description?: string;
   clanLevel: number;
   members: number;
-  /** The roster the Roster tab renders. Opaque here: T-M1-4 owns the typed
-   * member row. Carried through so the roster reads from this one fetch
-   * (SR-09: the clan response includes the complete member list). */
-  memberList?: unknown[];
+  /** The roster the Roster tab renders (SR-09: the clan response includes
+   * the complete member list, one fetch, no per-member requests). */
+  memberList?: ClanMember[];
   badgeUrls?: ClanBadgeUrls;
   location?: ClanLocation;
   requirements: ClanRequirements;
@@ -124,6 +154,45 @@ function toClanRequirements(parsed: unknown): ClanRequirements {
   };
 }
 
+function toClanMemberLeague(parsed: unknown): ClanMemberLeague | undefined {
+  if (!isRecord(parsed)) return undefined;
+  const name = typeof parsed.name === 'string' ? parsed.name : '';
+  // Unranked members arrive as an empty league object (or none at all);
+  // without a name there is nothing to display, so the row renders its
+  // quiet "Unranked" value instead.
+  if (name === '') return undefined;
+  const iconUrls = isRecord(parsed.iconUrls)
+    ? {
+        small: String(parsed.iconUrls.small ?? ''),
+        medium: String(parsed.iconUrls.medium ?? ''),
+        large: String(parsed.iconUrls.large ?? ''),
+      }
+    : undefined;
+  return { name, iconUrls };
+}
+
+function toClanMember(parsed: unknown): ClanMember | null {
+  if (!isRecord(parsed)) return null;
+  const tag = typeof parsed.tag === 'string' ? parsed.tag : '';
+  // A member row without a tag cannot be linked, keyed, or tie-broken, so
+  // it is dropped rather than rendered as a blank unusable row. Everything
+  // else degrades to defaults, the same tolerance the clan fields get.
+  if (tag === '') return null;
+  const league = toClanMemberLeague(parsed.league);
+  return {
+    tag,
+    name: typeof parsed.name === 'string' ? parsed.name : '',
+    role: typeof parsed.role === 'string' ? parsed.role : 'member',
+    expLevel: typeof parsed.expLevel === 'number' ? parsed.expLevel : 0,
+    townHallLevel: typeof parsed.townHallLevel === 'number' ? parsed.townHallLevel : 0,
+    trophies: typeof parsed.trophies === 'number' ? parsed.trophies : 0,
+    donations: typeof parsed.donations === 'number' ? parsed.donations : 0,
+    donationsReceived: typeof parsed.donationsReceived === 'number' ? parsed.donationsReceived : 0,
+    clanRank: typeof parsed.clanRank === 'number' ? parsed.clanRank : undefined,
+    league,
+  };
+}
+
 function toClanResponse(parsed: unknown): ClanResponse {
   if (!isRecord(parsed)) {
     throw new ClanFetchError({ kind: 'bad_request', detail: 'response was not a JSON object' });
@@ -132,7 +201,11 @@ function toClanResponse(parsed: unknown): ClanResponse {
   const name = typeof parsed.name === 'string' ? parsed.name : '';
   const clanLevel = typeof parsed.clanLevel === 'number' ? parsed.clanLevel : 0;
   const members = typeof parsed.members === 'number' ? parsed.members : 0;
-  const memberList = Array.isArray(parsed.memberList) ? parsed.memberList : undefined;
+  const memberList = Array.isArray(parsed.memberList)
+    ? parsed.memberList
+        .map(toClanMember)
+        .filter((entry): entry is ClanMember => entry !== null)
+    : undefined;
   const description = typeof parsed.description === 'string' ? parsed.description : undefined;
   const age = typeof parsed.age === 'number' ? parsed.age : 0;
   const badgeUrls = isRecord(parsed.badgeUrls)

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
 import { useTheme } from '../theme';
+import { linkEnterActivation } from '../lib/link-activation';
 
 // The one pill button (07 section 4). Search, the retry actions, and the
 // footer links were three copies of the same accent pill inside the search
@@ -13,6 +14,11 @@ import { useTheme } from '../theme';
 // behavior, never a stylesheet. Focus visibility is the same outline pair
 // every interactive kit piece uses (07 section 6), and the 44 px touch
 // floor comes from the layout token.
+//
+// Link-role instances carry linkEnterActivation so Enter fires onPress:
+// react-native-web's responder assumes role=link elements are real anchors
+// and never calls onPress for them (lib/link-activation.ts owns the why).
+// Button-role instances need nothing; the responder serves them natively.
 
 export interface PillButtonProps {
   /** Button text; doubles as the accessibility label. */
@@ -52,6 +58,10 @@ export default function PillButton({
       accessibilityLabel={label}
       accessibilityHint={hint}
       onPress={onPress}
+      // Guarded by disabled: the responder ignores clicks on a disabled
+      // Pressable, but a raw onKeyDown still fires, so the Enter path has
+      // to respect the disabled flag itself.
+      onKeyDown={role === 'link' && !disabled ? linkEnterActivation(onPress) : undefined}
       disabled={disabled}
       style={({ pressed }) => [
         styles.button,
