@@ -42,7 +42,7 @@ of the semester touches nothing but this app.
 | Endpoint | Gives us | Notes |
 |---|---|---|
 | `GET /clans` | clan search by name + filters (`minMembers`, `minClanLevel`, `warFrequency`, `locationId`, `limit`, `after`) | the only "search by name" the API has |
-| `GET /clans/{tag}` | full clan profile **including the whole roster inline** (`memberList`: role, TH, trophies, league, donations, donations received, XP, war preference) | roster + donation data in ONE call |
+| `GET /clans/{tag}` | full clan profile **including the whole roster inline** (`memberList`: role, TH, trophies, `leagueTier` (the ranked-ladder tier, the new themed league set with rank numbers; the legacy `league` object still arrives but is not read), donations, donations received, XP, war preference) | roster + donation data in ONE call |
 | `GET /players/{tag}` | player profile: unit arrays with `level` + `maxLevel`, heroes, spells, achievements, league | everything the rushed engine needs ([05](./05-scoring-engines.md)) |
 | `GET /clans/{tag}/currentwar` | live war state, both clans' stars/destruction, per-member attacks | works for every clan |
 | `GET /clans/{tag}/warlog` | war history with results | **only for clans with a public log**, 403 otherwise |
@@ -58,9 +58,12 @@ of the semester touches nothing but this app.
   so the search bar takes both and a leading `#` is what says "tag, not
   name" (bare tags and names share the same alphabet). We never promise
   name-based player search.
-- **Tags start with `#`** and must be URL-encoded (`%23`). Exactly one
-  module owns the tag rule and its wording; exactly one layer owns
-  encoding.
+- **Tags start with `#`** and must be URL-encoded (`%23`) on the upstream
+  path. Exactly one module owns the tag rule and its wording; exactly one
+  layer owns encoding. The browser's own URLs carry the bare tag
+  (`/clan/2JPCYP98L`) for clean sharing: the `%23` lives only inside the
+  tier request, hidden from the visitor, and legacy `%23` links still
+  resolve.
 - **`memberList` is complete.** The roster screen needs no per-member fetches:
   donations, trophies, and XP all arrive with the clan call. This is why the
   clan screen is one cached request, not fifty.

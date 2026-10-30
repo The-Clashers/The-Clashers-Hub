@@ -158,7 +158,7 @@ SR-08 to SR-19.
 
 | ID | System requirement | Status |
 |---|---|---|
-| SR-13 | The tag rule lives in exactly one module (src/lib/tag.ts): the player box accepts a tag with or without the # prefix, normalizes it (uppercase, prepend #), and routes to /player/:tag with the tag URL-encoded; the clan search bar runs the same rule when its input starts with # and routes to /clan/:tag the same way | Draft |
+| SR-13 | The tag rule lives in exactly one module (src/lib/tag.ts): the player box accepts a tag with or without the # prefix, normalizes it (uppercase, prepend #), and routes to /player/:tag carrying the bare tag (no #, no %23) so shareable links read clean; the route param is canonicalized back to #TAG by the same module, and legacy %23 links still resolve. The clan search bar runs the same rule when its input starts with # and routes to /clan/:tag the same way | Draft |
 | SR-14 | The player screen fetches GET /api/player/:tag (300 s TTL) and computes the rushed analysis client-side: overall percentage, per-category breakdown, top-deficit list, with super-troop levels normalized against their base troop and entries lacking a maxLevel skipped with a footnote | Draft |
 | SR-15 | The player screen renders the hero grid (level versus maximum, equipment where the API exposes it) and the achievements list with progress rails and stars, all from the single player response | Draft |
 | SR-16 | The progression grid renders entirely from the same single GET /api/player/:tag response: unit icons resolve through the bundled static icon map with the placeholder fallback, and maxed-for-Town-Hall indicators come from the bundled Town Hall cap reference tables; no request beyond the player fetch is made | Draft |

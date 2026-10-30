@@ -43,9 +43,14 @@ rides along wherever it fits.
 | `/compare/players?a=:tag&b=:tag` | Player compare | P1 |
 | `/compare/clans?a=:tag&b=:tag` | Clan compare | P1 |
 
-Notes on tags: game tags start with `#` and are URL-encoded as `%23`; the
-router and the `TagInput` component own normalization (uppercase, prepend `#`)
-in exactly one place each, never scattered.
+Notes on tags: game tags start with `#`, but the shareable URL carries the
+bare tag (`/player/ABC123`, `/clan/2JPCYP98L`) so a pasted link reads clean
+in a chat. The `#` stays hidden: `lib/tag.ts` re-attaches it to a route
+param in exactly one place (`canonicalTagFromRoute`), and `%23` appears only
+on the tier request path, never in the browser's address bar. Legacy `%23`
+links still resolve, because the router decodes them before the
+canonicalizer sees them. Normalization (uppercase, prepend `#`) owns one
+module, never scattered.
 
 ## 3. The two golden paths
 
@@ -70,14 +75,19 @@ error (upstream busy / not found), empty
 
 - **Search:** bar + filters + results; handles "no results" with relaxed-filter
   suggestions.
-- **Clan detail:** identity block (badge, name, tag, level, description,
-  location, requirements, war frequency), stat chips (members, win streak,
-  war wins, points), tab bar, roster table.
+- **Clan detail:** compact horizontal identity block (badge, name, tag,
+  level, description, location) with the stat chips and join requirements
+  merged into one left-to-right details band, short height; tab bar, roster
+  table.
 - **Roster:** columns role / TH / trophies / league / donations / received /
   XP (war-preference is not in the clan response, and SR-09 forbids
   per-member fetches, so it renders only where the player payload is
-  already in hand); ratio flag chip per row; summary strip (average TH,
-  total donations, flagged count); needs-attention sort.
+  already in hand); the league column reads the ranked-ladder tier
+  (`leagueTier`, the new themed league set with its rank number); ratio flag
+  chip per row showing the member's `ratio : 1`; summary strip (average TH,
+  total donations, flagged count); needs-attention sort. The roster renders
+  in page flow: the browser scrollbar owns the scrolling, no inner scroll
+  window.
 - **Player detail:** header (name, tag, TH, league, XP, clan role), rushed
   panel (overall gauge + category bars + top-deficit list), progression grid
   (every unit of both villages with icon, level, and maxed-for-Town-Hall

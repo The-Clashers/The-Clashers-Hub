@@ -101,7 +101,10 @@ content skipped" footnote; a payload with zero usable units returns `null`
 
 **Mechanics:**
 
-- `ratio = given / max(received, 1)`, displayed `given : received`.
+- `ratio = given / max(received, 1)`, displayed on the chip as `ratio : 1`
+  (one decimal at most; a saint reads `∞ : 1`, no data reads as a dash). The
+  raw given/received counters stay in their own roster columns instead of
+  being repeated inside the chip.
 - Target ratio `R` (default 1.0, adjustable client-side with instant
   re-computation, the engine is local, so no refetch).
 - A member is **flagged** when `given < R × received` and `received` exceeds a

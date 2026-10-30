@@ -140,18 +140,26 @@ overscroll.
 ## 3. Layout
 
 - Centered content column, max width 1280, side padding from the spacing scale.
+- **Clan detail header:** compact and horizontal. The identity block (badge
+  48, name, tag, level, location, description clamped to two lines) reads
+  left to right, and the stat chips and join requirements merge into one
+  inline details band under it, short height (the owner's layout call).
 - **Roster table ↔ cards:** ≥ 768px a real sortable table; below, one card per
   member with the same columns stacked and a "Sort by" dropdown plus direction
   toggle riding above the list, because FR-04's six sorts carry no width
   qualifier. Same data, same sort rules (`lib/roster-sort.ts`), two
-  presentations.
+  presentations. The roster renders in page flow in both presentations: the
+  browser scrollbar owns the scrolling, no inner scroll window boxing the
+  list to the viewport (a clan caps at 50 members, the lists that actually
+  grow keep their FlatLists).
 - **Player detail:** ≥ 1024px two columns (identity + analysis); stacked below.
 - Breakpoints come from `useWindowDimensions` into a shared `breakpoints`
   helper, no CSS media queries scattered through components; RN paradigm is
   JS-driven layout.
-- Every list that can exceed ~30 rows is virtualized (FlatList), because
-  50-member rosters, paginated search results, and the progression grid's
-  ~100 unit tiles are the *normal* case.
+- Virtualize the lists that grow without bound: paginated search results and
+  the progression grid's ~100 unit tiles are the *normal* case. The roster is
+  page-flow by design (50-row cap, owner call: the list scrolls with the main
+  window, not inside a viewport-sized box).
 
 ## 4. Component inventory (shared kit)
 
@@ -163,8 +171,8 @@ overscroll.
 | `TagInput` | the player tag box: /player/:tag routing, through the one tag module ([03 §2](./03-features-list.md)) |
 | `PillButton` | the one pill button: search, retry, and footer-link actions all render it; primary gold, secondary raised panel, link role with the trailing arrow for footer-style links |
 | `ClanCard` | search result row: badge, level, members, location |
-| `StatChip` | label + value pair used on every header |
-| `RatioFlag` | donation-balance chip (good/warn/dash states) |
+| `StatChip` | label + value pair used on headers; the clan detail header is the recorded exception, it uses the compact inline details band (07 §3) |
+| `RatioFlag` | donation-balance chip: shows the member's `ratio : 1` (one decimal), good/warn/dash states |
 | `RosterTable` / `RosterCard` | the clan roster, table & card presentations |
 | `ProgressRail` | achievement value/target bar with star markers |
 | `CategoryBars` | rushed per-category horizontal bars |
@@ -200,12 +208,15 @@ overscroll.
 - Contrast ≥ 4.5:1 checked against the token pairs during M0 review; muted
   text on panels is the pair most likely to fail, so it's verified first.
 - Touch targets ≥ 44px on the card presentation (phone web is a real target).
+  One recorded exception: the clan detail tab strip runs compact
+  (padding-driven, ~34 px buttons, the owner's call to shave its height); it
+  stays keyboard-focusable with the visible gold ring.
 
 ## 7. Imagery
 
 Two icon sources, one rule each.
 
-- **API icons:** clan badges and league icons come from the game API's own
+- **API icons:** clan badges and league-tier icons come from the game API's own
   `iconUrls` (public CDN). They are rendered with RN `Image` (an `<img>` on
   web) in fixed layout slots (badge 48, league icon 24) so slow CDN loads
   never reflow the layout.
