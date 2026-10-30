@@ -57,10 +57,13 @@ import {
 // <clan name>, the location line that also says where the back path goes
 // (the owner's call; the back-to-search button retired with it).
 //
-// The clan details card renders two columns (the owner's layout from the
-// uploaded wireframe): the identity (badge, name, tag/level/location,
-// description) on the left, the stat chips and join requirements centered
-// on the right, stacked below 768 px.
+// The clan details card stacks three bands (the owner's better-layout
+// call over the two-column wireframe): the identity row (badge, name, the
+// tag/level/location line), the description under it, then a hairline and
+// a uniform stat grid, four cells per row from tablet up and two below
+// it. The war log's public/private status is one of the grid cells, so a
+// visitor knows before opening the Log tab whether there is anything to
+// read.
 //
 // The tab bar reads `?tab=` from the URL (03 section 2 "Screens & URLs") so
 // a deep link to the War, Log, or Needs Attention tab is shareable (F-12).
@@ -204,13 +207,15 @@ export default function ClanScreen() {
     <View style={base.appRoot}>
       <View style={base.screen}>
         <View style={[base.contentColumn, styles.column]}>
-          <Breadcrumbs
-            crumbs={[
-              { label: 'Home', route: '/' },
-              { label: 'Clans', route: '/clans' },
-              { label: currentCrumb },
-            ]}
-          />
+          <View style={styles.breadcrumbWrap}>
+            <Breadcrumbs
+              crumbs={[
+                { label: 'Home', route: '/' },
+                { label: 'Clans', route: '/clans' },
+                { label: currentCrumb },
+              ]}
+            />
+          </View>
 
           {query.isPending ? (
             <ClanLoading busyRetrying={busyRetrying} />
@@ -282,42 +287,41 @@ interface ClanSuccessProps {
 }
 
 function ClanSuccess({ clan, base, styles }: ClanSuccessProps) {
-  // The two-column details card (the owner's layout from the uploaded
-  // wireframe): identity on the left (badge, name, the tag/level/location
-  // line, description clamped to two lines), a hairline divider, and the
-  // stat chips plus join requirements centered on the right, stacked below
-  // 768 px where the columns would squeeze each other. Every F-04 datum
-  // survives, arranged as two columns instead of one horizontal band.
-  // The badge is an API icon (07 section 7) in the 48 px slot, rendered
-  // through RN Image so a slow CDN load never reflows the block; a missing
-  // badge gets a quiet block instead, never a broken-image glyph.
+  // The details card as three stacked bands (the owner's better-layout
+  // call): the identity row (badge, name, the tag/level/location line),
+  // the description under it at full width, then a hairline and a uniform
+  // stat grid. Every F-04 datum survives; the grid replaces the old
+  // centered chip wrap, which read as a ragged cloud of unequal chips
+  // (the owner's screenshot note). Four cells per row from tablet up, two
+  // below, and the war log's public/private visibility is one of the
+  // cells. The badge is an API icon (07 section 7) in the 48 px slot,
+  // rendered through RN Image so a slow CDN load never reflows the block;
+  // a missing badge gets a quiet block instead, never a broken-image
+  // glyph.
   const { width } = useWindowDimensions();
-  const twoColumns = breakpointFor(width) === 'tablet' || breakpointFor(width) === 'desktop';
+  const breakpoint = breakpointFor(width);
+  const twoColumns = breakpoint === 'tablet' || breakpoint === 'desktop';
   const badgeUri = clan.badgeUrls?.medium || clan.badgeUrls?.small;
   const locationName = clan.location?.name ?? 'No location';
-  // The details column: the stat chips and the join requirements as one
-  // centered wrap of inline label-value chips, in the wireframe's order
-  // (requirements first, then the war stats, Points last). Trophies and TH
-  // read as the join requirements they are ("Trophies req", "TH req") so
-  // the column needs no group headings to stay honest.
-  const details: ReadonlyArray<{ label: string; value: string }> = [
+  // The stat grid, ordered clan vitals first (what the clan is), then the
+  // war facts and the join requirements. The cells render as one flat
+  // uniform grid, no group headings; the labels carry the grouping.
+  const stats: ReadonlyArray<{ label: string; value: string }> = [
+    { label: 'Members', value: String(clan.members) },
+    { label: 'Points', value: String(clan.clanPoints) },
+    { label: 'War wins', value: String(clan.warWins) },
+    { label: 'Win streak', value: String(clan.warWinStreak) },
+    { label: 'War', value: warFrequencyLabel(clan.requirements.warFrequency) },
+    { label: 'War log', value: clan.isWarLogPublic ? 'Public' : 'Private' },
     { label: 'Trophies req', value: String(clan.requirements.requiredTrophies) },
     ...(clan.requirements.requiredTownhallLevel !== undefined
       ? [{ label: 'TH req', value: `TH ${clan.requirements.requiredTownhallLevel}` }]
       : []),
-    { label: 'War', value: warFrequencyLabel(clan.requirements.warFrequency) },
-    { label: 'Members', value: String(clan.members) },
-    { label: 'Win streak', value: String(clan.warWinStreak) },
-    { label: 'War wins', value: String(clan.warWins) },
-    { label: 'Points', value: String(clan.clanPoints) },
   ];
 
   return (
-    <View
-      style={[styles.successWrap, twoColumns ? styles.detailColumns : styles.detailStacked]}
-      accessibilityLabel={`${clan.name} clan detail`}
-    >
-      <View style={twoColumns ? styles.identityColumn : styles.identityStacked}>
+    <View style={styles.successWrap} accessibilityLabel={`${clan.name} clan detail`}>
+      <View style={styles.identityRow}>
         {badgeUri ? (
           <Image
             source={{ uri: badgeUri }}
@@ -342,27 +346,29 @@ function ClanSuccess({ clan, base, styles }: ClanSuccessProps) {
             </Text>
             <Text style={styles.locationLine}>{locationName}</Text>
           </View>
-          {clan.description ? (
-            <Text style={styles.description} numberOfLines={2}>
-              {clan.description}
-            </Text>
-          ) : null}
         </View>
       </View>
 
-      {twoColumns ? <View style={styles.columnDivider} aria-hidden /> : null}
+      {clan.description ? (
+        <Text style={styles.description} numberOfLines={2}>
+          {clan.description}
+        </Text>
+      ) : null}
 
-      <View style={styles.statsColumn}>
-        <View style={styles.detailsRow}>
-          {details.map((detail) => (
-            <View key={detail.label} style={styles.detailChip}>
-              <Text style={styles.detailChipLabel}>{detail.label}</Text>
-              <Text style={styles.detailChipValue} numberOfLines={1}>
-                {detail.value}
-              </Text>
-            </View>
-          ))}
-        </View>
+      <View style={styles.statDivider} aria-hidden />
+
+      <View style={styles.statGrid}>
+        {stats.map((stat) => (
+          <View
+            key={stat.label}
+            style={[styles.statCell, twoColumns ? styles.statCellQuarter : styles.statCellHalf]}
+          >
+            <Text style={styles.statLabel}>{stat.label}</Text>
+            <Text style={styles.statValue} numberOfLines={1}>
+              {stat.value}
+            </Text>
+          </View>
+        ))}
       </View>
     </View>
   );
@@ -381,19 +387,23 @@ interface ClanLoadingProps {
 // would hold only the header's height and the page would visibly grow and
 // reflow the moment data landed (the layout-matched rule, 06 section 3).
 // Every size here mirrors a real element; if the success layout changes,
-// this follows in the same PR. The detail half mirrors the two-column
-// card: the identity skeleton on the left (badge 48, one-line name, meta
-// line, two-line description) and the centered chips wrap on the right.
+// this follows in the same PR. The detail half mirrors the stacked card:
+// the identity row (badge 48, one-line name, meta line), the two-line
+// description, the hairline, and the uniform stat grid (8 cells, 4 per
+// row from tablet up, 2 below).
 
 // The identity block's fixed badge slot (the success state renders the
 // API badge at this size, 07 section 7).
 const SKELETON_BADGE_SLOT = 48;
 
-// Line widths chosen to read as a name and a meta line; the detail chips
-// mirror the inline label-value pairs they stand in for.
+// Line widths chosen to read as a name and a meta line; the stat cells
+// mirror the uniform grid they stand in for.
 const SKELETON_NAME_WIDTH = 220;
 const SKELETON_META_WIDTH = 180;
-const SKELETON_DETAIL_WIDTH = 72;
+
+// The stat cells the skeleton draws, matching the success grid's usual
+// count (8 when the clan sets a TH requirement).
+const SKELETON_STAT_CELLS = 8;
 
 // Enough roster rows to fill a laptop viewport; the roster renders in
 // page flow now, so the skeleton shows the first screenful and the page
@@ -417,12 +427,8 @@ function ClanLoading({ busyRetrying }: ClanLoadingProps) {
   return (
     <>
       <View style={[base.panelRaised, styles.detailPanel]}>
-        <View
-          style={[styles.identityWrap, twoColumns ? styles.identityWrapColumns : null]}
-          accessibilityRole="progressbar"
-          accessibilityLabel="Loading clan"
-        >
-          <View style={styles.identity}>
+        <View style={styles.identityWrap} accessibilityRole="progressbar" accessibilityLabel="Loading clan">
+          <View style={styles.identityRow}>
             <SkeletonBlock
               width={SKELETON_BADGE_SLOT}
               height={SKELETON_BADGE_SLOT}
@@ -432,21 +438,22 @@ function ClanLoading({ busyRetrying }: ClanLoadingProps) {
             <View style={styles.identityText}>
               <SkeletonBlock width={SKELETON_NAME_WIDTH} height={theme.fontSize.xl} pulse={pulse} />
               <SkeletonBlock width={SKELETON_META_WIDTH} height={theme.fontSize.xs} pulse={pulse} />
-              <SkeletonBlock
-                width="100%"
-                height={Math.round(theme.lineHeight.normal * theme.fontSize.sm) * 2}
-                pulse={pulse}
-              />
             </View>
           </View>
-          <View style={styles.detailsRow}>
-            {[0, 1, 2, 3, 4, 5, 6].map((index) => (
-              <View key={index} style={styles.detailChip}>
-                <SkeletonBlock
-                  width={SKELETON_DETAIL_WIDTH}
-                  height={theme.fontSize.sm}
-                  pulse={pulse}
-                />
+          <SkeletonBlock
+            width="100%"
+            height={Math.round(theme.lineHeight.normal * theme.fontSize.sm) * 2}
+            pulse={pulse}
+          />
+          <View style={styles.statDivider} aria-hidden />
+          <View style={styles.statGrid}>
+            {Array.from({ length: SKELETON_STAT_CELLS }, (_, index) => (
+              <View
+                key={index}
+                style={[styles.statCell, twoColumns ? styles.statCellQuarter : styles.statCellHalf]}
+              >
+                <SkeletonBlock width="70%" height={theme.fontSize.xs} pulse={pulse} />
+                <SkeletonBlock width="50%" height={theme.fontSize.sm} pulse={pulse} />
               </View>
             ))}
           </View>
@@ -1080,8 +1087,8 @@ function attentionNoteStyle(t: ReturnType<typeof useTheme>['theme']) {
 // The loading skeleton's own styles (STD-13, the RosterSection pattern).
 // Each block mirrors the success element it stands in for; the mirror is
 // the point (layout-matched, 06 section 3), so a change to the success
-// layout is a change here in the same PR. Updated with the two-column
-// detail card: identity left, centered chips right, four tab cells.
+// layout is a change here in the same PR. Updated with the stacked detail
+// card: identity row, description, hairline, stat grid, four tab cells.
 function createClanLoadingStyles(t: ReturnType<typeof useTheme>['theme']) {
   const c = t.colors;
   return StyleSheet.create({
@@ -1091,20 +1098,13 @@ function createClanLoadingStyles(t: ReturnType<typeof useTheme>['theme']) {
     },
     // Mirrors the success wrap's stack and gap.
     identityWrap: {
-      gap: t.spacing[4],
+      gap: t.spacing[5],
     },
-    // Mirrors the two-column card: identity left, chips right.
-    identityWrapColumns: {
-      flexDirection: 'row',
-      columnGap: t.spacing[6],
-      alignItems: 'flex-start',
-    },
-    identity: {
+    // Mirrors the identity row: badge slot beside the name/meta column.
+    identityRow: {
       flexDirection: 'row',
       alignItems: 'flex-start',
       gap: t.spacing[4],
-      flex: 1.5,
-      minWidth: 0,
     },
     identityText: {
       flex: 1,
@@ -1112,27 +1112,29 @@ function createClanLoadingStyles(t: ReturnType<typeof useTheme>['theme']) {
       minWidth: 0,
     },
 
-    // Mirrors the centered chips wrap on the right of the two-column card.
-    detailsRow: {
+    // Mirrors the hairline between the description and the stat grid, and
+    // the grid itself: the same wrap, gaps, and cell bases the success
+    // state renders so the skeleton holds the exact cell positions.
+    statDivider: {
+      height: 1,
+      backgroundColor: c.hairline,
+    },
+    statGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      alignItems: 'center',
-      alignContent: 'center',
-      justifyContent: 'center',
-      columnGap: t.spacing[2],
-      rowGap: t.spacing[2],
-      flex: 1,
+      columnGap: t.spacing[4],
+      rowGap: t.spacing[4],
     },
-    detailChip: {
-      flexDirection: 'row',
-      alignItems: 'baseline',
-      columnGap: t.spacing[2],
-      backgroundColor: c.panel,
-      borderRadius: t.radius[1],
-      borderWidth: 1,
-      borderColor: c.panelBorder,
-      paddingHorizontal: t.spacing[3],
-      paddingVertical: t.spacing[2],
+    statCell: {
+      flexGrow: 1,
+      flexShrink: 1,
+      gap: t.spacing[1],
+    },
+    statCellQuarter: {
+      flexBasis: '22%',
+    },
+    statCellHalf: {
+      flexBasis: '46%',
     },
     caption: {
       marginTop: t.spacing[1],
@@ -1196,46 +1198,27 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     column: {
       flex: 1,
     },
+    // The crumbs sit a full step above the details card (the owner's
+    // "too near the card" note); the wrap owns that distance so the
+    // loading and error states keep it too.
+    breadcrumbWrap: {
+      marginBottom: t.spacing[4],
+    },
     detailPanel: {
       gap: t.spacing[5],
     },
 
-    // success: the two-column details card. The identity (badge, name,
-    // tag/level/location, description) takes the left, the stat chips and
-    // join requirements center on the right (the owner's layout from the
-    // uploaded wireframe, "make them centered"); below 768 px the columns
-    // stack, identity first.
+    // success: the stacked details card. The identity row (badge, name,
+    // tag/level/location line), the description under it, a hairline, and
+    // the uniform stat grid: 4 cells per row from tablet up, 2 below. The
+    // cells flex within their row so the grid stays even at any width.
     successWrap: {
-      gap: t.spacing[4],
-    },
-    detailColumns: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      columnGap: t.spacing[6],
-    },
-    detailStacked: {
-      flexDirection: 'column',
       gap: t.spacing[5],
     },
-    identityColumn: {
-      flex: 1.5,
-      minWidth: 0,
-    },
-    identityStacked: {
+    identityRow: {
       flexDirection: 'row',
       alignItems: 'flex-start',
       gap: t.spacing[4],
-    },
-    columnDivider: {
-      width: 1,
-      alignSelf: 'stretch',
-      backgroundColor: c.hairline,
-    },
-    statsColumn: {
-      flex: 1,
-      minWidth: 0,
-      alignItems: 'center',
-      justifyContent: 'center',
     },
     identityText: {
       flex: 1,
@@ -1294,29 +1277,31 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       color: c.textMuted,
     },
 
-    // details column: stats and join requirements as one centered wrap of
-    // inline label-value chips
-    detailsRow: {
+    // the uniform stat grid: one flat wrap of label-above-value cells
+    statDivider: {
+      height: 1,
+      backgroundColor: c.hairline,
+    },
+    statGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      alignItems: 'center',
-      alignContent: 'center',
-      justifyContent: 'center',
-      columnGap: t.spacing[2],
-      rowGap: t.spacing[2],
+      columnGap: t.spacing[4],
+      rowGap: t.spacing[4],
     },
-    detailChip: {
-      flexDirection: 'row',
-      alignItems: 'baseline',
-      columnGap: t.spacing[2],
-      backgroundColor: c.panel,
-      borderRadius: t.radius[1],
-      borderWidth: 1,
-      borderColor: c.panelBorder,
-      paddingHorizontal: t.spacing[3],
-      paddingVertical: t.spacing[2],
+    // The basis sits under a half row so the wrap lands on even columns
+    // (4 up, 2 below) while flexGrow fills each line to the edges.
+    statCell: {
+      flexGrow: 1,
+      flexShrink: 1,
+      gap: t.spacing[1],
     },
-    detailChipLabel: {
+    statCellQuarter: {
+      flexBasis: '22%',
+    },
+    statCellHalf: {
+      flexBasis: '46%',
+    },
+    statLabel: {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.xs,
       fontWeight: t.fontWeight.medium,
@@ -1324,7 +1309,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       textTransform: 'uppercase',
       letterSpacing: 0.6,
     },
-    detailChipValue: {
+    statValue: {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.sm,
       fontWeight: t.fontWeight.semibold,

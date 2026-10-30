@@ -21,6 +21,19 @@
         display: flex;
         flex-direction: column;
       }
+      /* The document owns the scrolling on the page-flow screens (the
+         roster tab, and the clan search since it joined the same scroll
+         model), so switching between a short page and a long one would
+         toggle the document scrollbar and reflow every centered and
+         full-width element (the owner's "screen size changing" note).
+         scrollbar-gutter: stable is the standard fix: the gutter is
+         reserved always, the scrollbar only paints when there is
+         something to scroll, and no element shifts when it appears.
+         Overlay-scrollbar platforms (macOS, mobile) reserve nothing and
+         never shifted in the first place. */
+      html {
+        scrollbar-gutter: stable;
+      }
     </style>
   </head>
   <body>

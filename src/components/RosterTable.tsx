@@ -10,11 +10,14 @@ import type { ClanMember } from '../api/clan';
 // The roster's table presentation (07 section 4), rendered at 768 px and up
 // (NFR-05). Sortable columns are the six FR-04 names: role, Town Hall,
 // trophies, donations given, donations received, XP. The league moved up
-// against the member (the owner's layout): the first column is RANK, the
-// tier icon with the rank number parsed out of the tier name, and the
-// member column after it is name and tag. The ratio chip no longer lives
-// here; the Needs Attention tab renders its own table (the owner's call),
-// so this table shows the plain roster.
+// against the member (the owner's layout): the RANK column carries the tier
+// icon with the rank number parsed out of the tier name, and a separate
+// leading # column carries the member's position in the current order
+// (the owner's call), the same shape the needs-attention table opens with
+// so the two tables read as one family. The member column after it is name
+// and tag. The ratio chip no longer lives here; the Needs Attention tab
+// renders its own table (the owner's call), so this table shows the plain
+// roster.
 //
 // Structure and keyboard path follow the house pattern the search results
 // already use: the table container carries the grid role, the header row
@@ -29,20 +32,27 @@ import type { ClanMember } from '../api/clan';
 // 50 members, so the whole table renders at once with no virtualization
 // and no inner scroll window that fights the page scroll (07 section 3).
 
-// Column layouts. The member text column flexes; the metric columns take
-// fixed widths so columns of tabular numbers line up without the header
-// guessing at content width. At the 768 px floor the fixed columns sum to
-// about 600 px, leaving the member column the rest; below 768 the card
-// presentation takes over entirely.
-const NAME_FLEX = 1.6;
+// Column layouts. The name column flexes from a modest basis and the six
+// label/metric columns grow a small share each, so wide viewports spread
+// the slack across the whole row instead of pouring all of it into the
+// name column (the owner's "name column is too wide" note): at the 1280 px
+// content max the name lands near 300 px rather than the ~500 px a lone
+// flex column would take. # and rank stay fixed (an icon and one- or
+// two-digit numbers never need more). At the 768 px floor the fixed
+// columns plus the name's basis sum to about 690 px, leaving the name
+// column its shrink slack; below 768 the card presentation takes over
+// entirely.
+const NAME_BASIS = 160;
+const COLUMN_GROW = 0.4;
 const COLUMN_WIDTHS = {
-  rank: 72,
-  role: 92,
-  townHall: 52,
-  trophies: 84,
-  donations: 76,
-  received: 88,
-  xp: 56,
+  number: 40,
+  rank: 64,
+  role: 88,
+  townHall: 48,
+  trophies: 80,
+  donations: 72,
+  received: 84,
+  xp: 48,
 } as const;
 
 // Micro-label tracking: the one-off 0.6 px tracking the design language
@@ -54,7 +64,7 @@ const SORT_ARROW: Record<RosterSortDirection, string> = {
   desc: '↓',
 };
 
-type ColumnId = 'rank' | 'name' | RosterSortKey;
+type ColumnId = 'number' | 'rank' | 'name' | RosterSortKey;
 
 interface ColumnSpec {
   id: ColumnId;
@@ -67,8 +77,15 @@ interface ColumnSpec {
 }
 
 const BASE_COLUMNS: ReadonlyArray<ColumnSpec> = [
+  {
+    id: 'number',
+    label: '#',
+    accessibilityLabel: 'Position in the roster',
+    sortable: false,
+    align: 'right',
+  },
   { id: 'rank', label: 'Rank', accessibilityLabel: 'League rank', sortable: false, align: 'left' },
-  { id: 'name', label: 'Member', accessibilityLabel: 'Member name and tag', sortable: false, align: 'left' },
+  { id: 'name', label: 'Name', accessibilityLabel: 'Member name and tag', sortable: false, align: 'left' },
   { id: 'role', label: 'Role', accessibilityLabel: 'Clan role', sortable: true, align: 'left' },
   { id: 'townHall', label: 'TH', accessibilityLabel: 'Town Hall level', sortable: true, align: 'right' },
   { id: 'trophies', label: 'Trophies', accessibilityLabel: 'Trophies', sortable: true, align: 'right' },
@@ -105,10 +122,11 @@ export default function RosterTable({
         onPressColumn={onPressColumn}
         columns={BASE_COLUMNS}
       />
-      {members.map((member) => (
+      {members.map((member, index) => (
         <RosterRow
           key={member.tag}
           member={member}
+          position={index + 1}
           styles={styles}
           onPress={() => onPressMember(member.tag)}
         />
@@ -170,16 +188,21 @@ function HeaderRow({ styles, sort, onPressColumn, columns }: HeaderRowProps) {
 
 interface RosterRowProps {
   member: ClanMember;
+  /** 1-based position in the rendered order: the # column. Clan order by
+   * default, the active sort otherwise, so the number is the order the
+   * visitor is looking at made visible. */
+  position: number;
   styles: ReturnType<typeof createStyles>;
   onPress: () => void;
 }
 
-function RosterRow({ member, styles, onPress }: RosterRowProps) {
+function RosterRow({ member, position, styles, onPress }: RosterRowProps) {
   const leagueName = member.leagueTier?.name ?? 'Unranked';
   // The whole row is the link (FR-04 "tapping a row opens that player"),
   // so the label reads the full row for screen readers and the hint says
-  // where it goes. Same contract as the search result cards.
-  const rowLabel = `${member.name}, ${clanRoleLabel(member.role)}, town hall ${member.townHallLevel}, ${member.trophies} trophies, ${leagueName}, donated ${member.donations}, received ${member.donationsReceived}, experience level ${member.expLevel}`;
+  // where it goes. Same contract as the search result cards. The position
+  // leads the label the same way the needs-attention table's does.
+  const rowLabel = `Number ${position}, ${member.name}, ${clanRoleLabel(member.role)}, town hall ${member.townHallLevel}, ${member.trophies} trophies, ${leagueName}, donated ${member.donations}, received ${member.donationsReceived}, experience level ${member.expLevel}`;
   return (
     <Pressable
       accessibilityRole="link"
@@ -189,6 +212,9 @@ function RosterRow({ member, styles, onPress }: RosterRowProps) {
       onKeyDown={linkEnterActivation(onPress)}
       style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
     >
+      <View style={columnStyle('number', styles)}>
+        <Text style={styles.cellNumber}>{position}</Text>
+      </View>
       <View style={columnStyle('rank', styles)}>
         <LeagueRank tier={member.leagueTier} />
       </View>
@@ -228,6 +254,8 @@ function RosterRow({ member, styles, onPress }: RosterRowProps) {
  * flex for the member column. One table, so one place. */
 function columnStyle(id: ColumnId, styles: ReturnType<typeof createStyles>) {
   switch (id) {
+    case 'number':
+      return styles.columnNumber;
     case 'rank':
       return styles.columnRank;
     case 'name':
@@ -343,34 +371,57 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       textAlign: 'right',
     },
 
-    // column layouts: metric columns fixed, the member column flex
+    // column layouts: # and rank fixed; the name column flexes from a
+    // modest basis; the six label/metric columns take fixed widths but
+    // grow a small share so wide viewports do not dump every spare pixel
+    // into the name column
+    columnNumber: {
+      width: COLUMN_WIDTHS.number,
+      alignItems: 'flex-end',
+      flexShrink: 0,
+    },
     columnRank: {
       width: COLUMN_WIDTHS.rank,
+      flexShrink: 0,
     },
     columnName: {
-      flex: NAME_FLEX,
+      flexGrow: 1,
+      flexShrink: 1,
+      flexBasis: NAME_BASIS,
     },
     columnRole: {
       width: COLUMN_WIDTHS.role,
+      flexGrow: COLUMN_GROW,
+      flexShrink: 0,
     },
     columnTownHall: {
       width: COLUMN_WIDTHS.townHall,
+      flexGrow: COLUMN_GROW,
+      flexShrink: 0,
       alignItems: 'flex-end',
     },
     columnTrophies: {
       width: COLUMN_WIDTHS.trophies,
+      flexGrow: COLUMN_GROW,
+      flexShrink: 0,
       alignItems: 'flex-end',
     },
     columnDonations: {
       width: COLUMN_WIDTHS.donations,
+      flexGrow: COLUMN_GROW,
+      flexShrink: 0,
       alignItems: 'flex-end',
     },
     columnReceived: {
       width: COLUMN_WIDTHS.received,
+      flexGrow: COLUMN_GROW,
+      flexShrink: 0,
       alignItems: 'flex-end',
     },
     columnXp: {
       width: COLUMN_WIDTHS.xp,
+      flexGrow: COLUMN_GROW,
+      flexShrink: 0,
       alignItems: 'flex-end',
     },
   });

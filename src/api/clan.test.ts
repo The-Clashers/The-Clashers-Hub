@@ -58,6 +58,7 @@ describe('fetchClan', () => {
     warWinStreak: 10,
     warWins: 31,
     clanPoints: 5800,
+    isWarLogPublic: true,
     age: 12,
   };
 
@@ -110,6 +111,7 @@ describe('fetchClan', () => {
       warWinStreak: 10,
       warWins: 31,
       clanPoints: 5800,
+      isWarLogPublic: true,
       age: 12,
     } satisfies ClanResponse);
   });
@@ -142,6 +144,9 @@ describe('fetchClan', () => {
     expect(clan.warWinStreak).toBe(0);
     expect(clan.warWins).toBe(0);
     expect(clan.clanPoints).toBe(0);
+    // The war log status defaults to private when the payload omits it,
+    // the safer read for a clan we know nothing about.
+    expect(clan.isWarLogPublic).toBe(false);
   });
 
   it('degrades member rows whose optional fields are missing', async () => {

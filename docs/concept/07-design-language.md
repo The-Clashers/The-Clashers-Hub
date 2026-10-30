@@ -154,23 +154,30 @@ overscroll.
   the compact exception the tab strip already records (07 section 6): the
   row heights are compact by the owner's call, while every pressable keeps
   the 44 px floor, keyboard focus, and the gold ring.
-- **Clan detail card:** two columns (the owner's layout from the uploaded
-  wireframe). Identity on the left (badge 48, name, tag/level/location
-  line, description clamped to two lines), a hairline divider, and the
-  stat chips plus join requirements centered on the right; stacked below
-  768 px. Breadcrumbs (`Home › Clans › <clan name>`) sit above the card
-  instead of a screen header, and carry the back path the removed
-  back-to-search button used to.
+- **Clan detail card:** three stacked bands (the owner's better-layout call
+  over the two-column wireframe). The identity row (badge 48, name,
+  tag/level/location line), the description at full width clamped to two
+  lines, a hairline divider, then a uniform stat grid: label-above-value
+  cells, four per row from tablet up and two below, carrying the vitals
+  (members, points, war wins, win streak), the war facts (frequency plus
+  the log's public/private status), and the join requirements. Breadcrumbs
+  (`Home › Clans › <clan name>`) sit above the card with a full spacing
+  step of clearance (the owner's spacing note) instead of a screen header,
+  and carry the back path the removed back-to-search button used to.
 - **Roster table ↔ cards:** ≥ 768px a real sortable table; below, one card per
   member with the same columns stacked and a "Sort by" dropdown plus direction
   toggle riding above the list, because FR-04's six sorts carry no width
   qualifier. Same data, same sort rules (`lib/roster-sort.ts`), two
   presentations. The roster renders in page flow in both presentations: the
   browser scrollbar owns the scrolling, no inner scroll window boxing the
-  list to the viewport (a clan caps at 50 members, the lists that actually
-  grow keep their FlatLists). The league column is gone: the rank (tier icon
+  list to the viewport (a clan caps at 50 members). A leading # column
+  carries the member's position in the current order (the owner's call),
+  the same shape the needs-attention table opens with; the rank (tier icon
   plus the number parsed from the tier name) sits in its own narrow column
-  beside the member, the way the game shows it.
+  beside the name, the way the game shows it. The name column flexes from
+  a modest basis while the six label/metric columns grow a small share
+  each, so wide viewports spread the slack across the row instead of
+  pouring it all into the name column (the owner's width note).
 - **Needs Attention tab ↔ cards:** the worst-first donation view renders its
   own table (number, rank, name, role, donated, received, ratio, attacks
   left) with the same 768 px switch to cards. No sort controls: the row
@@ -180,10 +187,14 @@ overscroll.
 - Breakpoints come from `useWindowDimensions` into a shared `breakpoints`
   helper, no CSS media queries scattered through components; RN paradigm is
   JS-driven layout.
-- Virtualize the lists that grow without bound: paginated search results and
-  the progression grid's ~100 unit tiles are the *normal* case. The roster is
-  page-flow by design (50-row cap, owner call: the list scrolls with the main
-  window, not inside a viewport-sized box).
+- Paginated search results render in page flow too (the owner's call,
+  retired from virtualization): 30 clans per page land in the document's
+  own scroll, and a sentinel under the last card loads the next page when
+  it nears the viewport, the same scroll model the roster uses. The
+  progression grid's ~100 unit tiles stay virtualized as the normal case.
+  Both page-flow lists rely on `scrollbar-gutter: stable` on the document
+  root so the scrollbar's appearance never reflows the page (the owner's
+  stable-window note).
 
 ## 4. Component inventory (shared kit)
 
