@@ -18,14 +18,18 @@ import EmptyState from '../components/EmptyState';
 import PillButton from '../components/PillButton';
 import RosterTable from '../components/RosterTable';
 import RosterCard from '../components/RosterCard';
+import Dropdown from '../components/Dropdown';
 import { fetchClan, ClanFetchError, type ClanMember } from '../api/clan';
 import { warFrequencyLabel } from '../lib/war-frequency';
 import { playerRouteFor } from '../lib/tag';
 import {
   CLAN_ORDER,
+  flipRosterSortDirection,
   nextRosterSortState,
+  rosterSortForSelection,
   sortRoster,
   type RosterSortKey,
+  type RosterSortSelection,
   type RosterSortState,
 } from '../lib/roster-sort';
 
@@ -434,6 +438,60 @@ function TabButton({ label, active, onPress, styles }: TabButtonProps) {
 const INITIAL_CARDS_TO_RENDER = 8;
 const CARDS_PER_BATCH = 12;
 
+// ---------- card sort bar ----------
+
+// The card presentation (below 768 px) has no column headers to press, so
+// the same six sortable columns surface as the kit's select-style control
+// (07 section 4): a "Sort members by" dropdown plus a direction toggle.
+// FR-04 carries no width qualifier, so a phone gets the same six sorts the
+// table does, through the same rules: what either control means for the
+// row order lives in lib/roster-sort.ts next to the table's header cycle,
+// and both presentations drive the one sort state RosterSection owns.
+// Option labels read the FR-04 column names in full (the table headers
+// stay terse because their meaning is positional).
+const SORT_OPTIONS: ReadonlyArray<{ label: string; value: RosterSortSelection }> = [
+  { label: 'Clan order', value: 'clan' },
+  { label: 'Role', value: 'role' },
+  { label: 'Town Hall', value: 'townHall' },
+  { label: 'Trophies', value: 'trophies' },
+  { label: 'Donations given', value: 'donations' },
+  { label: 'Donations received', value: 'received' },
+  { label: 'XP', value: 'xp' },
+];
+
+interface RosterCardSortBarProps {
+  /** The sort the roster is currently rendered in. */
+  sort: RosterSortState;
+  /** The one setter both controls drive; the lib rules decide the next state. */
+  onChange: (next: RosterSortState) => void;
+}
+
+function RosterCardSortBar({ sort, onChange }: RosterCardSortBarProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createRosterStyles(theme), [theme]);
+  // "Clan order" is the dropdown's reset option; it maps to the null key.
+  const selection: RosterSortSelection = sort.key ?? 'clan';
+  return (
+    <View style={styles.sortBar}>
+      <View style={styles.sortBarDropdown}>
+        <Dropdown
+          label="Sort members by"
+          options={SORT_OPTIONS}
+          value={selection}
+          onSelect={(next) => onChange(rosterSortForSelection(next, sort))}
+        />
+      </View>
+      <PillButton
+        label={sort.direction === 'asc' ? 'Ascending' : 'Descending'}
+        onPress={() => onChange(flipRosterSortDirection(sort))}
+        variant="secondary"
+        disabled={sort.key === null}
+        hint="Flips the sort direction of the picked column."
+      />
+    </View>
+  );
+}
+
 interface RosterSectionProps {
   members: ClanMember[];
 }
@@ -487,15 +545,22 @@ function RosterSection({ members }: RosterSectionProps) {
 
   if (isCardPresentation) {
     return (
-      <FlatList
-        data={sortedMembers}
-        keyExtractor={(member) => member.tag}
-        renderItem={({ item }) => <RosterCard member={item} onPress={openMember} />}
-        initialNumToRender={INITIAL_CARDS_TO_RENDER}
-        maxToRenderPerBatch={CARDS_PER_BATCH}
-        contentContainerStyle={styles.rosterListContent}
-        style={styles.rosterList}
-      />
+      // The wrapper must flex like the table's grid wrapper so the
+      // FlatList below the sort bar stays the scroll container (the same
+      // RNWeb lesson RosterTable documents); the bar rides above the list,
+      // reachable while the roster scrolls.
+      <View style={styles.cardPresentation}>
+        <RosterCardSortBar sort={sort} onChange={setSort} />
+        <FlatList
+          data={sortedMembers}
+          keyExtractor={(member) => member.tag}
+          renderItem={({ item }) => <RosterCard member={item} onPress={openMember} />}
+          initialNumToRender={INITIAL_CARDS_TO_RENDER}
+          maxToRenderPerBatch={CARDS_PER_BATCH}
+          contentContainerStyle={styles.rosterListContent}
+          style={styles.rosterList}
+        />
+      </View>
     );
   }
 
@@ -542,6 +607,29 @@ function TabPlaceholder({ tab }: TabPlaceholderProps) {
 // like any component, never receives the screen's stylesheet as a prop.
 function createRosterStyles(t: ReturnType<typeof useTheme>['theme']) {
   return StyleSheet.create({
+    // The card presentation's wrapper: flexes like the table's grid wrapper
+    // so the FlatList below the sort bar stays the scroll container.
+    cardPresentation: {
+      flex: 1,
+    },
+    // The sort bar rides above the scrolling list. Bottom-aligned so the
+    // direction pill lines up with the dropdown's trigger, not its micro
+    // label; wraps at the 360 px floor so the pill never squeezes the
+    // trigger's value text.
+    sortBar: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      flexWrap: 'wrap',
+      columnGap: t.spacing[3],
+      rowGap: t.spacing[2],
+      marginBottom: t.spacing[3],
+    },
+    sortBarDropdown: {
+      flexGrow: 1,
+      flexShrink: 1,
+      flexBasis: 180,
+      minWidth: 0,
+    },
     // The card list's scroll container; the table presentation brings its
     // own inside RosterTable.
     rosterList: {
