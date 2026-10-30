@@ -12,7 +12,7 @@ cross-reference the tracker in [02](./02-requirements-tracker.md).
 | F-02 | Search results: virtualized card list, badge, level, members, location, war frequency; cursor pagination | P0 | FR-01 | |
 | F-03 | Tag lookup: paste-a-tag box on the home screen (accepts `#ABC123` or `ABC123`, normalized) | P0 | FR-02 | the only way to reach a player without a clan; the game has no player search by name |
 | F-04 | Clan detail: header + stats + roster | P0 | FR-03 | tabs: Roster / War / Log |
-| F-05 | Roster table: sortable, tap-through to player; donation flags inline; "needs attention" sort toggle | P0 | FR-04, FR-05 | switches to cards below 768px |
+| F-05 | Roster table: sortable, tap-through to player; donation flags inline; "needs attention" sort toggle | P0 | FR-04, FR-05 | switches to cards below 768px; the cards keep the six sorts through a "Sort by" dropdown and direction toggle (07 section 3) |
 | F-06 | Player detail: profile + rushed analysis + achievements + heroes | P0 | FR-06, FR-07, FR-08, FR-09 | the analysis centerpiece |
 | F-07 | Donation balance: per-member flags + clan-level health summary | P0 | FR-05 | target ratio adjustable client-side |
 | F-08 | Current war view | P1 | FR-10 | standings + per-member table |
