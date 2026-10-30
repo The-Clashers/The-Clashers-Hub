@@ -108,6 +108,10 @@ export interface RosterTableProps {
   /** When set, a Ratio column is appended and each flagged row renders the
    * RatioFlag chip from its verdict. Undefined when needs-attention is off. */
   verdictByTag?: Map<string, DonationVerdict>;
+  /** While the needs-attention view owns the row order, a column press does
+   * not change the order, so the header buttons disable rather than show a
+   * sort arrow that is not in effect. Undefined (enabled) otherwise. */
+  sortDisabled?: boolean;
 }
 
 export default function RosterTable({
@@ -116,6 +120,7 @@ export default function RosterTable({
   onPressColumn,
   onPressMember,
   verdictByTag,
+  sortDisabled = false,
 }: RosterTableProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -134,6 +139,7 @@ export default function RosterTable({
             sort={sort}
             onPressColumn={onPressColumn}
             columns={columns}
+            sortDisabled={sortDisabled}
           />
         }
         renderItem={({ item }) => (
@@ -161,9 +167,10 @@ interface HeaderRowProps {
   sort: RosterSortState;
   onPressColumn: (key: RosterSortKey) => void;
   columns: ReadonlyArray<ColumnSpec>;
+  sortDisabled: boolean;
 }
 
-function HeaderRow({ styles, sort, onPressColumn, columns }: HeaderRowProps) {
+function HeaderRow({ styles, sort, onPressColumn, columns, sortDisabled }: HeaderRowProps) {
   return (
     <View accessibilityRole="row" style={styles.headerRow}>
       {columns.map((column) => {
@@ -190,7 +197,12 @@ function HeaderRow({ styles, sort, onPressColumn, columns }: HeaderRowProps) {
               }
               accessibilityHint="Sorts the roster by this column. Press again to reverse; a third press returns to clan order."
               onPress={() => onPressColumn(column.id as RosterSortKey)}
-              style={({ pressed }) => [styles.headerButton, pressed && styles.headerButtonPressed]}
+              disabled={sortDisabled}
+              style={({ pressed }) => [
+                styles.headerButton,
+                pressed && styles.headerButtonPressed,
+                sortDisabled && styles.headerButtonDisabled,
+              ]}
             >
               <Text style={[styles.headerLabel, labelAlign, active && styles.headerLabelActive]}>
                 {column.label}
@@ -359,6 +371,9 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     },
     headerButtonPressed: {
       opacity: 0.7,
+    },
+    headerButtonDisabled: {
+      opacity: 0.5,
     },
     headerLabel: {
       fontFamily: t.fontFamily.sans,

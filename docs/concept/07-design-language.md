@@ -141,7 +141,10 @@ overscroll.
 
 - Centered content column, max width 1280, side padding from the spacing scale.
 - **Roster table ↔ cards:** ≥ 768px a real sortable table; below, one card per
-  member with the same columns stacked. Same data, two presentations.
+  member with the same columns stacked and a "Sort by" dropdown plus direction
+  toggle riding above the list, because FR-04's six sorts carry no width
+  qualifier. Same data, same sort rules (`lib/roster-sort.ts`), two
+  presentations.
 - **Player detail:** ≥ 1024px two columns (identity + analysis); stacked below.
 - Breakpoints come from `useWindowDimensions` into a shared `breakpoints`
   helper, no CSS media queries scattered through components; RN paradigm is
