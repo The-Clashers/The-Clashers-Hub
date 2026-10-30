@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  canonicalTagFromRoute,
   clanRouteFor,
-  encodeTagForRoute,
   normalizeTagInput,
   playerRouteFor,
   TAG_REJECT_COPY,
@@ -53,34 +53,51 @@ describe('normalizeTagInput', () => {
   });
 });
 
-describe('encodeTagForRoute', () => {
-  it('encodes the hash so the router sees one path segment', () => {
-    expect(encodeTagForRoute('#ABC123')).toBe('%23ABC123');
+describe('canonicalTagFromRoute', () => {
+  it('re-attaches the hash to the bare tag the shareable URL carries', () => {
+    expect(canonicalTagFromRoute('JGYCPCUJ')).toBe('#JGYCPCUJ');
   });
 
-  it('round-trips through decodeURIComponent back to the canonical tag', () => {
-    const tag = '#JGYCPCUJ';
-    expect(decodeURIComponent(encodeTagForRoute(tag))).toBe(tag);
+  it('keeps the hash a legacy %23 link decoded to, so old links still resolve', () => {
+    expect(canonicalTagFromRoute('#JGYCPCUJ')).toBe('#JGYCPCUJ');
+  });
+
+  it('uppercases and trims whatever shape the param arrives in', () => {
+    expect(canonicalTagFromRoute(' jgycpcuj ')).toBe('#JGYCPCUJ');
   });
 });
 
 describe('playerRouteFor', () => {
-  it('builds /player/<encoded tag> with the hash encoded', () => {
-    expect(playerRouteFor('#JGYCPCUJ')).toBe('/player/%23JGYCPCUJ');
+  it('builds /player/<bare tag>, no hash and no %23 in the shareable URL', () => {
+    expect(playerRouteFor('#JGYCPCUJ')).toBe('/player/JGYCPCUJ');
   });
 
   it('keeps the hash out of the path so the router never sees a fragment', () => {
     expect(playerRouteFor('#ABC')).not.toContain('#');
+    expect(playerRouteFor('#ABC')).not.toContain('%23');
+  });
+
+  it('round-trips through canonicalTagFromRoute back to the canonical tag', () => {
+    const tag = '#JGYCPCUJ';
+    const bare = playerRouteFor(tag).split('/').pop() as string;
+    expect(canonicalTagFromRoute(bare)).toBe(tag);
   });
 });
 
 describe('clanRouteFor', () => {
-  it('builds /clan/<encoded tag> with the hash encoded', () => {
-    expect(clanRouteFor('#2CJPGCLUC')).toBe('/clan/%232CJPGCLUC');
+  it('builds /clan/<bare tag>, no hash and no %23 in the shareable URL', () => {
+    expect(clanRouteFor('#2JPCYP98L')).toBe('/clan/2JPCYP98L');
   });
 
   it('keeps the hash out of the path so the router never sees a fragment', () => {
     expect(clanRouteFor('#ABC')).not.toContain('#');
+    expect(clanRouteFor('#ABC')).not.toContain('%23');
+  });
+
+  it('round-trips through canonicalTagFromRoute back to the canonical tag', () => {
+    const tag = '#2CJPGCLUC';
+    const bare = clanRouteFor(tag).split('/').pop() as string;
+    expect(canonicalTagFromRoute(bare)).toBe(tag);
   });
 });
 

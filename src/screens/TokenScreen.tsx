@@ -17,7 +17,6 @@ import {
   type ColorTokens,
   type ThemeTokens,
 } from '../theme/tokens';
-import { ThemeToggle } from '../components/ThemeToggle';
 
 // The token review screen. Every token the product ships with is listed here
 // once, grouped by surface, so a reviewer can see the whole system on one
@@ -87,10 +86,10 @@ export default function TokenScreen() {
               <Text style={base.micro}>T-M0-2 review</Text>
               <Text style={base.display}>Design tokens</Text>
               <Text style={base.subtitle}>
-                The only allowed values. Flip the canvas to verify both themes.
+                The only allowed values. Flip the canvas (nav bar) to verify both
+                themes.
               </Text>
             </View>
-            <ThemeToggle />
           </View>
 
           <Section title="Color tokens" base={base} styles={styles}>

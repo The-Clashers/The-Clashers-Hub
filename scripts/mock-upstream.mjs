@@ -36,7 +36,7 @@ const clan = {
       name: 'Mock Player',
       role: 'leader',
       expLevel: 189,
-      league: { name: 'Titan League I' },
+      leagueTier: { name: 'Electro League 31', iconUrls: { small: 'mock-tier.png', large: 'mock-tier.png' } },
       trophies: 4871,
       versusTrophies: 3120,
       clanRank: 1,
@@ -49,7 +49,7 @@ const clan = {
       name: 'Mock Second',
       role: 'member',
       expLevel: 142,
-      league: { name: 'Champion League I' },
+      leagueTier: { name: 'Witch League 18', iconUrls: { small: 'mock-tier.png', large: 'mock-tier.png' } },
       trophies: 3911,
       versusTrophies: 2901,
       clanRank: 2,
@@ -81,7 +81,37 @@ const player = {
 const war = {
   state: 'inWar',
   teamSize: 15,
-  clan: { tag: '#MOCKCLAN', name: 'Mock Clan', attacks: 12, stars: 24, destructionPercentage: 78.4 },
+  attacksPerMember: 2,
+  clan: {
+    tag: '#MOCKCLAN',
+    name: 'Mock Clan',
+    attacks: 12,
+    stars: 24,
+    destructionPercentage: 78.4,
+    // The war roster: the same members the clan payload carries, with the
+    // attack arrays the needs-attention tab's "attacks left" column reads
+    // (attacksPerMember minus attacks used). Mock Player spent both,
+    // Mock Second spent one, and a third war member sits idle at zero so
+    // the "0 left" and "2 left" rows both render.
+    members: [
+      {
+        tag: '#MOCKPLAY',
+        name: 'Mock Player',
+        position: 1,
+        attacks: [
+          { stars: 3, destructionPercentage: 84.2, order: 1 },
+          { stars: 2, destructionPercentage: 61.1, order: 6 },
+        ],
+      },
+      {
+        tag: '#MOCKTWO',
+        name: 'Mock Second',
+        position: 2,
+        attacks: [{ stars: 1, destructionPercentage: 44.9, order: 4 }],
+      },
+      { tag: '#MOCKIDLE', name: 'Mock Idle', position: 3, attacks: [] },
+    ],
+  },
   opponent: { tag: '#MOCKFOE', name: 'Mock Foe', attacks: 11, stars: 22, destructionPercentage: 75.1 },
 };
 
