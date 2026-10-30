@@ -671,7 +671,12 @@ function DonationControlBar({
         accessibilityRole="switch"
         accessibilityLabel="Needs attention"
         accessibilityHint="Re-orders the roster worst-first by donation deficit and shows the ratio chip on flagged members."
-        accessibilityState={{ checked: needsAttention }}
+        // aria-checked directly, not accessibilityState: react-native-web
+        // 0.20 does not map accessibilityState onto aria attributes, so the
+        // switch would never announce its state (the Dropdown's trigger uses
+        // aria-expanded directly for the same reason). The switch is what
+        // tells a screen reader the sort controls are paused.
+        aria-checked={needsAttention}
         onPress={onToggleNeedsAttention}
         style={({ pressed }) => [
           styles.toggle,
@@ -693,7 +698,7 @@ function DonationControlBar({
                 accessibilityRole="button"
                 accessibilityLabel={`Target ${option.label}`}
                 accessibilityHint="Sets the donation target ratio. The roster re-computes locally, no refetch."
-                accessibilityState={{ selected }}
+                aria-pressed={selected}
                 onPress={() => onSelectTarget(option.value)}
                 style={({ pressed }) => [
                   styles.targetChip,
