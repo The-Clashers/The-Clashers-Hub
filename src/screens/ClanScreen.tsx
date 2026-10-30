@@ -20,17 +20,28 @@ import RosterTable from '../components/RosterTable';
 import RosterCard from '../components/RosterCard';
 import SkeletonCard from '../components/Skeleton';
 import SkeletonBlock, { useSkeletonPulse } from '../components/SkeletonBlock';
+import Dropdown from '../components/Dropdown';
 import { fetchClan, ClanFetchError, type ClanMember } from '../api/clan';
 import { busyRetryDelayMs, shouldRetryBusy } from '../lib/busy-retry';
 import { warFrequencyLabel } from '../lib/war-frequency';
 import { playerRouteFor } from '../lib/tag';
 import {
   CLAN_ORDER,
+  flipRosterSortDirection,
   nextRosterSortState,
+  rosterSortForSelection,
   sortRoster,
   type RosterSortKey,
+  type RosterSortSelection,
   type RosterSortState,
 } from '../lib/roster-sort';
+import {
+  computeDonationBalance,
+  sortNeedsAttention,
+  DEFAULT_DONATION_TARGET,
+  type DonationTarget,
+  type DonationVerdict,
+} from '../lib/donation-balance';
 
 // The clan detail screen (T-M1-3, FR-03, SR-10). The search result cards and
 // the search bar's #tag path both land here. The screen owns layout and the
@@ -572,6 +583,74 @@ function TabButton({ label, active, onPress, styles }: TabButtonProps) {
 const INITIAL_CARDS_TO_RENDER = 8;
 const CARDS_PER_BATCH = 12;
 
+// ---------- card sort bar ----------
+
+// The card presentation (below 768 px) has no column headers to press, so
+// the same six sortable columns surface as the kit's select-style control
+// (07 section 4): a "Sort members by" dropdown plus a direction toggle.
+// FR-04 carries no width qualifier, so a phone gets the same six sorts the
+// table does, through the same rules: what either control means for the
+// row order lives in lib/roster-sort.ts next to the table's header cycle,
+// and both presentations drive the one sort state RosterSection owns.
+// Option labels read the FR-04 column names in full (the table headers
+// stay terse because their meaning is positional).
+const SORT_OPTIONS: ReadonlyArray<{ label: string; value: RosterSortSelection }> = [
+  { label: 'Clan order', value: 'clan' },
+  { label: 'Role', value: 'role' },
+  { label: 'Town Hall', value: 'townHall' },
+  { label: 'Trophies', value: 'trophies' },
+  { label: 'Donations given', value: 'donations' },
+  { label: 'Donations received', value: 'received' },
+  { label: 'XP', value: 'xp' },
+];
+
+interface RosterCardSortBarProps {
+  /** The sort the roster is currently rendered in. */
+  sort: RosterSortState;
+  /** The one setter both controls drive; the lib rules decide the next state. */
+  onChange: (next: RosterSortState) => void;
+  /** While the needs-attention view owns the row order, the column sort is
+   * not in effect, so both controls disable rather than lie about it. */
+  disabled: boolean;
+}
+
+function RosterCardSortBar({ sort, onChange, disabled }: RosterCardSortBarProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createRosterStyles(theme), [theme]);
+  // "Clan order" is the dropdown's reset option; it maps to the null key.
+  const selection: RosterSortSelection = sort.key ?? 'clan';
+  return (
+    <View style={styles.sortBar}>
+      <View style={styles.sortBarDropdown}>
+        <Dropdown
+          label="Sort members by"
+          options={SORT_OPTIONS}
+          value={selection}
+          onSelect={(next) => onChange(rosterSortForSelection(next, sort))}
+          disabled={disabled}
+        />
+      </View>
+      <PillButton
+        label={sort.direction === 'asc' ? 'Ascending' : 'Descending'}
+        onPress={() => onChange(flipRosterSortDirection(sort))}
+        variant="secondary"
+        disabled={disabled || sort.key === null}
+        hint="Flips the sort direction of the picked column."
+      />
+    </View>
+  );
+}
+
+// Preset target ratios for the donation balance control (SR-12). A small
+// closed set keeps the control a chip row, not a free-form input; 0.5
+// means "give at least half", 2.0 means "give double". The default is 1:1.
+const TARGET_OPTIONS: ReadonlyArray<{ label: string; value: DonationTarget }> = [
+  { label: '0.5', value: 0.5 },
+  { label: '1:1', value: 1.0 },
+  { label: '1.5', value: 1.5 },
+  { label: '2.0', value: 2.0 },
+];
+
 interface RosterSectionProps {
   members: ClanMember[];
 }
@@ -590,6 +669,13 @@ function RosterSection({ members }: RosterSectionProps) {
   // so it lives here in useState and resets when the visitor leaves the
   // screen. The ordering rule itself is lib/roster-sort.ts, pure and tested.
   const [sort, setSort] = useState<RosterSortState>(CLAN_ORDER);
+  // The needs-attention toggle (FR-05, SR-12, AC-02). When on, the roster
+  // re-orders worst-first by donation deficit and every flagged row shows
+  // the RatioFlag chip. The target is adjustable client-side (SR-12): the
+  // engine is a pure function, so changing the target is a re-call with the
+  // same members, no refetch.
+  const [needsAttention, setNeedsAttention] = useState(false);
+  const [target, setTarget] = useState<DonationTarget>(DEFAULT_DONATION_TARGET);
   // The presentation switch (NFR-05): a real table at 768 px and up, one
   // card per member below it. Read through useWindowDimensions into the
   // breakpoints helper, never CSS media queries (07 section 3).
@@ -597,7 +683,30 @@ function RosterSection({ members }: RosterSectionProps) {
   const breakpoint = breakpointFor(width);
   const isCardPresentation = breakpoint === 'small' || breakpoint === 'mobile';
 
-  const sortedMembers = useMemo(() => sortRoster(members, sort), [members, sort]);
+  // The donation balance is computed from the same members the roster
+  // already holds (SR-09: one fetch, no per-member requests). Pure, so it
+  // re-computes locally when the target changes without any refetch (SR-12).
+  const balance = useMemo(
+    () => computeDonationBalance(members, target),
+    [members, target],
+  );
+
+  const sortedMembers = useMemo(() => {
+    if (needsAttention) {
+      return sortNeedsAttention(members, target);
+    }
+    return sortRoster(members, sort);
+  }, [members, sort, needsAttention, target]);
+
+  // A verdict lookup by tag so each row finds its chip in O(n) without the
+  // table re-indexing. Built once per balance change.
+  const verdictByTag = useMemo(() => {
+    const map = new Map<string, DonationVerdict>();
+    for (const verdict of balance.verdicts) {
+      map.set(verdict.member.tag, verdict);
+    }
+    return map;
+  }, [balance]);
 
   const handleColumnPress = (key: RosterSortKey) => {
     setSort((previous) => nextRosterSortState(key, previous));
@@ -623,27 +732,128 @@ function RosterSection({ members }: RosterSectionProps) {
     );
   }
 
-  if (isCardPresentation) {
-    return (
-      <FlatList
-        data={sortedMembers}
-        keyExtractor={(member) => member.tag}
-        renderItem={({ item }) => <RosterCard member={item} onPress={openMember} />}
-        initialNumToRender={INITIAL_CARDS_TO_RENDER}
-        maxToRenderPerBatch={CARDS_PER_BATCH}
-        contentContainerStyle={styles.rosterListContent}
-        style={styles.rosterList}
-      />
-    );
-  }
-
   return (
-    <RosterTable
-      members={sortedMembers}
-      sort={sort}
-      onPressColumn={handleColumnPress}
-      onPressMember={openMember}
-    />
+    <View style={styles.rosterWrap}>
+      <DonationControlBar
+        needsAttention={needsAttention}
+        onToggleNeedsAttention={() => setNeedsAttention((previous) => !previous)}
+        target={target}
+        onSelectTarget={setTarget}
+        summary={balance.summary}
+        styles={styles}
+      />
+      {isCardPresentation ? (
+        // The card presentation has no column headers, so the sort rides in
+        // the bar above the list (the wrapper View around the FlatList keeps
+        // the same flex contract the table's grid wrapper documents). While
+        // the needs-attention view owns the row order, the sort controls
+        // disable instead of pretending to work.
+        <View style={styles.cardPresentation}>
+          <RosterCardSortBar sort={sort} onChange={setSort} disabled={needsAttention} />
+          <FlatList
+            data={sortedMembers}
+            keyExtractor={(member) => member.tag}
+            renderItem={({ item }) => (
+              <RosterCard
+                member={item}
+                onPress={openMember}
+                verdict={needsAttention ? verdictByTag.get(item.tag) : undefined}
+              />
+            )}
+            initialNumToRender={INITIAL_CARDS_TO_RENDER}
+            maxToRenderPerBatch={CARDS_PER_BATCH}
+            contentContainerStyle={styles.rosterListContent}
+            style={styles.rosterList}
+          />
+        </View>
+      ) : (
+        <RosterTable
+          members={sortedMembers}
+          sort={sort}
+          onPressColumn={handleColumnPress}
+          onPressMember={openMember}
+          verdictByTag={needsAttention ? verdictByTag : undefined}
+          sortDisabled={needsAttention}
+        />
+      )}
+    </View>
+  );
+}
+
+// ---------- donation control bar ----------
+
+interface DonationControlBarProps {
+  needsAttention: boolean;
+  onToggleNeedsAttention: () => void;
+  target: DonationTarget;
+  onSelectTarget: (target: DonationTarget) => void;
+  summary: ReturnType<typeof computeDonationBalance>['summary'];
+  styles: ReturnType<typeof createRosterStyles>;
+}
+
+function DonationControlBar({
+  needsAttention,
+  onToggleNeedsAttention,
+  target,
+  onSelectTarget,
+  summary,
+  styles,
+}: DonationControlBarProps) {
+  const healthText =
+    summary.healthShare === null
+      ? '\u2014'
+      : `${Math.round(summary.healthShare * 100)}% at target`;
+  return (
+    <View style={styles.controlBar}>
+      <Pressable
+        accessibilityRole="switch"
+        accessibilityLabel="Needs attention"
+        accessibilityHint="Re-orders the roster worst-first by donation deficit and shows the ratio chip on flagged members."
+        // aria-checked directly, not accessibilityState: react-native-web
+        // 0.20 does not map accessibilityState onto aria attributes, so the
+        // switch would never announce its state (the Dropdown's trigger uses
+        // aria-expanded directly for the same reason). The switch is what
+        // tells a screen reader the sort controls are paused.
+        aria-checked={needsAttention}
+        onPress={onToggleNeedsAttention}
+        style={({ pressed }) => [
+          styles.toggle,
+          needsAttention && styles.toggleOn,
+          pressed && styles.togglePressed,
+        ]}
+      >
+        <Text style={[styles.toggleLabel, needsAttention && styles.toggleLabelOn]}>
+          Needs attention
+        </Text>
+      </Pressable>
+      {needsAttention ? (
+        <View style={styles.targetRow}>
+          {TARGET_OPTIONS.map((option) => {
+            const selected = option.value === target;
+            return (
+              <Pressable
+                key={option.label}
+                accessibilityRole="button"
+                accessibilityLabel={`Target ${option.label}`}
+                accessibilityHint="Sets the donation target ratio. The roster re-computes locally, no refetch."
+                aria-pressed={selected}
+                onPress={() => onSelectTarget(option.value)}
+                style={({ pressed }) => [
+                  styles.targetChip,
+                  selected && styles.targetChipSelected,
+                  pressed && styles.targetChipPressed,
+                ]}
+              >
+                <Text style={[styles.targetChipText, selected && styles.targetChipTextSelected]}>
+                  {option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+          <Text style={styles.healthLabel}>{healthText}</Text>
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -679,7 +889,117 @@ function TabPlaceholder({ tab }: TabPlaceholderProps) {
 // The roster section's own styles (STD-13): it builds them from the theme
 // like any component, never receives the screen's stylesheet as a prop.
 function createRosterStyles(t: ReturnType<typeof useTheme>['theme']) {
+  const c = t.colors;
   return StyleSheet.create({
+    rosterWrap: {
+      flex: 1,
+    },
+    // The donation control bar sits above the roster. Quiet chrome: a flat
+    // row, not a raised panel, so the roster table keeps the visual weight.
+    controlBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      columnGap: t.spacing[4],
+      rowGap: t.spacing[2],
+      marginBottom: t.spacing[3],
+    },
+    // The card presentation's wrapper: flexes like the table's grid wrapper
+    // so the FlatList below the sort bar stays the scroll container.
+    cardPresentation: {
+      flex: 1,
+    },
+    // The sort bar rides above the scrolling card list. Bottom-aligned so
+    // the direction pill lines up with the dropdown's trigger, not its
+    // micro label; wraps at the 360 px floor so the pill never squeezes
+    // the trigger's value text.
+    sortBar: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      flexWrap: 'wrap',
+      columnGap: t.spacing[3],
+      rowGap: t.spacing[2],
+      marginBottom: t.spacing[3],
+    },
+    sortBarDropdown: {
+      flexGrow: 1,
+      flexShrink: 1,
+      flexBasis: 180,
+      minWidth: 0,
+    },
+    toggle: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: t.layout.touchTargetMin,
+      paddingHorizontal: t.spacing[5],
+      paddingVertical: t.spacing[2],
+      borderRadius: t.radius.pill,
+      borderWidth: 1,
+      borderColor: c.panelBorderStrong,
+      backgroundColor: c.panelRaised,
+      outlineColor: c.focusRing,
+      outlineOffset: t.layout.focusRingOffset,
+    },
+    toggleOn: {
+      backgroundColor: c.accent,
+      borderColor: c.accent,
+    },
+    togglePressed: {
+      opacity: 0.7,
+    },
+    toggleLabel: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.body,
+      fontWeight: t.fontWeight.semibold,
+      color: c.textPrimary,
+    },
+    toggleLabelOn: {
+      color: c.textOnAccent,
+    },
+    targetRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      columnGap: t.spacing[2],
+      rowGap: t.spacing[2],
+    },
+    targetChip: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: t.layout.touchTargetMin,
+      paddingHorizontal: t.spacing[4],
+      paddingVertical: t.spacing[1],
+      borderRadius: t.radius.pill,
+      borderWidth: 1,
+      borderColor: c.panelBorderStrong,
+      backgroundColor: c.panelRaised,
+      outlineColor: c.focusRing,
+      outlineOffset: t.layout.focusRingOffset,
+    },
+    targetChipSelected: {
+      backgroundColor: c.accentSoft,
+      borderColor: c.accent,
+    },
+    targetChipPressed: {
+      opacity: 0.7,
+    },
+    targetChipText: {
+      fontFamily: t.fontFamily.mono,
+      fontSize: t.fontSize.sm,
+      fontWeight: t.fontWeight.medium,
+      color: c.textPrimary,
+    },
+    targetChipTextSelected: {
+      color: c.accent,
+      fontWeight: t.fontWeight.semibold,
+    },
+    healthLabel: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.sm,
+      color: c.textMuted,
+      fontVariant: ['tabular-nums'],
+    },
     // The card list's scroll container; the table presentation brings its
     // own inside RosterTable.
     rosterList: {

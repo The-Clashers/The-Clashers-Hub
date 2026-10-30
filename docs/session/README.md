@@ -26,3 +26,5 @@ One file per session, copied from [_template.md](_template.md), named
 | 10-28-2026 | 19 | [10-28-2026-session-19](./10-28-2026-session-19.md) |
 | 10-29-2026 | 20 | [10-29-2026-session-20](./10-29-2026-session-20.md) |
 | 10-30-2026 | 21 | [10-30-2026-session-21](./10-30-2026-session-21.md) |
+| 10-30-2026 | 22 | [10-30-2026-session-22](./10-30-2026-session-22.md) |
+| 10-30-2026 | 23 | [10-30-2026-session-23](./10-30-2026-session-23.md) |

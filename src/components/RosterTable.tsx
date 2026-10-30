@@ -3,7 +3,9 @@ import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native
 import { useTheme } from '../theme';
 import { clanRoleLabel } from '../lib/clan-role';
 import { linkEnterActivation } from '../lib/link-activation';
+import RatioFlag from './RatioFlag';
 import type { RosterSortDirection, RosterSortKey, RosterSortState } from '../lib/roster-sort';
+import type { DonationVerdict } from '../lib/donation-balance';
 import type { ClanMember } from '../api/clan';
 
 // The roster's table presentation (07 section 4), rendered at 768 px and up
@@ -38,6 +40,7 @@ const COLUMN_WIDTHS = {
   donations: 76,
   received: 88,
   xp: 56,
+  ratio: 96,
 } as const;
 
 // The league icon slot (07 section 7): an API icon in a fixed 24 px box so
@@ -58,7 +61,7 @@ const SORT_ARROW: Record<RosterSortDirection, string> = {
   desc: '↓',
 };
 
-type ColumnId = 'name' | RosterSortKey | 'league';
+type ColumnId = 'name' | RosterSortKey | 'league' | 'ratio';
 
 interface ColumnSpec {
   id: ColumnId;
@@ -66,11 +69,15 @@ interface ColumnSpec {
   /** The full name a screen reader hears; the visible label stays terse. */
   accessibilityLabel: string;
   sortable: boolean;
-  /** Which edge the label and values align to; metric columns read right. */
-  align: 'left' | 'right';
+  /** Which edge the label and values align to; metric columns read right,
+   * the ratio chip reads center. */
+  align: 'left' | 'right' | 'center';
 }
 
-const COLUMNS: ReadonlyArray<ColumnSpec> = [
+// The ratio column is appended only when the needs-attention mode is on,
+// so the table's column count is stable within a mode and a toggle does
+// not cause a mid-scroll layout shift on the rows already rendered.
+const BASE_COLUMNS: ReadonlyArray<ColumnSpec> = [
   { id: 'name', label: 'Member', accessibilityLabel: 'Member name and tag', sortable: false, align: 'left' },
   { id: 'role', label: 'Role', accessibilityLabel: 'Clan role', sortable: true, align: 'left' },
   { id: 'townHall', label: 'TH', accessibilityLabel: 'Town Hall level', sortable: true, align: 'right' },
@@ -81,6 +88,14 @@ const COLUMNS: ReadonlyArray<ColumnSpec> = [
   { id: 'xp', label: 'XP', accessibilityLabel: 'Experience level', sortable: true, align: 'right' },
 ];
 
+const RATIO_COLUMN: ColumnSpec = {
+  id: 'ratio',
+  label: 'Ratio',
+  accessibilityLabel: 'Donation ratio given to received',
+  sortable: false,
+  align: 'center',
+};
+
 export interface RosterTableProps {
   /** The members to render, already in the order the caller wants. */
   members: ClanMember[];
@@ -90,11 +105,27 @@ export interface RosterTableProps {
   onPressColumn: (key: RosterSortKey) => void;
   /** Fired with the member's tag when a row is tapped (FR-04). */
   onPressMember: (tag: string) => void;
+  /** When set, a Ratio column is appended and each flagged row renders the
+   * RatioFlag chip from its verdict. Undefined when needs-attention is off. */
+  verdictByTag?: Map<string, DonationVerdict>;
+  /** While the needs-attention view owns the row order, a column press does
+   * not change the order, so the header buttons disable rather than show a
+   * sort arrow that is not in effect. Undefined (enabled) otherwise. */
+  sortDisabled?: boolean;
 }
 
-export default function RosterTable({ members, sort, onPressColumn, onPressMember }: RosterTableProps) {
+export default function RosterTable({
+  members,
+  sort,
+  onPressColumn,
+  onPressMember,
+  verdictByTag,
+  sortDisabled = false,
+}: RosterTableProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const showRatio = verdictByTag !== undefined;
+  const columns = showRatio ? [...BASE_COLUMNS, RATIO_COLUMN] : BASE_COLUMNS;
 
   return (
     <View accessibilityRole="grid" accessibilityLabel="Clan roster" style={styles.grid}>
@@ -102,9 +133,23 @@ export default function RosterTable({ members, sort, onPressColumn, onPressMembe
         data={members}
         keyExtractor={(member) => member.tag}
         stickyHeaderIndices={[0]}
-        ListHeaderComponent={<HeaderRow styles={styles} sort={sort} onPressColumn={onPressColumn} />}
+        ListHeaderComponent={
+          <HeaderRow
+            styles={styles}
+            sort={sort}
+            onPressColumn={onPressColumn}
+            columns={columns}
+            sortDisabled={sortDisabled}
+          />
+        }
         renderItem={({ item }) => (
-          <RosterRow member={item} styles={styles} onPress={() => onPressMember(item.tag)} />
+          <RosterRow
+            member={item}
+            styles={styles}
+            columns={columns}
+            verdict={verdictByTag?.get(item.tag)}
+            onPress={() => onPressMember(item.tag)}
+          />
         )}
         initialNumToRender={INITIAL_ROWS_TO_RENDER}
         maxToRenderPerBatch={ROWS_PER_BATCH}
@@ -121,14 +166,21 @@ interface HeaderRowProps {
   styles: ReturnType<typeof createStyles>;
   sort: RosterSortState;
   onPressColumn: (key: RosterSortKey) => void;
+  columns: ReadonlyArray<ColumnSpec>;
+  sortDisabled: boolean;
 }
 
-function HeaderRow({ styles, sort, onPressColumn }: HeaderRowProps) {
+function HeaderRow({ styles, sort, onPressColumn, columns, sortDisabled }: HeaderRowProps) {
   return (
     <View accessibilityRole="row" style={styles.headerRow}>
-      {COLUMNS.map((column) => {
+      {columns.map((column) => {
         const active = sort.key === column.id;
-        const labelAlign = column.align === 'right' ? styles.headerLabelRight : styles.headerLabelLeft;
+        const labelAlign =
+          column.align === 'right'
+            ? styles.headerLabelRight
+            : column.align === 'center'
+              ? styles.headerLabelCenter
+              : styles.headerLabelLeft;
         if (!column.sortable) {
           return (
             <View key={column.id} accessibilityRole="columnheader" style={columnStyle(column.id, styles)}>
@@ -145,7 +197,12 @@ function HeaderRow({ styles, sort, onPressColumn }: HeaderRowProps) {
               }
               accessibilityHint="Sorts the roster by this column. Press again to reverse; a third press returns to clan order."
               onPress={() => onPressColumn(column.id as RosterSortKey)}
-              style={({ pressed }) => [styles.headerButton, pressed && styles.headerButtonPressed]}
+              disabled={sortDisabled}
+              style={({ pressed }) => [
+                styles.headerButton,
+                pressed && styles.headerButtonPressed,
+                sortDisabled && styles.headerButtonDisabled,
+              ]}
             >
               <Text style={[styles.headerLabel, labelAlign, active && styles.headerLabelActive]}>
                 {column.label}
@@ -164,10 +221,12 @@ function HeaderRow({ styles, sort, onPressColumn }: HeaderRowProps) {
 interface RosterRowProps {
   member: ClanMember;
   styles: ReturnType<typeof createStyles>;
+  columns: ReadonlyArray<ColumnSpec>;
+  verdict?: DonationVerdict;
   onPress: () => void;
 }
 
-function RosterRow({ member, styles, onPress }: RosterRowProps) {
+function RosterRow({ member, styles, columns, verdict, onPress }: RosterRowProps) {
   const leagueName = member.league?.name ?? 'Unranked';
   const leagueIcon = member.league?.iconUrls?.small;
   // The whole row is the link (FR-04 "tapping a row opens that player"),
@@ -227,6 +286,11 @@ function RosterRow({ member, styles, onPress }: RosterRowProps) {
       <View style={columnStyle('xp', styles)}>
         <Text style={styles.cellNumber}>{member.expLevel}</Text>
       </View>
+      {columns.some((column) => column.id === 'ratio') ? (
+        <View style={columnStyle('ratio', styles)}>
+          {verdict ? <RatioFlag verdict={verdict} /> : null}
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -251,6 +315,8 @@ function columnStyle(id: ColumnId, styles: ReturnType<typeof createStyles>) {
       return styles.columnReceived;
     case 'xp':
       return styles.columnXp;
+    case 'ratio':
+      return styles.columnRatio;
   }
 }
 
@@ -306,6 +372,9 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     headerButtonPressed: {
       opacity: 0.7,
     },
+    headerButtonDisabled: {
+      opacity: 0.5,
+    },
     headerLabel: {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.xs,
@@ -319,6 +388,9 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     },
     headerLabelRight: {
       textAlign: 'right',
+    },
+    headerLabelCenter: {
+      textAlign: 'center',
     },
     headerLabelActive: {
       color: c.textPrimary,
@@ -402,6 +474,11 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     columnXp: {
       width: COLUMN_WIDTHS.xp,
       alignItems: 'flex-end',
+    },
+    columnRatio: {
+      width: COLUMN_WIDTHS.ratio,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
   });
 }

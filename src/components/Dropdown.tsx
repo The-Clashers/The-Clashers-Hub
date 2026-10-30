@@ -54,6 +54,11 @@ interface DropdownProps<V> {
   value: V;
   /** Fires with the picked option's value. Apply-on-submit stays the screen's rule. */
   onSelect: (value: V) => void;
+  /** While set, the trigger does not open and renders dimmed. For the rare
+   * case where the control's effect is temporarily not in force (the roster
+   * sort dropdown while the needs-attention view owns the row order), so the
+   * control disables instead of silently doing nothing. */
+  disabled?: boolean;
 }
 
 export default function Dropdown<V>({
@@ -61,6 +66,7 @@ export default function Dropdown<V>({
   options,
   value,
   onSelect,
+  disabled = false,
 }: DropdownProps<V>) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -201,9 +207,13 @@ export default function Dropdown<V>({
   // Arrow keys on the closed trigger open the list first. onKeyDown is a
   // react-native-web forwarded prop; the RN event type carries no `key`, so
   // it is read through the web KeyboardEvent the runtime actually delivers.
+  // Guarded by disabled: the responder ignores presses on a disabled
+  // Pressable, but a raw onKeyDown still fires, so the arrow-open path has
+  // to respect the flag itself (the same guard PillButton documents).
   const handleTriggerKeyDown = (
     event: Parameters<NonNullable<React.ComponentProps<typeof Pressable>['onKeyDown']>>[0],
   ) => {
+    if (disabled) return;
     const key = (event as unknown as KeyboardEvent).key;
     if (key === 'ArrowDown' || key === 'ArrowUp') {
       event.preventDefault();
@@ -273,10 +283,12 @@ export default function Dropdown<V>({
         accessibilityHint="Opens a list of options. Arrow keys move, Enter picks."
         onPress={() => (open ? closeList(false) : openList())}
         onKeyDown={handleTriggerKeyDown}
+        disabled={disabled}
         style={({ pressed }) => [
           styles.trigger,
           open && styles.triggerOpen,
           pressed && styles.triggerPressed,
+          disabled && styles.triggerDisabled,
         ]}
       >
         <Text style={styles.triggerText} numberOfLines={1}>
@@ -329,6 +341,9 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     },
     triggerPressed: {
       backgroundColor: c.panel,
+    },
+    triggerDisabled: {
+      opacity: 0.5,
     },
     triggerText: {
       flexShrink: 1,

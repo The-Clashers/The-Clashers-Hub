@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   CLAN_ORDER,
+  flipRosterSortDirection,
   nextRosterSortState,
+  rosterSortForSelection,
   sortRoster,
   type RosterSortableMember,
+  type RosterSortSelection,
   type RosterSortState,
 } from './roster-sort';
 
@@ -118,5 +121,42 @@ describe('nextRosterSortState', () => {
   it('starts a different column at asc regardless of the previous state', () => {
     const donationsDesc: RosterSortState = { key: 'donations', direction: 'desc' };
     expect(nextRosterSortState('trophies', donationsDesc)).toEqual({ key: 'trophies', direction: 'asc' });
+  });
+});
+
+describe('rosterSortForSelection (the card dropdown)', () => {
+  it.each([
+    ['clan', CLAN_ORDER, { key: null, direction: 'asc' }],
+    ['clan', { key: 'trophies', direction: 'desc' }, { key: null, direction: 'asc' }],
+    ['trophies', CLAN_ORDER, { key: 'trophies', direction: 'asc' }],
+    ['trophies', { key: 'trophies', direction: 'asc' }, { key: 'trophies', direction: 'asc' }],
+    ['trophies', { key: 'trophies', direction: 'desc' }, { key: 'trophies', direction: 'desc' }],
+    ['donations', { key: 'trophies', direction: 'desc' }, { key: 'donations', direction: 'asc' }],
+    ['xp', { key: 'received', direction: 'desc' }, { key: 'xp', direction: 'asc' }],
+  ] as const)('selection %s from %j gives %j', (selection, current, expected) => {
+    expect(rosterSortForSelection(selection as RosterSortSelection, current as RosterSortState)).toEqual(expected);
+  });
+
+  it('returns the same state object when the active column is re-picked, so React can bail out', () => {
+    const current: RosterSortState = { key: 'xp', direction: 'desc' };
+    expect(rosterSortForSelection('xp', current)).toBe(current);
+  });
+});
+
+describe('flipRosterSortDirection (the card direction toggle)', () => {
+  it.each([
+    [{ key: 'trophies', direction: 'asc' }, { key: 'trophies', direction: 'desc' }],
+    [{ key: 'trophies', direction: 'desc' }, { key: 'trophies', direction: 'asc' }],
+    [{ key: 'role', direction: 'asc' }, { key: 'role', direction: 'desc' }],
+    [CLAN_ORDER, CLAN_ORDER],
+  ] as const)('flips %j to %j', (current, expected) => {
+    expect(flipRosterSortDirection(current as RosterSortState)).toEqual(expected);
+  });
+
+  it('keeps the column, changes only the direction', () => {
+    expect(flipRosterSortDirection({ key: 'donations', direction: 'asc' })).toEqual({
+      key: 'donations',
+      direction: 'desc',
+    });
   });
 });
