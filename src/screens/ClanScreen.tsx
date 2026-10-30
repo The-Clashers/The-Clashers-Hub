@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import {
-  FlatList,
   Image,
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
   useWindowDimensions,
 } from 'react-native';
@@ -12,7 +12,6 @@ import { useParams, useSearchParams, useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTheme, createBaseStyles, breakpointFor } from '../theme';
 import { ThemeToggle } from '../components/ThemeToggle';
-import StatChip from '../components/StatChip';
 import ErrorState from '../components/ErrorState';
 import EmptyState from '../components/EmptyState';
 import PillButton from '../components/PillButton';
@@ -21,7 +20,7 @@ import RosterCard from '../components/RosterCard';
 import Dropdown from '../components/Dropdown';
 import { fetchClan, ClanFetchError, type ClanMember } from '../api/clan';
 import { warFrequencyLabel } from '../lib/war-frequency';
-import { playerRouteFor } from '../lib/tag';
+import { canonicalTagFromRoute, playerRouteFor } from '../lib/tag';
 import {
   CLAN_ORDER,
   flipRosterSortDirection,
@@ -43,20 +42,24 @@ import {
 // The clan detail screen (T-M1-3, FR-03, SR-10). The search result cards and
 // the search bar's #tag path both land here. The screen owns layout and the
 // route's state; the pieces it renders come from the shared kit (07 section 4):
-// StatChip for the stat row, ErrorState for the contract's three failure
-// kinds, EmptyState for the designed "this tab lands later" placeholder,
-// PillButton for the retry and back-to-search actions, ThemeToggle for the
-// header, RosterTable and RosterCard for the Roster tab (T-M1-4). Every
-// state the design language requires is designed (06 section 3): a
-// layout-matched loading skeleton, the contract's three error states
-// (not_found, busy, unreachable) plus bad_request, and the success state
-// with the identity block, the stat chips, the tab bar, and the roster.
+// ErrorState for the contract's three failure kinds, EmptyState for the
+// designed "this tab lands later" placeholder, PillButton for the retry and
+// back-to-search actions, ThemeToggle for the header, RosterTable and
+// RosterCard for the Roster tab (T-M1-4). Every state the design language
+// requires is designed (06 section 3): a layout-matched loading skeleton,
+// the contract's three error states (not_found, busy, unreachable) plus
+// bad_request, and the success state with the compact horizontal identity
+// block and its details band, the tab bar, and the roster.
 //
 // The tab bar reads `?tab=` from the URL (03 section 2 "Screens & URLs") so a
 // deep link to the War or Log tab is shareable (F-12). Roster is the default
 // when the param is absent or holds an unknown value. The War and Log tabs
 // keep their designed placeholders until M3; the Roster tab renders the real
 // roster from the same single clan fetch (SR-09).
+//
+// The route param carries the bare tag (shareable URLs carry no `#` and no
+// `%23`, see src/lib/tag.ts), canonicalized back through the tag module so
+// the fetch, the cache key, and the on-screen tag all agree on `#TAG`.
 
 // ---------- tab bar ----------
 
@@ -81,12 +84,6 @@ function tabFromValue(raw: string | null): ClanTab {
 // cache layers decay together, the same pairing the hello screen uses.
 const CLAN_STALE_TIME_MS = 180_000;
 
-// The roster region's height floor: small enough that the identity block
-// and stat row keep their room on a laptop, tall enough that the roster's
-// own scroll window stays usable (about six rows). Below it the page grows
-// instead, the same trade the search screen's results area makes.
-const ROSTER_REGION_MIN_HEIGHT = 320;
-
 export default function ClanScreen() {
   const { theme } = useTheme();
   const base = useMemo(() => createBaseStyles(theme), [theme]);
@@ -95,7 +92,7 @@ export default function ClanScreen() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const tag = params.tag ?? '';
+  const tag = canonicalTagFromRoute(params.tag ?? '');
   const activeTab = tabFromValue(searchParams.get('tab'));
 
   const query = useQuery({
@@ -182,7 +179,6 @@ export default function ClanScreen() {
               )}
             </View>
           ) : null}
-
           <View style={styles.footer}>
             <PillButton
               label="Back to search"
@@ -202,7 +198,7 @@ export default function ClanScreen() {
   );
 }
 
-// ---------- success: identity header + stat chips ----------
+// ---------- success: compact horizontal identity + details band ----------
 
 interface ClanSuccessProps {
   clan: Awaited<ReturnType<typeof fetchClan>>;
@@ -211,15 +207,27 @@ interface ClanSuccessProps {
 }
 
 function ClanSuccess({ clan, base, styles }: ClanSuccessProps) {
-  // The badge is an API icon (07 section 7), rendered through RN Image in a
-  // fixed slot so a slow CDN load never reflows the identity block. A missing
+  // The identity block is horizontal and short (the owner's layout call):
+  // badge, name, tag/level/location line on the left to right, description
+  // clamped to two lines under it. Everything F-04's identity block
+  // requires stays, arranged as one compact band instead of stacked blocks.
+  // The badge is an API icon (07 section 7) in the 48 px slot, rendered
+  // through RN Image so a slow CDN load never reflows the block; a missing
   // badge gets a quiet block instead, never a broken-image glyph.
   const badgeUri = clan.badgeUrls?.medium || clan.badgeUrls?.small;
   const locationName = clan.location?.name ?? 'No location';
-  const requirements: ReadonlyArray<{ label: string; value: string }> = [
-    { label: 'Trophies', value: String(clan.requirements.requiredTrophies) },
+  // The details band: the stat chips and the join requirements merged into
+  // one left-to-right row of inline label-value chips. Trophies and TH read
+  // as the join requirements they are ("Trophies req", "TH req") so the
+  // band needs no group headings to stay honest.
+  const details: ReadonlyArray<{ label: string; value: string }> = [
+    { label: 'Members', value: String(clan.members) },
+    { label: 'Win streak', value: String(clan.warWinStreak) },
+    { label: 'War wins', value: String(clan.warWins) },
+    { label: 'Points', value: String(clan.clanPoints) },
+    { label: 'Trophies req', value: String(clan.requirements.requiredTrophies) },
     ...(clan.requirements.requiredTownhallLevel !== undefined
-      ? [{ label: 'Town Hall', value: `TH ${clan.requirements.requiredTownhallLevel}` }]
+      ? [{ label: 'TH req', value: `TH ${clan.requirements.requiredTownhallLevel}` }]
       : []),
     { label: 'War', value: warFrequencyLabel(clan.requirements.warFrequency) },
   ];
@@ -237,45 +245,37 @@ function ClanSuccess({ clan, base, styles }: ClanSuccessProps) {
           <View style={styles.badgePlaceholder} accessibilityLabel={`${clan.name} clan badge`} />
         )}
         <View style={styles.identityText}>
-          <Text style={base.title} numberOfLines={2}>
+          <Text style={base.title} numberOfLines={1}>
             {clan.name}
           </Text>
-          <Text style={styles.tagLine}>{clan.tag}</Text>
           <View style={styles.identityMeta}>
+            <Text style={styles.tagLine}>{clan.tag}</Text>
+            <Text style={styles.metaDot} aria-hidden>
+              |
+            </Text>
             <Text style={styles.levelChip}>Level {clan.clanLevel}</Text>
             <Text style={styles.metaDot} aria-hidden>
-              {'  |  '}
+              |
             </Text>
             <Text style={styles.locationLine}>{locationName}</Text>
           </View>
+          {clan.description ? (
+            <Text style={styles.description} numberOfLines={2}>
+              {clan.description}
+            </Text>
+          ) : null}
         </View>
       </View>
 
-      {clan.description ? (
-        <Text style={styles.description} numberOfLines={6}>
-          {clan.description}
-        </Text>
-      ) : null}
-
-      <View style={styles.requirementsBlock}>
-        <Text style={styles.requirementsLabel}>Requirements</Text>
-        <View style={styles.requirementsRow}>
-          {requirements.map((req) => (
-            <View key={req.label} style={styles.requirementChip}>
-              <Text style={styles.requirementChipLabel}>{req.label}</Text>
-              <Text style={styles.requirementChipValue} numberOfLines={1}>
-                {req.value}
-              </Text>
-            </View>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.statRow}>
-        <StatChip label="Members" value={String(clan.members)} />
-        <StatChip label="Win streak" value={String(clan.warWinStreak)} />
-        <StatChip label="War wins" value={String(clan.warWins)} />
-        <StatChip label="Points" value={String(clan.clanPoints)} />
+      <View style={styles.detailsRow}>
+        {details.map((detail) => (
+          <View key={detail.label} style={styles.detailChip}>
+            <Text style={styles.detailChipLabel}>{detail.label}</Text>
+            <Text style={styles.detailChipValue} numberOfLines={1}>
+              {detail.value}
+            </Text>
+          </View>
+        ))}
       </View>
     </View>
   );
@@ -290,8 +290,8 @@ interface ClanSkeletonProps {
 
 function ClanSkeleton({ base, styles }: ClanSkeletonProps) {
   // Layout-matched skeleton (06 section 3): same shape as the success state
-  // (badge, name, tag, meta line, description, requirements, stat row) so the
-  // swap from skeleton to data does not reflow. No spinner; the layout is the
+  // (badge, name, meta line, description, details band) so the swap from
+  // skeleton to data does not reflow. No spinner; the layout is the
   // signal that data is on its way.
   return (
     <View style={styles.successWrap} accessibilityRole="progressbar" accessibilityLabel="Loading clan">
@@ -299,24 +299,14 @@ function ClanSkeleton({ base, styles }: ClanSkeletonProps) {
         <View style={[styles.badge, styles.skeletonBlock]} />
         <View style={styles.identityText}>
           <View style={[styles.skeletonLine, styles.skeletonTitle]} />
-          <View style={[styles.skeletonLine, styles.skeletonTag]} />
           <View style={[styles.skeletonLine, styles.skeletonMeta]} />
+          <View style={[styles.skeletonLine, styles.skeletonDescription]} />
         </View>
       </View>
-      <View style={[styles.skeletonLine, styles.skeletonDescription]} />
-      <View style={styles.requirementsRow}>
-        {[0, 1, 2].map((i) => (
-          <View key={i} style={styles.requirementChip}>
-            <View style={[styles.skeletonLine, styles.skeletonReqLabel]} />
-            <View style={[styles.skeletonLine, styles.skeletonReqValue]} />
-          </View>
-        ))}
-      </View>
-      <View style={styles.statRow}>
-        {[0, 1, 2, 3].map((i) => (
-          <View key={i} style={styles.skeletonStat}>
-            <View style={[styles.skeletonLine, styles.skeletonStatLabel]} />
-            <View style={[styles.skeletonLine, styles.skeletonStatValue]} />
+      <View style={styles.detailsRow}>
+        {[0, 1, 2, 3, 4, 5].map((i) => (
+          <View key={i} style={styles.detailChip}>
+            <View style={[styles.skeletonLine, styles.skeletonDetailValue]} />
           </View>
         ))}
       </View>
@@ -425,7 +415,11 @@ function TabButton({ label, active, onPress, styles }: TabButtonProps) {
     <Pressable
       accessibilityRole="tab"
       accessibilityLabel={label}
-      accessibilityState={{ selected: active }}
+      // aria-selected directly, not accessibilityState: react-native-web
+      // 0.20 does not map accessibilityState onto aria attributes, the
+      // same gap the needs-attention switch had (session 22), so the tab
+      // would never announce which pane is active.
+      aria-selected={active}
       onPress={onPress}
       style={({ pressed }) => [
         styles.tabButton,
@@ -439,11 +433,6 @@ function TabButton({ label, active, onPress, styles }: TabButtonProps) {
 }
 
 // ---------- roster tab (T-M1-4, FR-04, SR-11, NFR-05) ----------
-
-// The card list keeps the search screen's virtualization tuning: cards are
-// the cheaper row, so a smaller initial window still fills a phone screen.
-const INITIAL_CARDS_TO_RENDER = 8;
-const CARDS_PER_BATCH = 12;
 
 // ---------- card sort bar ----------
 
@@ -478,7 +467,7 @@ interface RosterCardSortBarProps {
 
 function RosterCardSortBar({ sort, onChange, disabled }: RosterCardSortBarProps) {
   const { theme } = useTheme();
-  const styles = useMemo(() => createRosterStyles(theme), [theme]);
+  const styles = useMemo(() => createSortBarStyles(theme), [theme]);
   // "Clan order" is the dropdown's reset option; it maps to the null key.
   const selection: RosterSortSelection = sort.key ?? 'clan';
   return (
@@ -503,23 +492,14 @@ function RosterCardSortBar({ sort, onChange, disabled }: RosterCardSortBarProps)
   );
 }
 
-// Preset target ratios for the donation balance control (SR-12). A small
-// closed set keeps the control a chip row, not a free-form input; 0.5
-// means "give at least half", 2.0 means "give double". The default is 1:1.
-const TARGET_OPTIONS: ReadonlyArray<{ label: string; value: DonationTarget }> = [
-  { label: '0.5', value: 0.5 },
-  { label: '1:1', value: 1.0 },
-  { label: '1.5', value: 1.5 },
-  { label: '2.0', value: 2.0 },
-];
+// Preset target ratios are gone: the donation ratio is a free two-number
+// input now (see DonationRatioInput), so this space holds no chip list.
 
 interface RosterSectionProps {
   members: ClanMember[];
 }
 
 function RosterSection({ members }: RosterSectionProps) {
-  const { theme } = useTheme();
-  const styles = useMemo(() => createRosterStyles(theme), [theme]);
   const navigate = useNavigate();
   // Tap-through goes through the one tag module (SR-13) so the URL is
   // built exactly like every other player link in the app.
@@ -595,39 +575,32 @@ function RosterSection({ members }: RosterSectionProps) {
   }
 
   return (
-    <View style={styles.rosterWrap}>
+    <>
       <DonationControlBar
         needsAttention={needsAttention}
         onToggleNeedsAttention={() => setNeedsAttention((previous) => !previous)}
-        target={target}
         onSelectTarget={setTarget}
         summary={balance.summary}
-        styles={styles}
       />
       {isCardPresentation ? (
         // The card presentation has no column headers, so the sort rides in
-        // the bar above the list (the wrapper View around the FlatList keeps
-        // the same flex contract the table's grid wrapper documents). While
-        // the needs-attention view owns the row order, the sort controls
+        // the bar above the list. The cards render in page flow like the
+        // table rows: the browser scrollbar owns the scrolling (07 section
+        // 3), so the roster runs as long as it runs instead of boxing the
+        // visitor into a four-card inner scroll window. While the
+        // needs-attention view owns the row order, the sort controls
         // disable instead of pretending to work.
-        <View style={styles.cardPresentation}>
+        <>
           <RosterCardSortBar sort={sort} onChange={setSort} disabled={needsAttention} />
-          <FlatList
-            data={sortedMembers}
-            keyExtractor={(member) => member.tag}
-            renderItem={({ item }) => (
-              <RosterCard
-                member={item}
-                onPress={openMember}
-                verdict={needsAttention ? verdictByTag.get(item.tag) : undefined}
-              />
-            )}
-            initialNumToRender={INITIAL_CARDS_TO_RENDER}
-            maxToRenderPerBatch={CARDS_PER_BATCH}
-            contentContainerStyle={styles.rosterListContent}
-            style={styles.rosterList}
-          />
-        </View>
+          {sortedMembers.map((member) => (
+            <RosterCard
+              key={member.tag}
+              member={member}
+              onPress={openMember}
+              verdict={needsAttention ? verdictByTag.get(member.tag) : undefined}
+            />
+          ))}
+        </>
       ) : (
         <RosterTable
           members={sortedMembers}
@@ -638,7 +611,7 @@ function RosterSection({ members }: RosterSectionProps) {
           sortDisabled={needsAttention}
         />
       )}
-    </View>
+    </>
   );
 }
 
@@ -647,20 +620,21 @@ function RosterSection({ members }: RosterSectionProps) {
 interface DonationControlBarProps {
   needsAttention: boolean;
   onToggleNeedsAttention: () => void;
-  target: DonationTarget;
   onSelectTarget: (target: DonationTarget) => void;
   summary: ReturnType<typeof computeDonationBalance>['summary'];
-  styles: ReturnType<typeof createRosterStyles>;
 }
 
+// The bar builds its own styles (STD-13, paid down from the threading the
+// session 22 log flagged): a component's stylesheet is its own, never a
+// prop on the caller's roster sheet.
 function DonationControlBar({
   needsAttention,
   onToggleNeedsAttention,
-  target,
   onSelectTarget,
   summary,
-  styles,
 }: DonationControlBarProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createDonationBarStyles(theme), [theme]);
   const healthText =
     summary.healthShare === null
       ? '\u2014'
@@ -688,35 +662,97 @@ function DonationControlBar({
           Needs attention
         </Text>
       </Pressable>
-      {needsAttention ? (
-        <View style={styles.targetRow}>
-          {TARGET_OPTIONS.map((option) => {
-            const selected = option.value === target;
-            return (
-              <Pressable
-                key={option.label}
-                accessibilityRole="button"
-                accessibilityLabel={`Target ${option.label}`}
-                accessibilityHint="Sets the donation target ratio. The roster re-computes locally, no refetch."
-                aria-pressed={selected}
-                onPress={() => onSelectTarget(option.value)}
-                style={({ pressed }) => [
-                  styles.targetChip,
-                  selected && styles.targetChipSelected,
-                  pressed && styles.targetChipPressed,
-                ]}
-              >
-                <Text style={[styles.targetChipText, selected && styles.targetChipTextSelected]}>
-                  {option.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-          <Text style={styles.healthLabel}>{healthText}</Text>
-        </View>
-      ) : null}
+      <DonationRatioInput
+        onSelectTarget={onSelectTarget}
+        // The boxes stay mounted and disable while the needs-attention view
+        // is off (the disable-not-hide rule the sort controls already
+        // follow): mounted, their draft values never reset on a toggle, so
+        // what the boxes show is always the ratio the engine runs with.
+        disabled={!needsAttention}
+        styles={styles}
+      />
+      {needsAttention ? <Text style={styles.healthLabel}>{healthText}</Text> : null}
     </View>
   );
+}
+
+// ---------- donation ratio input ----------
+
+interface DonationRatioInputProps {
+  onSelectTarget: (target: DonationTarget) => void;
+  /** While the needs-attention view is off the ratio has no visible effect,
+   * so the boxes dim and stop taking input instead of pretending to work. */
+  disabled: boolean;
+  styles: ReturnType<typeof createDonationBarStyles>;
+}
+
+// The donation ratio input: two number boxes, "__ : __", the target ratio
+// written as given : received (SR-12's adjustable target). This replaces the
+// preset chip row (0.5 / 1:1 / 1.5 / 2.0) on the owner's call: a free
+// two-number ratio says exactly what the visitor means ("1 : 2" is give
+// half, "3 : 2" is give 1.5x) without reading a legend of decimals. The
+// drafts start at "1"/"1", mirroring DEFAULT_DONATION_TARGET's 1:1; the
+// parsed pair is the only writer of the target, so the boxes never drift
+// from what the engine runs with.
+function DonationRatioInput({ onSelectTarget, disabled, styles }: DonationRatioInputProps) {
+  const [givenDraft, setGivenDraft] = useState('1');
+  const [receivedDraft, setReceivedDraft] = useState('1');
+
+  // The pair parses as soon as both sides hold a whole number and the
+  // received side is at least 1 ("give 1 for every 0 received" is not a
+  // ratio). An empty or invalid box keeps the last valid target, so
+  // clearing a box mid-edit never flickers the roster.
+  const apply = (nextGiven: string, nextReceived: string) => {
+    const given = parseRatioSide(nextGiven);
+    const received = parseRatioSide(nextReceived);
+    if (given === null || received === null || received < 1) return;
+    onSelectTarget(given / received);
+  };
+
+  return (
+    <View style={styles.ratioBox}>
+      <Text style={styles.ratioLabel}>Donation ratio</Text>
+      <View style={styles.ratioRow}>
+        <TextInput
+          value={givenDraft}
+          onChangeText={(text) => {
+            setGivenDraft(text);
+            apply(text, receivedDraft);
+          }}
+          accessibilityLabel="Donation ratio, given side"
+          accessibilityHint="How many troops the member should give. The roster re-computes locally, no refetch."
+          keyboardType="numeric"
+          maxLength={3}
+          editable={!disabled}
+          style={[styles.ratioInput, disabled && styles.ratioInputDisabled]}
+        />
+        <Text style={styles.ratioColon} aria-hidden>
+          :
+        </Text>
+        <TextInput
+          value={receivedDraft}
+          onChangeText={(text) => {
+            setReceivedDraft(text);
+            apply(givenDraft, text);
+          }}
+          accessibilityLabel="Donation ratio, received side"
+          accessibilityHint="For every this many troops received. Must be at least one."
+          keyboardType="numeric"
+          maxLength={3}
+          editable={!disabled}
+          style={[styles.ratioInput, disabled && styles.ratioInputDisabled]}
+        />
+      </View>
+    </View>
+  );
+}
+
+/** One side of the ratio: 1 to 3 digits, a whole number, 0 or more. Returns
+ * null for anything else (empty box mid-edit, pasted junk). */
+function parseRatioSide(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!/^\d{1,3}$/.test(trimmed)) return null;
+  return Number.parseInt(trimmed, 10);
 }
 
 // ---------- tab content placeholder ----------
@@ -748,31 +784,14 @@ function TabPlaceholder({ tab }: TabPlaceholderProps) {
 
 // ---------- styles ----------
 
-// The roster section's own styles (STD-13): it builds them from the theme
-// like any component, never receives the screen's stylesheet as a prop.
-function createRosterStyles(t: ReturnType<typeof useTheme>['theme']) {
-  const c = t.colors;
+// The card sort bar's own styles (STD-13): it builds them from the theme
+// like any component, never receives a screen stylesheet as a prop. The
+// roster itself needs no styles anymore: it renders in page flow (no
+// scroll container to flex), and its pieces own theirs.
+function createSortBarStyles(t: ReturnType<typeof useTheme>['theme']) {
   return StyleSheet.create({
-    rosterWrap: {
-      flex: 1,
-    },
-    // The donation control bar sits above the roster. Quiet chrome: a flat
-    // row, not a raised panel, so the roster table keeps the visual weight.
-    controlBar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      flexWrap: 'wrap',
-      columnGap: t.spacing[4],
-      rowGap: t.spacing[2],
-      marginBottom: t.spacing[3],
-    },
-    // The card presentation's wrapper: flexes like the table's grid wrapper
-    // so the FlatList below the sort bar stays the scroll container.
-    cardPresentation: {
-      flex: 1,
-    },
-    // The sort bar rides above the scrolling card list. Bottom-aligned so
-    // the direction pill lines up with the dropdown's trigger, not its
+    // The sort bar rides above the card list. Bottom-aligned so the
+    // direction pill lines up with the dropdown's trigger, not its
     // micro label; wraps at the 360 px floor so the pill never squeezes
     // the trigger's value text.
     sortBar: {
@@ -788,6 +807,23 @@ function createRosterStyles(t: ReturnType<typeof useTheme>['theme']) {
       flexShrink: 1,
       flexBasis: 180,
       minWidth: 0,
+    },
+  });
+}
+
+// The donation control bar's own styles (STD-13, paid down from the
+// stylesheet threading session 22 flagged). Quiet chrome: a flat row, not
+// a raised panel, so the roster keeps the visual weight.
+function createDonationBarStyles(t: ReturnType<typeof useTheme>['theme']) {
+  const c = t.colors;
+  return StyleSheet.create({
+    controlBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      columnGap: t.spacing[4],
+      rowGap: t.spacing[2],
+      marginBottom: t.spacing[3],
     },
     toggle: {
       flexDirection: 'row',
@@ -819,56 +855,56 @@ function createRosterStyles(t: ReturnType<typeof useTheme>['theme']) {
     toggleLabelOn: {
       color: c.textOnAccent,
     },
-    targetRow: {
+    // The "Donation ratio" two-number box. Label whispers on top, the
+    // "__ : __" row speaks under it, the same label-value rhythm every
+    // other control in the kit uses.
+    ratioBox: {
+      gap: t.spacing[1],
+    },
+    ratioLabel: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.xs,
+      fontWeight: t.fontWeight.medium,
+      color: c.textMuted,
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+    },
+    ratioRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      flexWrap: 'wrap',
-      columnGap: t.spacing[2],
-      rowGap: t.spacing[2],
+      gap: t.spacing[2],
     },
-    targetChip: {
-      alignItems: 'center',
-      justifyContent: 'center',
+    ratioInput: {
+      width: 56,
       minHeight: t.layout.touchTargetMin,
-      paddingHorizontal: t.spacing[4],
-      paddingVertical: t.spacing[1],
-      borderRadius: t.radius.pill,
+      paddingHorizontal: t.spacing[2],
+      borderRadius: t.radius[1],
       borderWidth: 1,
       borderColor: c.panelBorderStrong,
       backgroundColor: c.panelRaised,
+      fontFamily: t.fontFamily.mono,
+      fontSize: t.fontSize.md,
+      color: c.textPrimary,
+      textAlign: 'center',
+      fontVariant: ['tabular-nums'],
       outlineColor: c.focusRing,
       outlineOffset: t.layout.focusRingOffset,
     },
-    targetChipSelected: {
-      backgroundColor: c.accentSoft,
-      borderColor: c.accent,
+    // Dimmed, not hidden, while the needs-attention view is off: the same
+    // disabled treatment the Dropdown's trigger gets.
+    ratioInputDisabled: {
+      opacity: 0.5,
     },
-    targetChipPressed: {
-      opacity: 0.7,
-    },
-    targetChipText: {
+    ratioColon: {
       fontFamily: t.fontFamily.mono,
-      fontSize: t.fontSize.sm,
-      fontWeight: t.fontWeight.medium,
-      color: c.textPrimary,
-    },
-    targetChipTextSelected: {
-      color: c.accent,
-      fontWeight: t.fontWeight.semibold,
+      fontSize: t.fontSize.md,
+      color: c.textMuted,
     },
     healthLabel: {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.sm,
       color: c.textMuted,
       fontVariant: ['tabular-nums'],
-    },
-    // The card list's scroll container; the table presentation brings its
-    // own inside RosterTable.
-    rosterList: {
-      flex: 1,
-    },
-    rosterListContent: {
-      paddingBottom: t.spacing[6],
     },
   });
 }
@@ -894,9 +930,12 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       gap: t.spacing[5],
     },
 
-    // success: identity block
+    // success: compact horizontal identity block. The band keeps every
+    // F-04 datum but reads left to right at a short height instead of
+    // stacking (the owner's layout call): badge and text side by side,
+    // details as one inline chip row under it.
     successWrap: {
-      gap: t.spacing[5],
+      gap: t.spacing[4],
     },
     identity: {
       flexDirection: 'row',
@@ -906,7 +945,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     identityText: {
       flex: 1,
       gap: t.spacing[1],
-      flexWrap: 'wrap',
+      minWidth: 0,
     },
     tagLine: {
       fontFamily: t.fontFamily.mono,
@@ -919,7 +958,6 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       flexWrap: 'wrap',
       columnGap: t.spacing[2],
       rowGap: t.spacing[1],
-      marginTop: t.spacing[1],
     },
     levelChip: {
       fontFamily: t.fontFamily.sans,
@@ -940,54 +978,47 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       textTransform: 'uppercase',
       letterSpacing: 0.6,
     },
+    // The badge slot (07 section 7): 48 px, the size the design language
+    // documents for API badges.
     badge: {
-      width: 64,
-      height: 64,
-      borderRadius: t.radius[3],
+      width: 48,
+      height: 48,
+      borderRadius: t.radius[2],
       backgroundColor: c.panel,
     },
     badgePlaceholder: {
-      width: 64,
-      height: 64,
-      borderRadius: t.radius[3],
+      width: 48,
+      height: 48,
+      borderRadius: t.radius[2],
       backgroundColor: c.hairline,
     },
     description: {
       fontFamily: t.fontFamily.sans,
-      fontSize: t.fontSize.body,
-      lineHeight: Math.round(t.lineHeight.relaxed * t.fontSize.body),
-      color: c.textSecondary,
+      fontSize: t.fontSize.sm,
+      lineHeight: Math.round(t.lineHeight.normal * t.fontSize.sm),
+      color: c.textMuted,
     },
 
-    // requirements
-    requirementsBlock: {
-      gap: t.spacing[2],
-    },
-    requirementsLabel: {
-      fontFamily: t.fontFamily.sans,
-      fontSize: t.fontSize.xs,
-      fontWeight: t.fontWeight.medium,
-      color: c.textMuted,
-      textTransform: 'uppercase',
-      letterSpacing: 0.6,
-    },
-    requirementsRow: {
+    // details band: stats and join requirements as one left-to-right row
+    // of inline label-value chips, short height
+    detailsRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
       columnGap: t.spacing[2],
       rowGap: t.spacing[2],
     },
-    requirementChip: {
+    detailChip: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      columnGap: t.spacing[2],
       backgroundColor: c.panel,
       borderRadius: t.radius[1],
       borderWidth: 1,
       borderColor: c.panelBorder,
       paddingHorizontal: t.spacing[3],
       paddingVertical: t.spacing[2],
-      gap: t.spacing[1],
-      minWidth: 96,
     },
-    requirementChipLabel: {
+    detailChipLabel: {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.xs,
       fontWeight: t.fontWeight.medium,
@@ -995,7 +1026,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       textTransform: 'uppercase',
       letterSpacing: 0.6,
     },
-    requirementChipValue: {
+    detailChipValue: {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.sm,
       fontWeight: t.fontWeight.semibold,
@@ -1003,19 +1034,14 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontVariant: ['tabular-nums'],
     },
 
-    // stat row (reuses the kit StatChip; the row just lays them out)
-    statRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      columnGap: t.spacing[6],
-      rowGap: t.spacing[3],
-    },
-
-    // tab bar
+    // tab bar: a deliberately compact strip (the owner's call to shave the
+    // height): padding-driven, no touch-target floor. It is the one
+    // recorded exception to 07 section 6's 44 px floor, keyboard focus and
+    // the visible ring still apply.
     tabBar: {
       flexDirection: 'row',
       gap: t.spacing[1],
-      marginTop: t.spacing[5],
+      marginTop: t.spacing[4],
       padding: t.spacing[1],
       backgroundColor: c.panel,
       borderRadius: t.radius[2],
@@ -1029,7 +1055,6 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       borderRadius: t.radius[1],
       alignItems: 'center',
       justifyContent: 'center',
-      minHeight: t.layout.touchTargetMin,
       outlineColor: c.focusRing,
       outlineOffset: t.layout.focusRingOffset,
     },
@@ -1050,13 +1075,10 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontWeight: t.fontWeight.semibold,
     },
 
-    // tab content: flexes to fill the screen's remaining height so the
-    // roster's FlatList can own scrolling (the search screen's resultsArea
-    // does the same), with a floor so the roster stays usable on short
-    // viewports; below the floor the page grows instead (NFR-05).
+    // tab content: natural height. The roster renders in page flow and the
+    // browser scrollbar owns the scrolling (07 section 3), so this region
+    // grows as tall as the roster runs and pushes the footer down with it.
     tabContent: {
-      flex: 1,
-      minHeight: ROSTER_REGION_MIN_HEIGHT,
       marginTop: t.spacing[4],
     },
 
@@ -1072,7 +1094,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     },
 
     // skeleton placeholders (06 section 3): quiet blocks and lines that
-    // mirror the success layout so the swap does not reflow.
+    // mirror the compact success layout so the swap does not reflow.
     skeletonBlock: {
       backgroundColor: c.hairline,
     },
@@ -1084,39 +1106,20 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       height: t.fontSize.xl,
       width: 220,
     },
-    skeletonTag: {
-      height: t.fontSize.sm,
-      width: 140,
-      marginTop: t.spacing[1],
-    },
     skeletonMeta: {
       height: t.fontSize.xs,
       width: 180,
       marginTop: t.spacing[2],
     },
     skeletonDescription: {
-      height: Math.round(t.lineHeight.relaxed * t.fontSize.body) * 2,
+      height: Math.round(t.lineHeight.normal * t.fontSize.sm),
       width: '100%',
+      maxWidth: 420,
+      marginTop: t.spacing[2],
     },
-    skeletonReqLabel: {
-      height: t.fontSize.xs,
-      width: 64,
-    },
-    skeletonReqValue: {
+    skeletonDetailValue: {
       height: t.fontSize.sm,
-      width: 80,
-      marginTop: t.spacing[1],
-    },
-    skeletonStat: {
-      gap: t.spacing[1],
-    },
-    skeletonStatLabel: {
-      height: t.fontSize.xs,
       width: 72,
-    },
-    skeletonStatValue: {
-      height: t.fontSize.sm,
-      width: 56,
     },
     skeletonCaption: {
       marginTop: t.spacing[1],

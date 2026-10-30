@@ -4,7 +4,7 @@ import { useTheme } from '../theme';
 import type { DonationState, DonationVerdict } from '../lib/donation-balance';
 
 // The donation-balance chip (07 section 4: "RatioFlag, donation-balance chip
-// (good/warn/dash states)"). Renders one member's given/received ratio as a
+// (good/warn/dash states)"). Renders one member's donation ratio as a
 // compact pill whose color carries the verdict: good (at or above target)
 // is the success token, warn (below target, above the noise floor) is the
 // warning token, and dash (no data, both counters zero) is a muted dash.
@@ -14,10 +14,13 @@ import type { DonationState, DonationVerdict } from '../lib/donation-balance';
 // it. That keeps the render a lookup and the rule testable without React
 // (STD-09).
 //
-// The ratio is displayed as "given : received" (05 section 2), with
-// tabular figures so a column of chips aligns without decimal noise. The
-// component owns its styles (STD-13): callers pass a verdict, never a
-// stylesheet.
+// The chip shows the RATIO as "ratio : 1" (05 section 2), not the raw
+// given/received counters: those already have their own roster columns
+// (Donations, Received), so repeating them here would make the row say the
+// same thing twice. One decimal at most, tabular figures so a column of
+// chips aligns. The accessibility label still reads the counters and the
+// verdict, so a screen reader hears the whole judgment. The component owns
+// its styles (STD-13): callers pass a verdict, never a stylesheet.
 
 export interface RatioFlagProps {
   /** The member's donation verdict from the balance engine. */
@@ -38,13 +41,21 @@ export default function RatioFlag({ verdict }: RatioFlagProps) {
   );
 }
 
-/** The on-screen string for the ratio: "given : received". */
+/** The on-screen string for the ratio: "ratio : 1" (05 section 2). A
+ * saint (received = 0, given > 0) has no finite ratio, so it reads as the
+ * infinity it is; both zero is the dash state, handled by the caller. */
 function formatRatio(verdict: DonationVerdict): string {
-  return `${formatNumber(verdict.given)} : ${formatNumber(verdict.received)}`;
+  if (verdict.received === 0) {
+    return '\u221E : 1';
+  }
+  return `${formatRatioNumber(verdict.given / verdict.received)} : 1`;
 }
 
-function formatNumber(value: number): string {
-  return value.toLocaleString('en-US');
+/** One decimal at most, trailing ".0" dropped: 1 -> "1", 1.2 -> "1.2",
+ * 0.4 -> "0.4". The ratio is inherently fractional, which is the one case
+ * the design language allows a decimal (07 section 5). */
+function formatRatioNumber(value: number): string {
+  return value.toFixed(1).replace(/\.0$/, '');
 }
 
 function accessibilityLabel(verdict: DonationVerdict): string {
