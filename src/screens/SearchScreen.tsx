@@ -13,6 +13,7 @@ import ErrorState from '../components/ErrorState';
 import PillButton from '../components/PillButton';
 import { clanRouteFor, normalizeTagInput, TAG_REJECT_COPY } from '../lib/tag';
 import { WAR_FREQUENCY_LABELS } from '../lib/war-frequency';
+import { busyRetryDelayMs, shouldRetryBusy } from '../lib/busy-retry';
 import {
   fetchSearchPage,
   SearchFetchError,
@@ -97,6 +98,10 @@ const FILTER_CELL_BASIS = 140;
 // results are coming.
 const SKELETON_CARD_COUNT = 6;
 
+// Two skeleton cards while the next page loads: enough to say "more of the
+// same is coming" without implying a page size.
+const SKELETON_FOOTER_CARD_COUNT = 2;
+
 // ---------- the screen ----------
 
 export default function SearchScreen() {
@@ -166,12 +171,28 @@ export default function SearchScreen() {
     staleTime: SEARCH_STALE_TIME_MS,
     retry: (failureCount, error) => {
       // A 400 is our request being wrong; retrying the same request cannot
-      // fix it, so we stop. Everything else gets the single default retry
-      // (the tier already retries upstream throttles itself).
-      if (error instanceof SearchFetchError && error.result.kind === 'bad_request') {
-        return false;
+      // fix it, so we stop. The busy outcome auto-retries with backoff (06
+      // section 3): the tier already retried the throttle itself, so the
+      // client paces itself through lib/busy-retry and the screen keeps its
+      // skeleton with a "one moment" note instead of flipping to an error
+      // screen. Everything else gets the single default retry.
+      if (error instanceof SearchFetchError) {
+        if (error.result.kind === 'bad_request') {
+          return false;
+        }
+        if (error.result.kind === 'busy') {
+          return shouldRetryBusy(failureCount);
+        }
       }
       return failureCount < 1;
+    },
+    retryDelay: (failureCount, error) => {
+      if (error instanceof SearchFetchError && error.result.kind === 'busy') {
+        return busyRetryDelayMs(error.result.retryAfter, failureCount);
+      }
+      // Only the single default retry ever waits on this: the library's
+      // own first backoff.
+      return 1_000;
     },
   });
 
@@ -180,6 +201,14 @@ export default function SearchScreen() {
     [query.data],
   );
   const firstPageAge = query.data?.pages[0]?.age ?? 0;
+
+  // True while the first load is auto-retrying a busy answer: the skeleton
+  // stays up and its note says "one moment" (06 section 3), so a throttled
+  // upstream reads as a slow fetch, not an error screen.
+  const busyRetrying =
+    query.isPending &&
+    query.failureReason instanceof SearchFetchError &&
+    query.failureReason.result.kind === 'busy';
 
   const hasActiveFilters =
     submitted !== null &&
@@ -300,8 +329,18 @@ export default function SearchScreen() {
                 {Array.from({ length: SKELETON_CARD_COUNT }, (_, index) => (
                   <SkeletonCard key={index} />
                 ))}
+                {busyRetrying ? (
+                  <Text style={styles.skeletonNote}>
+                    The game API is busy. One moment, retrying automatically…
+                  </Text>
+                ) : null}
               </View>
-            ) : query.isError ? (
+            ) : query.isError && !query.data ? (
+              // The panel replaces the list only when nothing was loaded:
+              // once pages exist, a later failure belongs to the footer
+              // under the list, never to a whole-screen swap that throws
+              // the visitor's scroll away (STD-35, the matrix is per data
+              // view).
               <SearchError
                 error={query.error as SearchFetchError | Error}
                 onRetry={() => void query.refetch()}
@@ -332,7 +371,7 @@ export default function SearchScreen() {
                     <ClanCard clan={item} onPress={() => navigate(clanRouteFor(item.tag))} />
                   )}
                   onEndReached={() => {
-                    if (query.hasNextPage && !query.isFetchingNextPage) {
+                    if (query.hasNextPage && !query.isFetchingNextPage && !query.isFetchNextPageError) {
                       void query.fetchNextPage();
                     }
                   }}
@@ -343,6 +382,9 @@ export default function SearchScreen() {
                     <ResultsFooter
                       hasNextPage={query.hasNextPage ?? false}
                       isFetchingNextPage={query.isFetchingNextPage}
+                      isFetchNextPageError={query.isFetchNextPageError}
+                      failureReason={query.failureReason}
+                      onRetry={() => void query.fetchNextPage()}
                     />
                   }
                   contentContainerStyle={styles.listContent}
@@ -391,7 +433,9 @@ interface SearchErrorProps {
 function SearchError({ error, onRetry, isRetrying }: SearchErrorProps) {
   // The contract (04 section 6) hands search three states: upstream_busy,
   // upstream_unreachable, and bad_request. Each gets its own copy and a
-  // next action, never a dead end.
+  // next action, never a dead end. The busy copy assumes the auto-retry
+  // already ran (lib/busy-retry): what is left to offer is the manual
+  // nudge and the honest wait.
   let tone: 'busy' | 'gone' = 'gone';
   let title = 'Something went wrong';
   let body = error.message || 'An unexpected error happened while searching.';
@@ -401,7 +445,7 @@ function SearchError({ error, onRetry, isRetrying }: SearchErrorProps) {
     if (error.result.kind === 'busy') {
       tone = 'busy';
       title = 'The game API is busy';
-      body = `Upstream answered 429. Trying again in about ${error.result.retryAfter}s, or hit retry to nudge it.`;
+      body = `Upstream answered 429 and automatic retries have not cleared it yet. Trying again now may work, or wait about ${error.result.retryAfter}s and retry.`;
       retryLabel = 'Retry now';
     } else if (error.result.kind === 'unreachable') {
       title = "Can't reach the game API";
@@ -432,14 +476,71 @@ function SearchError({ error, onRetry, isRetrying }: SearchErrorProps) {
 interface ResultsFooterProps {
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
+  /** True when the last fetchNextPage failed even through its retries;
+   * the list above stays, the failure is owned here, inline. */
+  isFetchNextPageError: boolean;
+  /** The error the pagination attempt ended on, for busy-vs-transient copy. */
+  failureReason: SearchFetchError | Error | null;
+  onRetry: () => void;
 }
 
-function ResultsFooter({ hasNextPage, isFetchingNextPage }: ResultsFooterProps) {
+function ResultsFooter({
+  hasNextPage,
+  isFetchingNextPage,
+  isFetchNextPageError,
+  failureReason,
+  onRetry,
+}: ResultsFooterProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createFooterStyles(theme), [theme]);
+
   if (isFetchingNextPage) {
-    return <Text style={styles.text}>Loading more clans…</Text>;
+    // Checked before the error branch on purpose: while a retry is in
+    // flight the query status is still the previous error (status only
+    // flips on success), so isFetchNextPageError stays true through the
+    // whole fetch and the error branch would swallow the loading state.
+    // Layout-matched loading for the next page (06 section 3): the same
+    // card skeleton the first load uses, two of them, so the list grows by
+    // the shape it is about to receive. The row carries the progressbar
+    // role because the skeleton blocks themselves are decorative and
+    // silent; a screen reader still needs to hear that more is loading.
+    return (
+      <View
+        style={styles.loadingRow}
+        accessibilityRole="progressbar"
+        accessibilityLabel="Loading more clans"
+      >
+        {Array.from({ length: SKELETON_FOOTER_CARD_COUNT }, (_, index) => (
+          <SkeletonCard key={index} />
+        ))}
+      </View>
+    );
   }
+
+  if (isFetchNextPageError) {
+    // A failed page load used to be swallowed: the list just ended, which
+    // read as "that was everything". The footer owns the failure instead
+    // (STD-35): the loaded clans stay on screen and the retry sits right
+    // where the next page would have appeared.
+    const busy =
+      failureReason instanceof SearchFetchError && failureReason.result.kind === 'busy';
+    return (
+      <View style={styles.errorRow} accessibilityRole="alert">
+        <Text style={styles.errorText}>
+          {busy
+            ? 'The game API is busy, so the next page of clans is not loading.'
+            : 'The request for more clans failed. This is usually transient.'}
+        </Text>
+        <PillButton
+          label="Retry"
+          variant="secondary"
+          onPress={onRetry}
+          hint="Loads the next page of results again, keeping the clans already on screen."
+        />
+      </View>
+    );
+  }
+
   if (!hasNextPage) {
     return <Text style={styles.text}>End of results</Text>;
   }
@@ -455,6 +556,28 @@ function createFooterStyles(t: ReturnType<typeof useTheme>['theme']) {
       color: c.textMuted,
       textAlign: 'center',
       paddingVertical: t.spacing[4],
+    },
+    // The skeleton pair sits in the list's own card rhythm (the last card
+    // already carries the marginBottom that spaces the footer).
+    loadingRow: {
+      gap: t.spacing[3],
+    },
+    errorRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      columnGap: t.spacing[3],
+      rowGap: t.spacing[2],
+      paddingVertical: t.spacing[3],
+    },
+    errorText: {
+      flex: 1,
+      // Keeps the sentence readable before the retry button wraps under
+      // it on a narrow screen.
+      minWidth: 200,
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.sm,
+      color: c.textSecondary,
     },
   });
 }
@@ -558,6 +681,11 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     },
     skeletonWrap: {
       gap: t.spacing[3],
+    },
+    skeletonNote: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.sm,
+      color: c.textMuted,
     },
 
     // footer (M0 review surfaces)

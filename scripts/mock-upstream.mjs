@@ -5,6 +5,11 @@
 //
 // Special tags and names exercise the whole error contract:
 //   name contains "fail"        -> 500 (upstream_unreachable path)
+//   name contains "busy"        -> 429 with Retry-After (the busy path on search)
+//   name contains "empty"       -> 200 with no items (the empty-results state)
+//   name contains "failpage"    -> 500 only on the second and later pages
+//                                 (the failed-pagination state; page one
+//                                 succeeds so a list exists to keep)
 //   #NOTFOUND                   -> 404 (not_found + negative caching)
 //   #BADREQ                     -> 400 (bad_request with a reason)
 //   #HANG (war route only)      -> never answers (timeout path)
@@ -31,12 +36,12 @@ const clan = {
       name: 'Mock Player',
       role: 'leader',
       expLevel: 189,
-      league: { name: 'Titan League I' },
+      leagueTier: { name: 'Electro League 31', iconUrls: { small: 'mock-tier.png', large: 'mock-tier.png' } },
       trophies: 4871,
       versusTrophies: 3120,
       clanRank: 1,
       donations: 340,
-      received: 260,
+      donationsReceived: 260,
       townHallLevel: 14,
     },
     {
@@ -44,12 +49,12 @@ const clan = {
       name: 'Mock Second',
       role: 'member',
       expLevel: 142,
-      league: { name: 'Champion League I' },
+      leagueTier: { name: 'Witch League 18', iconUrls: { small: 'mock-tier.png', large: 'mock-tier.png' } },
       trophies: 3911,
       versusTrophies: 2901,
       clanRank: 2,
       donations: 51,
-      received: 343,
+      donationsReceived: 343,
       townHallLevel: 13,
     },
   ],
@@ -87,6 +92,16 @@ const warlog = {
   ],
 };
 
+// The clans the search endpoint pages through: one per page, distinct tags,
+// then a real end (the last page carries no cursor). A listing that
+// repeated one clan on every page would hand the client duplicate keys,
+// which the real API never does.
+const MOCK_SEARCH_CLANS = [
+  { ...clan, memberList: undefined },
+  { ...clan, tag: '#MOCKTWO', name: 'Mock Second Clan', memberList: undefined },
+  { ...clan, tag: '#MOCKTHREE', name: 'Mock Third Clan', memberList: undefined },
+];
+
 function sendJson(res, status, body, headers = {}) {
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', ...headers });
   res.end(JSON.stringify(body));
@@ -97,14 +112,40 @@ const server = createServer((req, res) => {
   const path = url.pathname;
 
   if (path === '/v1/clans') {
-    const name = url.searchParams.get('name') ?? '';
-    if (name.toLowerCase().includes('fail')) {
+    const name = (url.searchParams.get('name') ?? '').toLowerCase();
+    const after = url.searchParams.get('after');
+    // The cursor pages of "failpage" fail: exercises the client's failed-
+    // pagination state (T-M1-6). The first page must succeed so a list
+    // exists to keep on screen while the retry affordance shows; it falls
+    // through to the paged listing below.
+    if (name.includes('failpage')) {
+      if (after !== null) {
+        sendJson(res, 500, { reason: 'internalServerError', message: 'mock page failure' });
+        return;
+      }
+    } else if (name.includes('fail')) {
       sendJson(res, 500, { reason: 'internalServerError', message: 'mock failure' });
       return;
     }
+    if (name.includes('busy')) {
+      // A short Retry-After so the busy path is exercisable end to end
+      // (the tier's own backoff retries, then the client's auto-retry).
+      sendJson(res, 429, { reason: 'tooManyRequests' }, { 'retry-after': '2' });
+      return;
+    }
+    if (name.includes('empty')) {
+      // The empty-results state: a healthy 200 with nothing in it.
+      sendJson(res, 200, { items: [], paging: { cursors: {} } });
+      return;
+    }
+    // One clan per page, cursor-walked, then a page with no cursor so the
+    // listing ends the way a real one does.
+    const pageIndex = after === null ? 0 : Math.max(0, Number.parseInt(after, 10) || 0);
+    const pageItems = MOCK_SEARCH_CLANS.slice(pageIndex, pageIndex + 1);
+    const nextCursor = pageIndex + 1 < MOCK_SEARCH_CLANS.length ? String(pageIndex + 1) : null;
     sendJson(res, 200, {
-      items: [{ ...clan, memberList: undefined }],
-      paging: { cursors: { after: 'MOCKCURSOR' } },
+      items: pageItems,
+      paging: nextCursor === null ? { cursors: {} } : { cursors: { after: nextCursor } },
     });
     return;
   }
