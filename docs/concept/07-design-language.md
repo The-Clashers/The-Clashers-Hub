@@ -112,10 +112,14 @@ helper; no CSS media queries scattered through components (07 §3).
 | `normal` | 180ms |
 | `slow` | 240ms |
 | `ease` | `cubic-bezier(0.4, 0, 0.2, 1)` |
+| `pulse` | 1200ms |
 
 Data tools answer questions, they don't perform (07 §1): the scale is
 intentionally narrow and a screen adding its own curve is a PR that gets sent
-back.
+back. `pulse` is the one ambient motion in the product: the loading
+skeletons' quiet opacity loop, an affordance that data is on its way, never
+a performance. It is paused entirely under `prefers-reduced-motion`, where
+the skeleton's layout carries the loading signal alone.
 
 ### 2.7 Z-index
 
@@ -175,7 +179,8 @@ overscroll.
 | `WarResultChip` | win/loss/tie pill |
 | `CompareRow` | metric row with both values + delta arrow |
 | `Legend` | the ONE chart legend pattern, all charts use it, no exceptions |
-| `SkeletonCard` | card-shaped loading skeleton, layout-matched to `ClanCard`; more shapes land with the screens that need them |
+| `SkeletonCard` | card-shaped loading skeleton, layout-matched to `ClanCard` |
+| `SkeletonBlock` | the skeleton atom every shape composes: one hairline block on the shared pulse (`useSkeletonPulse`, the `pulse` motion token, paused under reduced motion) |
 | `EmptyState` | the idle and empty states of the state matrix ([06 §3](./06-data-flow-and-caching.md)): title, body, optional next action |
 | `ErrorState` | the error state of the matrix: tone dot, title, body, next action, `role=alert` |
 
