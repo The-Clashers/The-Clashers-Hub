@@ -18,7 +18,10 @@ import EmptyState from '../components/EmptyState';
 import PillButton from '../components/PillButton';
 import RosterTable from '../components/RosterTable';
 import RosterCard from '../components/RosterCard';
+import SkeletonCard from '../components/Skeleton';
+import SkeletonBlock, { useSkeletonPulse } from '../components/SkeletonBlock';
 import { fetchClan, ClanFetchError, type ClanMember } from '../api/clan';
+import { busyRetryDelayMs, shouldRetryBusy } from '../lib/busy-retry';
 import { warFrequencyLabel } from '../lib/war-frequency';
 import { playerRouteFor } from '../lib/tag';
 import {
@@ -96,16 +99,38 @@ export default function ClanScreen() {
       // retired or the URL is stale); retrying burns no upstream calls
       // thanks to the 30 s negative cache, but it cannot fix anything, so
       // we stop. A 400 is our URL being wrong; retrying the same request
-      // cannot fix it. Everything else gets the single default retry (the
-      // tier already retries upstream throttles itself).
+      // cannot fix it. The busy outcome auto-retries with backoff (06
+      // section 3): the tier already retried the throttle itself, so the
+      // client paces itself through lib/busy-retry and the screen keeps
+      // its skeleton with a "one moment" note instead of flipping to an
+      // error screen. Everything else gets the single default retry.
       if (error instanceof ClanFetchError) {
         if (error.result.kind === 'not_found' || error.result.kind === 'bad_request') {
           return false;
         }
+        if (error.result.kind === 'busy') {
+          return shouldRetryBusy(failureCount);
+        }
       }
       return failureCount < 1;
     },
+    retryDelay: (failureCount, error) => {
+      if (error instanceof ClanFetchError && error.result.kind === 'busy') {
+        return busyRetryDelayMs(error.result.retryAfter, failureCount);
+      }
+      // Only the single default retry ever waits on this: the library's
+      // own first backoff.
+      return 1_000;
+    },
   });
+
+  // True while the first load is auto-retrying a busy answer: the skeleton
+  // stays up and its caption switches to the "one moment" note (06
+  // section 3), so a throttled demo reads as a slow fetch, not an error.
+  const busyRetrying =
+    query.isPending &&
+    query.failureReason instanceof ClanFetchError &&
+    query.failureReason.result.kind === 'busy';
 
   const selectTab = (next: ClanTab) => {
     // Replace, not push: tab switches are state on the same route, not pages
@@ -132,45 +157,49 @@ export default function ClanScreen() {
             <ThemeToggle />
           </View>
 
-          <View style={[base.panelRaised, styles.detailPanel]}>
-            {query.isPending ? (
-              <ClanSkeleton base={base} styles={styles} />
-            ) : query.isError ? (
-              <ClanError
-                error={query.error as ClanFetchError | Error}
-                onRetry={() => void query.refetch()}
-                onSearch={() => navigate('/')}
-                isRetrying={query.isFetching}
-                tag={tag}
-              />
-            ) : (
-              <ClanSuccess clan={query.data} base={base} styles={styles} />
-            )}
-          </View>
+          {query.isPending ? (
+            <ClanLoading busyRetrying={busyRetrying} />
+          ) : (
+            <>
+              <View style={[base.panelRaised, styles.detailPanel]}>
+                {query.isError ? (
+                  <ClanError
+                    error={query.error as ClanFetchError | Error}
+                    onRetry={() => void query.refetch()}
+                    onSearch={() => navigate('/')}
+                    isRetrying={query.isFetching}
+                    tag={tag}
+                  />
+                ) : (
+                  <ClanSuccess clan={query.data} base={base} styles={styles} />
+                )}
+              </View>
 
-          {query.isSuccess ? (
-            <View style={styles.tabBar} accessibilityRole="tablist">
-              {TABS.map((tab) => (
-                <TabButton
-                  key={tab.id}
-                  label={tab.label}
-                  active={tab.id === activeTab}
-                  onPress={() => selectTab(tab.id)}
-                  styles={styles}
-                />
-              ))}
-            </View>
-          ) : null}
+              {query.isSuccess ? (
+                <View style={styles.tabBar} accessibilityRole="tablist">
+                  {TABS.map((tab) => (
+                    <TabButton
+                      key={tab.id}
+                      label={tab.label}
+                      active={tab.id === activeTab}
+                      onPress={() => selectTab(tab.id)}
+                      styles={styles}
+                    />
+                  ))}
+                </View>
+              ) : null}
 
-          {query.isSuccess ? (
-            <View style={styles.tabContent}>
-              {activeTab === 'roster' ? (
-                <RosterSection members={query.data.memberList ?? []} />
-              ) : (
-                <TabPlaceholder tab={activeTab} />
-              )}
-            </View>
-          ) : null}
+              {query.isSuccess ? (
+                <View style={styles.tabContent}>
+                  {activeTab === 'roster' ? (
+                    <RosterSection members={query.data.memberList ?? []} />
+                  ) : (
+                    <TabPlaceholder tab={activeTab} />
+                  )}
+                </View>
+              ) : null}
+            </>
+          )}
 
           <View style={styles.footer}>
             <PillButton
@@ -270,47 +299,154 @@ function ClanSuccess({ clan, base, styles }: ClanSuccessProps) {
   );
 }
 
-// ---------- loading skeleton ----------
+// ---------- loading skeleton (T-M1-6, 06 section 3) ----------
 
-interface ClanSkeletonProps {
-  base: ReturnType<typeof createBaseStyles>;
-  styles: ReturnType<typeof createStyles>;
+interface ClanLoadingProps {
+  /** True while a busy answer is being auto-retried; swaps the caption to
+   * the "one moment" note so a throttled upstream reads as a slow fetch. */
+  busyRetrying: boolean;
 }
 
-function ClanSkeleton({ base, styles }: ClanSkeletonProps) {
-  // Layout-matched skeleton (06 section 3): same shape as the success state
-  // (badge, name, tag, meta line, description, requirements, stat row) so the
-  // swap from skeleton to data does not reflow. No spinner; the layout is the
-  // signal that data is on its way.
+// The skeleton mirrors the whole success layout, not just the identity
+// panel: without the tab bar and roster shapes below, the first paint
+// would hold only the header's height and the page would visibly grow and
+// reflow the moment data landed (the layout-matched rule, 06 section 3).
+// Every size here mirrors a real element; if the success layout changes,
+// this follows in the same PR.
+
+// The identity block's fixed badge slot (the success state renders the
+// API badge at this size, 07 section 7).
+const SKELETON_BADGE_SLOT = 64;
+
+// Line widths chosen to read as a name, a tag, and a meta line; the
+// requirement and stat chips mirror the label/value pairs they stand in
+// for.
+const SKELETON_NAME_WIDTH = 220;
+const SKELETON_TAG_WIDTH = 140;
+const SKELETON_META_WIDTH = 180;
+const SKELETON_REQ_LABEL_WIDTH = 64;
+const SKELETON_REQ_VALUE_WIDTH = 80;
+const SKELETON_STAT_LABEL_WIDTH = 72;
+const SKELETON_STAT_VALUE_WIDTH = 56;
+
+// Enough roster rows to fill the roster region's floor (about six rows
+// plus the header), the same count a laptop viewport shows.
+const SKELETON_ROSTER_ROWS = 6;
+
+function ClanLoading({ busyRetrying }: ClanLoadingProps) {
+  const { theme } = useTheme();
+  const base = useMemo(() => createBaseStyles(theme), [theme]);
+  const styles = useMemo(() => createClanLoadingStyles(theme), [theme]);
+  const pulse = useSkeletonPulse();
+  // The same presentation switch the roster itself uses (NFR-05): table
+  // rows at 768 px and up, cards below it, so the skeleton holds the exact
+  // shape the data will fill on this viewport.
+  const { width } = useWindowDimensions();
+  const breakpoint = breakpointFor(width);
+  const isCardPresentation = breakpoint === 'small' || breakpoint === 'mobile';
+
   return (
-    <View style={styles.successWrap} accessibilityRole="progressbar" accessibilityLabel="Loading clan">
-      <View style={styles.identity}>
-        <View style={[styles.badge, styles.skeletonBlock]} />
-        <View style={styles.identityText}>
-          <View style={[styles.skeletonLine, styles.skeletonTitle]} />
-          <View style={[styles.skeletonLine, styles.skeletonTag]} />
-          <View style={[styles.skeletonLine, styles.skeletonMeta]} />
+    <>
+      <View style={[base.panelRaised, styles.detailPanel]}>
+        <View
+          style={styles.identityWrap}
+          accessibilityRole="progressbar"
+          accessibilityLabel="Loading clan"
+        >
+          <View style={styles.identity}>
+            <SkeletonBlock
+              width={SKELETON_BADGE_SLOT}
+              height={SKELETON_BADGE_SLOT}
+              radiusStep={3}
+              pulse={pulse}
+            />
+            <View style={styles.identityText}>
+              <SkeletonBlock width={SKELETON_NAME_WIDTH} height={theme.fontSize.xl} pulse={pulse} />
+              <SkeletonBlock width={SKELETON_TAG_WIDTH} height={theme.fontSize.sm} pulse={pulse} />
+              <SkeletonBlock width={SKELETON_META_WIDTH} height={theme.fontSize.xs} pulse={pulse} />
+            </View>
+          </View>
+          <SkeletonBlock
+            width="100%"
+            height={Math.round(theme.lineHeight.relaxed * theme.fontSize.body) * 2}
+            pulse={pulse}
+          />
+          <View style={styles.requirementsRow}>
+            {[0, 1, 2].map((index) => (
+              <View key={index} style={styles.requirementChip}>
+                <SkeletonBlock
+                  width={SKELETON_REQ_LABEL_WIDTH}
+                  height={theme.fontSize.xs}
+                  pulse={pulse}
+                />
+                <SkeletonBlock
+                  width={SKELETON_REQ_VALUE_WIDTH}
+                  height={theme.fontSize.sm}
+                  pulse={pulse}
+                />
+              </View>
+            ))}
+          </View>
+          <View style={styles.statRow}>
+            {[0, 1, 2, 3].map((index) => (
+              <View key={index} style={styles.statCell}>
+                <SkeletonBlock
+                  width={SKELETON_STAT_LABEL_WIDTH}
+                  height={theme.fontSize.xs}
+                  pulse={pulse}
+                />
+                <SkeletonBlock
+                  width={SKELETON_STAT_VALUE_WIDTH}
+                  height={theme.fontSize.sm}
+                  pulse={pulse}
+                />
+              </View>
+            ))}
+          </View>
+          <Text style={[base.caption, styles.caption]}>
+            {busyRetrying
+              ? 'The game API is busy. One moment, retrying automatically…'
+              : 'Fetching through the tier…'}
+          </Text>
         </View>
       </View>
-      <View style={[styles.skeletonLine, styles.skeletonDescription]} />
-      <View style={styles.requirementsRow}>
-        {[0, 1, 2].map((i) => (
-          <View key={i} style={styles.requirementChip}>
-            <View style={[styles.skeletonLine, styles.skeletonReqLabel]} />
-            <View style={[styles.skeletonLine, styles.skeletonReqValue]} />
+
+      {/* The tab bar's own shape, so the pills do not pop in after data. */}
+      <View style={styles.tabBar} aria-hidden>
+        {['roster', 'war', 'log'].map((id) => (
+          <View key={id} style={styles.tabCell}>
+            <SkeletonBlock width="55%" height={theme.fontSize.sm} pulse={pulse} />
           </View>
         ))}
       </View>
-      <View style={styles.statRow}>
-        {[0, 1, 2, 3].map((i) => (
-          <View key={i} style={styles.skeletonStat}>
-            <View style={[styles.skeletonLine, styles.skeletonStatLabel]} />
-            <View style={[styles.skeletonLine, styles.skeletonStatValue]} />
+
+      {isCardPresentation ? (
+        <View
+          style={styles.rosterCards}
+          accessibilityRole="progressbar"
+          accessibilityLabel="Loading the clan roster"
+        >
+          {Array.from({ length: SKELETON_ROSTER_ROWS }, (_, index) => (
+            <SkeletonCard key={index} />
+          ))}
+        </View>
+      ) : (
+        <View
+          style={styles.rosterPanel}
+          accessibilityRole="progressbar"
+          accessibilityLabel="Loading the clan roster"
+        >
+          <View style={styles.rosterHeaderRow}>
+            <SkeletonBlock width="45%" height={theme.fontSize.xs} pulse={pulse} />
           </View>
-        ))}
-      </View>
-      <Text style={[base.caption, styles.skeletonCaption]}>Fetching through the tier…</Text>
-    </View>
+          {Array.from({ length: SKELETON_ROSTER_ROWS }, (_, index) => (
+            <View key={index} style={styles.rosterRow}>
+              <SkeletonBlock width="100%" height={theme.fontSize.sm} pulse={pulse} />
+            </View>
+          ))}
+        </View>
+      )}
+    </>
   );
 }
 
@@ -331,7 +467,9 @@ function ClanError({ error, onRetry, onSearch, isRetrying, tag }: ClanErrorProps
   // end (06 section 3). The retry action is shared; the back-to-search
   // action sits in the screen footer for every state, so the not_found
   // branch surfaces "search by name" as its own primary action since retry
-  // cannot fix a retired tag.
+  // cannot fix a retired tag. The not_found body carries the tag-correction
+  // hint the state matrix asks for: what a well-formed tag looks like, so a
+  // typo'd URL can be fixed by hand.
   if (error instanceof ClanFetchError) {
     const result = error.result;
     if (result.kind === 'not_found') {
@@ -339,7 +477,7 @@ function ClanError({ error, onRetry, onSearch, isRetrying, tag }: ClanErrorProps
         <ErrorState
           tone="gone"
           title="No clan with this tag"
-          body={`The tag ${tag} did not resolve. The clan was retired, or the URL is stale. Search the clan by name instead.`}
+          body={`The tag ${tag} did not resolve. The clan was retired, or the tag has a typo: tags are 3 to 20 letters and numbers after the #. Search the clan by name instead.`}
           action={<PillButton label="Search clans" role="link" arrow onPress={onSearch} />}
         />
       );
@@ -349,7 +487,7 @@ function ClanError({ error, onRetry, onSearch, isRetrying, tag }: ClanErrorProps
         <ErrorState
           tone="busy"
           title="The game API is busy"
-          body={`Upstream answered 429. The tier already retried with backoff; trying again in about ${result.retryAfter}s, or hit retry to nudge it.`}
+          body={`Upstream answered 429 and automatic retries have not cleared it yet. Trying again now may work, or wait about ${result.retryAfter}s and retry.`}
           action={
             <PillButton
               label={isRetrying ? 'Retrying…' : 'Retry now'}
@@ -553,6 +691,117 @@ function createRosterStyles(t: ReturnType<typeof useTheme>['theme']) {
   });
 }
 
+// The loading skeleton's own styles (STD-13, the RosterSection pattern).
+// Each block mirrors the success element it stands in for; the mirror is
+// the point (layout-matched, 06 section 3), so a change to the success
+// layout is a change here in the same PR.
+function createClanLoadingStyles(t: ReturnType<typeof useTheme>['theme']) {
+  const c = t.colors;
+  return StyleSheet.create({
+    // Mirrors the detail panel's own gap.
+    detailPanel: {
+      gap: t.spacing[5],
+    },
+    // Mirrors the success wrap's stack and gap.
+    identityWrap: {
+      gap: t.spacing[5],
+    },
+    identity: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: t.spacing[4],
+    },
+    identityText: {
+      flex: 1,
+      gap: t.spacing[1],
+      flexWrap: 'wrap',
+    },
+
+    // Mirrors the requirements chip row.
+    requirementsRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      columnGap: t.spacing[2],
+      rowGap: t.spacing[2],
+    },
+    requirementChip: {
+      backgroundColor: c.panel,
+      borderRadius: t.radius[1],
+      borderWidth: 1,
+      borderColor: c.panelBorder,
+      paddingHorizontal: t.spacing[3],
+      paddingVertical: t.spacing[2],
+      gap: t.spacing[1],
+      minWidth: 96,
+    },
+
+    // Mirrors the stat chip row's rhythm (the kit StatChip carries its own
+    // internals; the skeleton only needs the same gaps).
+    statRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      columnGap: t.spacing[6],
+      rowGap: t.spacing[3],
+    },
+    statCell: {
+      gap: t.spacing[1],
+    },
+    caption: {
+      marginTop: t.spacing[1],
+    },
+
+    // Mirrors the real tab bar's container.
+    tabBar: {
+      flexDirection: 'row',
+      gap: t.spacing[1],
+      marginTop: t.spacing[5],
+      padding: t.spacing[1],
+      backgroundColor: c.panel,
+      borderRadius: t.radius[2],
+      borderWidth: 1,
+      borderColor: c.panelBorder,
+    },
+    tabCell: {
+      flex: 1,
+      minHeight: t.layout.touchTargetMin,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+
+    // The table-shaped roster skeleton: a panel like RosterTable's, with a
+    // header row and body rows at the same row height the real rows keep.
+    rosterPanel: {
+      marginTop: t.spacing[4],
+      backgroundColor: c.panel,
+      borderRadius: t.radius[2],
+      borderWidth: 1,
+      borderColor: c.panelBorder,
+      overflow: 'hidden',
+    },
+    rosterHeaderRow: {
+      minHeight: t.layout.touchTargetMin,
+      paddingHorizontal: t.spacing[3],
+      justifyContent: 'center',
+      borderBottomWidth: 1,
+      borderBottomColor: c.panelBorder,
+    },
+    rosterRow: {
+      minHeight: t.layout.touchTargetMin,
+      paddingHorizontal: t.spacing[3],
+      justifyContent: 'center',
+      borderBottomWidth: 1,
+      borderBottomColor: c.hairline,
+    },
+
+    // The card-shaped roster skeleton below 768 px: the same gap the real
+    // card list's marginBottom rhythm keeps.
+    rosterCards: {
+      marginTop: t.spacing[4],
+      gap: t.spacing[3],
+    },
+  });
+}
+
 function createStyles(t: ReturnType<typeof useTheme>['theme']) {
   const c = t.colors;
   return StyleSheet.create({
@@ -749,57 +998,6 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       gap: t.spacing[3],
       marginTop: t.spacing[6],
       marginBottom: t.spacing[8],
-    },
-
-    // skeleton placeholders (06 section 3): quiet blocks and lines that
-    // mirror the success layout so the swap does not reflow.
-    skeletonBlock: {
-      backgroundColor: c.hairline,
-    },
-    skeletonLine: {
-      backgroundColor: c.hairline,
-      borderRadius: t.radius[1],
-    },
-    skeletonTitle: {
-      height: t.fontSize.xl,
-      width: 220,
-    },
-    skeletonTag: {
-      height: t.fontSize.sm,
-      width: 140,
-      marginTop: t.spacing[1],
-    },
-    skeletonMeta: {
-      height: t.fontSize.xs,
-      width: 180,
-      marginTop: t.spacing[2],
-    },
-    skeletonDescription: {
-      height: Math.round(t.lineHeight.relaxed * t.fontSize.body) * 2,
-      width: '100%',
-    },
-    skeletonReqLabel: {
-      height: t.fontSize.xs,
-      width: 64,
-    },
-    skeletonReqValue: {
-      height: t.fontSize.sm,
-      width: 80,
-      marginTop: t.spacing[1],
-    },
-    skeletonStat: {
-      gap: t.spacing[1],
-    },
-    skeletonStatLabel: {
-      height: t.fontSize.xs,
-      width: 72,
-    },
-    skeletonStatValue: {
-      height: t.fontSize.sm,
-      width: 56,
-    },
-    skeletonCaption: {
-      marginTop: t.spacing[1],
     },
   });
 }
