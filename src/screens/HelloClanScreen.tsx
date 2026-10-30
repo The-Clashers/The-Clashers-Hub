@@ -2,7 +2,6 @@ import { useMemo, type ReactNode } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useTheme, createBaseStyles } from '../theme';
-import { ThemeToggle } from '../components/ThemeToggle';
 import { fetchClan, ClanFetchError } from '../api/clan';
 
 // The hello clan screen (T-M0-5). A hardcoded tag, fetched live through the
@@ -69,7 +68,6 @@ export default function HelloClanScreen() {
                 path works end to end.
               </Text>
             </View>
-            <ThemeToggle />
           </View>
 
           <View style={[base.panelRaised, styles.clanPanel]}>

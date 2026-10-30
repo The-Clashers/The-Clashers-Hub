@@ -9,11 +9,14 @@ import { useTheme } from '../theme';
 // (07 §6: 2px gold focus ring, touch targets >= 44px).
 interface ThemeToggleProps {
   accessibilityLabel?: string;
+  /** Trimmed paddings for tight chrome like the nav bar's stacked row:
+  * same control, same floor height, narrower footprint. */
+  dense?: boolean;
 }
 
-function ThemeToggleImpl({ accessibilityLabel }: ThemeToggleProps) {
+function ThemeToggleImpl({ accessibilityLabel, dense = false }: ThemeToggleProps) {
   const { name, toggle, theme } = useTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = useMemo(() => createStyles(theme, dense), [theme, dense]);
   const label = name === 'light' ? 'Go dark' : 'Go light';
   return (
     <Pressable
@@ -35,14 +38,14 @@ function ThemeToggleImpl({ accessibilityLabel }: ThemeToggleProps) {
 
 export const ThemeToggle = memo(ThemeToggleImpl);
 
-function createStyles(t: ReturnType<typeof useTheme>['theme']) {
+function createStyles(t: ReturnType<typeof useTheme>['theme'], dense: boolean) {
   const c = t.colors;
   return StyleSheet.create({
     container: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: t.spacing[2],
-      paddingHorizontal: t.spacing[4],
+      paddingHorizontal: dense ? t.spacing[2] : t.spacing[4],
       // 44px touch target floor (07 §6).
       minHeight: t.layout.touchTargetMin,
       borderRadius: t.radius.pill,
@@ -52,6 +55,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       // Gold focus ring (07 §6).
       outlineColor: c.focusRing,
       outlineOffset: t.layout.focusRingOffset,
+      ...(dense ? { flexShrink: 0 } : {}),
     },
     containerPressed: {
       backgroundColor: c.panel,

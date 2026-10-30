@@ -1,10 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useTheme, createBaseStyles } from '../theme';
-import { ThemeToggle } from '../components/ThemeToggle';
-import TagInput from '../components/TagInput';
 import Dropdown from '../components/Dropdown';
 import ClanCard from '../components/ClanCard';
 import SkeletonCard from '../components/Skeleton';
@@ -23,18 +21,24 @@ import {
 } from '../api/search';
 import { LOCATION_FILTERS } from '../api/locations';
 
-// The search screen (T-M1-1, FR-01, SR-08). A visitor types a clan name
-// OR pastes a clan tag (the # prefix is what tells the two apart, since
-// names and bare tags share the same alphabet), optionally narrows a name
-// search with the filter row (minimum members, minimum clan level, war
-// frequency, location), submits, and gets a virtualized card list that
-// pages through the upstream cursor as it scrolls. A tag skips the listing
-// entirely and opens the clan detail screen directly, the same destination
-// the result cards link to.
+// The clans search screen (T-M1-1, FR-01, SR-08), the /clans page since
+// the nav revision split the old entry route into real pages. A visitor
+// types a clan name OR pastes a clan tag (the # prefix is what tells the
+// two apart, since names and bare tags share the same alphabet),
+// optionally narrows a name search with the filter row (minimum members,
+// minimum clan level, war frequency, location), submits, and gets a
+// virtualized card list that pages through the upstream cursor as it
+// scrolls. A tag skips the listing entirely and opens the clan detail
+// screen directly, the same destination the result cards link to. The
+// nav lookup box hands name searches to this page through ?name=, which
+// the screen consumes once and then strips so a reload starts idle.
+//
+// The player tag lookup moved to /players (and the nav box); the brand
+// and the theme toggle moved to the NavBar.
 //
 // The screen owns layout, composition, and the route's state; the pieces it
 // renders come from the shared kit (07 section 4): ClanCard, SkeletonCard,
-// EmptyState, ErrorState, PillButton, TagInput, Dropdown. Every state the
+// EmptyState, ErrorState, PillButton, Dropdown. Every state the
 // design language requires is designed: loading skeleton, error branches
 // with a next action, empty results with a relax-filters suggestion, and
 // the success list.
@@ -109,6 +113,7 @@ export default function SearchScreen() {
   const base = useMemo(() => createBaseStyles(theme), [theme]);
   const styles = useMemo(() => createStyles(theme), [theme]);
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [nameDraft, setNameDraft] = useState('');
   const [minMembers, setMinMembers] = useState<number | undefined>(undefined);
@@ -122,6 +127,29 @@ export default function SearchScreen() {
   // null until the first submit: the screen starts in the idle state, not in
   // loading. The query is disabled while this is null.
   const [submitted, setSubmitted] = useState<SearchFilters | null>(null);
+
+  // The nav lookup's name handoff: /clans?name=<text> seeds the input and
+  // runs the search once on arrival, then the param is stripped so a
+  // reload or a back-navigation starts idle instead of replaying it. The
+  // ref guards the StrictMode double-effect, and a same-route navigation
+  // (searching again from the nav box while already here) re-seeds because
+  // the param value changes.
+  const seededName = useRef<string | null>(null);
+  useEffect(() => {
+    const nameParam = searchParams.get('name');
+    if (nameParam === null || nameParam.trim() === '' || seededName.current === nameParam) {
+      return;
+    }
+    seededName.current = nameParam;
+    const name = nameParam.trim();
+    setNameDraft(name);
+    setSearchHint(null);
+    setSubmitted({ name, minMembers, minClanLevel, warFrequency, locationId });
+    setSearchParams({}, { replace: true });
+    // The filter values are read once, at seed time, which runs on arrival
+    // while the filters still hold their defaults; a later filter change
+    // re-submits through the Search button like any other search.
+  }, [searchParams]);
 
   const draftFilters = useMemo<SearchFilters>(
     () => ({ name: nameDraft.trim(), minMembers, minClanLevel, warFrequency, locationId }),
@@ -223,10 +251,11 @@ export default function SearchScreen() {
         <View style={[base.contentColumn, styles.column]}>
           <View style={styles.header}>
             <View style={styles.headerText}>
-              <Text style={base.micro}>The Clashers Hub</Text>
-              <Text style={base.display}>Search a clan</Text>
+              <Text style={base.display}>Clans</Text>
+              <Text style={base.subtitle}>
+                Search by clan name or #tag. Filters narrow name searches.
+              </Text>
             </View>
-            <ThemeToggle />
           </View>
 
           <View style={[base.panelRaised, styles.searchPanel]}>
@@ -308,10 +337,6 @@ export default function SearchScreen() {
                 Changed since the last search. Press Search to apply.
               </Text>
             ) : null}
-          </View>
-
-          <View style={[base.panel, styles.tagPanel]}>
-            <TagInput />
           </View>
 
           <View style={styles.resultsArea}>
@@ -652,14 +677,6 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.sm,
       color: c.info,
-    },
-    // The tag-lookup panel sits between the search panel and the results.
-    // It is the entry point for golden path B (paste a tag, land on the
-    // player). Quiet chrome: a flat panel, not raised, so the search panel
-    // stays the primary surface.
-    tagPanel: {
-      marginTop: t.spacing[4],
-      padding: t.spacing[4],
     },
 
     // results
