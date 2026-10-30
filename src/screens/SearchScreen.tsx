@@ -37,7 +37,13 @@ import { LOCATION_FILTERS } from '../api/locations';
 // and the theme toggle moved to the NavBar; the M0 review-surface links
 // (Hello clan, Review the tokens) retired from this screen's footer on
 // the owner's call, the tokens review now living on the contributors
-// page where design QA actually happens.
+// page where design QA actually happens, and the /hello smoke screen is
+// retired outright since /clan/:tag renders everything it showed.
+//
+// The search panel carries the same shape the player tag box carries
+// (the owner's consistency note): a micro label above the input, the
+// input and its action button, then one helper line under the row that
+// teaches the # rule, so the two lookup panels read as one family.
 //
 // The screen owns layout, composition, and the route's state; the pieces it
 // renders come from the shared kit (07 section 4): ClanCard, SkeletonCard,
@@ -309,44 +315,53 @@ export default function SearchScreen() {
           </View>
 
           <View style={[base.panelRaised, styles.searchPanel]}>
-            <View style={styles.nameRow}>
-              <TextInput
-                value={nameDraft}
-                onChangeText={(text) => {
-                  setNameDraft(text);
-                  // Clear the hint as soon as the problem is fixed: a name
-                  // once the input is non-blank, a # input once it
-                  // normalizes to a valid tag. Mirrors the tag box's
-                  // clear-on-fix so both inputs behave the same.
-                  if (searchHint === null) return;
-                  const trimmed = text.trim();
-                  const fixed = trimmed.startsWith('#')
-                    ? normalizeTagInput(trimmed).ok
-                    : trimmed.length > 0;
-                  if (fixed) setSearchHint(null);
-                }}
-                onSubmitEditing={submit}
-                placeholder="Clan name or #tag"
-                placeholderTextColor={theme.colors.textMuted}
-                accessibilityLabel="Clan name or tag"
-                accessibilityHint="Type a clan name, or a clan tag starting with #, and press Search."
-                autoCapitalize="none"
-                autoCorrect={false}
-                maxLength={64}
-                style={styles.nameInput}
-              />
-              <PillButton
-                label="Search"
-                onPress={submit}
-                hint="Runs the search with the current name and filters, or opens the clan directly when the input is a #tag."
-                stretch
-              />
-            </View>
-            {searchHint !== null ? (
-              <Text style={styles.validationHint} accessibilityRole="alert">
-                {searchHint}
+            <View style={styles.nameWrap}>
+              <Text style={styles.nameLabel}>Clan name or tag</Text>
+              <View style={styles.nameRow}>
+                <TextInput
+                  value={nameDraft}
+                  onChangeText={(text) => {
+                    setNameDraft(text);
+                    // Clear the hint as soon as the problem is fixed: a name
+                    // once the input is non-blank, a # input once it
+                    // normalizes to a valid tag. Mirrors the tag box's
+                    // clear-on-fix so both inputs behave the same.
+                    if (searchHint === null) return;
+                    const trimmed = text.trim();
+                    const fixed = trimmed.startsWith('#')
+                      ? normalizeTagInput(trimmed).ok
+                      : trimmed.length > 0;
+                    if (fixed) setSearchHint(null);
+                  }}
+                  onSubmitEditing={submit}
+                  placeholder="Clan name or #tag"
+                  placeholderTextColor={theme.colors.textMuted}
+                  accessibilityLabel="Clan name or tag"
+                  accessibilityHint="Type a clan name, or a clan tag starting with #, and press Search."
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  maxLength={64}
+                  style={styles.nameInput}
+                />
+                <PillButton
+                  label="Search"
+                  onPress={submit}
+                  hint="Runs the search with the current name and filters, or opens the clan directly when the input is a #tag."
+                  stretch
+                />
+              </View>
+              {searchHint !== null ? (
+                <Text style={styles.validationHint} accessibilityRole="alert">
+                  {searchHint}
+                </Text>
+              ) : null}
+              {/* The helper line the player tag box also carries (the
+                  owner's consistency note): same muted style, same slot
+                  under the input row, teaching this input's rule. */}
+              <Text style={styles.nameFootnote}>
+                A leading # opens that clan directly. Everything else searches clan names.
               </Text>
-            ) : null}
+            </View>
 
             <View style={styles.filterGrid}>
               <View style={styles.filterCell}>
@@ -643,9 +658,28 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       gap: t.spacing[2],
     },
 
-    // search panel
+    // search panel: the same unit the player tag box renders (label,
+    // input row, helper line), so the two lookup panels read as one family
     searchPanel: {
       gap: t.spacing[4],
+    },
+    nameWrap: {
+      gap: t.spacing[2],
+    },
+    // The micro label above the input, the house pattern TagInput and
+    // Dropdown both render (xs, medium, muted, uppercase, tracked).
+    nameLabel: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.xs,
+      fontWeight: t.fontWeight.medium,
+      color: c.textMuted,
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+    },
+    nameFootnote: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.sm,
+      color: c.textMuted,
     },
     nameRow: {
       flexDirection: 'row',

@@ -19,7 +19,8 @@ import type { ClanMember } from '../api/clan';
 // No column sorts: the row order is the engine's judgment (worst-first by
 // donation deficit, lib/donation-balance.ts), so a sort control here would
 // be a control that lies. The NUMBER column is that order made visible
-// (#1 is the worst offender).
+// (position 1 is the worst offender), rendered as the same plain number
+// cell the roster's # column renders so the two tables read as one family.
 //
 // Structure follows the roster table's house pattern (07 section 4): the
 // container carries the grid role, the header row carries row +
@@ -27,22 +28,25 @@ import type { ClanMember } from '../api/clan';
 // label reads the whole row. Rows render in page flow like the roster's,
 // the browser scrollbar owns the scrolling (07 section 3).
 
-// Column widths: the number and rank columns fixed and narrow, the metric
-// columns fixed so tabular numbers align, the name column flexes. Sized so
-// the flexing name column keeps a full two-word name readable at the 768 px
-// floor where the table presentation begins (the fixed columns sum to about
-// 600 px there, leaving the name its ~112 px).
+// Column widths, the roster table's own rule (the owner's consistency
+// note): the number and rank columns fixed and narrow at the same values
+// the roster uses, the name column flexes from the same modest basis, and
+// every metric column grows the same small share, so a wide viewport
+// spreads the slack across the row instead of pouring it all into the
+// name column (the same rebalance the roster got). At the 768 px floor
+// the fixed columns plus the name's basis sum past the column, leaving
+// the name its shrink slack, the same floor behavior the roster keeps.
+const NAME_BASIS = 160;
+const COLUMN_GROW = 0.4;
 const COLUMN_WIDTHS = {
-  number: 36,
+  number: 40,
   rank: 64,
-  role: 84,
-  donated: 76,
+  role: 88,
+  donated: 72,
   received: 84,
   ratio: 84,
   attacks: 100,
 } as const;
-
-const NAME_FLEX = 1.4;
 
 // Micro-label tracking, the same constant the roster header keeps.
 const HEADER_LABEL_TRACKING = 0.6;
@@ -156,7 +160,7 @@ function AttentionRow({
       style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
     >
       <View style={columnStyle('number', styles)}>
-        <Text style={styles.positionNumber}>#{position}</Text>
+        <Text style={styles.cellNumber}>{position}</Text>
       </View>
       <View style={columnStyle('rank', styles)}>
         <LeagueRank tier={member.leagueTier} />
@@ -274,13 +278,6 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     rowPressed: {
       backgroundColor: c.panel,
     },
-    positionNumber: {
-      fontFamily: t.fontFamily.mono,
-      fontSize: t.fontSize.xs,
-      color: c.textMuted,
-      fontVariant: ['tabular-nums'],
-      textAlign: 'right',
-    },
     name: {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.sm,
@@ -313,35 +310,52 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       textAlign: 'right',
     },
 
-    // column layouts
+    // column layouts: the roster table's own pattern. # and rank fixed;
+    // the name column flexes from the same modest basis; the metric
+    // columns take fixed widths but grow the same small share so wide
+    // viewports do not dump every spare pixel into the name column.
     columnNumber: {
       width: COLUMN_WIDTHS.number,
       alignItems: 'flex-end',
+      flexShrink: 0,
     },
     columnRank: {
       width: COLUMN_WIDTHS.rank,
+      flexShrink: 0,
     },
     columnName: {
-      flex: NAME_FLEX,
+      flexGrow: 1,
+      flexShrink: 1,
+      flexBasis: NAME_BASIS,
     },
     columnRole: {
       width: COLUMN_WIDTHS.role,
+      flexGrow: COLUMN_GROW,
+      flexShrink: 0,
     },
     columnDonated: {
       width: COLUMN_WIDTHS.donated,
+      flexGrow: COLUMN_GROW,
+      flexShrink: 0,
       alignItems: 'flex-end',
     },
     columnReceived: {
       width: COLUMN_WIDTHS.received,
+      flexGrow: COLUMN_GROW,
+      flexShrink: 0,
       alignItems: 'flex-end',
     },
     columnRatio: {
       width: COLUMN_WIDTHS.ratio,
+      flexGrow: COLUMN_GROW,
+      flexShrink: 0,
       alignItems: 'center',
       justifyContent: 'center',
     },
     columnAttacks: {
       width: COLUMN_WIDTHS.attacks,
+      flexGrow: COLUMN_GROW,
+      flexShrink: 0,
       alignItems: 'flex-end',
     },
   });
