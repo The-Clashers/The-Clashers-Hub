@@ -180,9 +180,14 @@ overscroll.
   pouring it all into the name column (the owner's width note).
 - **Needs Attention tab ↔ cards:** the worst-first donation view renders its
   own table (number, rank, name, role, donated, received, ratio, attacks
-  left) with the same 768 px switch to cards. No sort controls: the row
-  order is the engine's judgment. Attacks left reads the current-war
-  endpoint and dashes when there is no war to count.
+  left) with the same 768 px switch to cards. The table carries the roster's
+  column width rule verbatim (the owner's consistency note): the # and rank
+  columns fixed at the roster's values, the name column flexing from the
+  same modest basis, the metric columns growing the same small share, and
+  the plain number cell the roster's # column renders, so the two tables
+  read as one family. No sort controls: the row order is the engine's
+  judgment. Attacks left reads the current-war endpoint and dashes when
+  there is no war to count.
 - **Player detail:** ≥ 1024px two columns (identity + analysis); stacked below.
 - Breakpoints come from `useWindowDimensions` into a shared `breakpoints`
   helper, no CSS media queries scattered through components; RN paradigm is
@@ -195,6 +200,12 @@ overscroll.
   Both page-flow lists rely on `scrollbar-gutter: stable` on the document
   root so the scrollbar's appearance never reflows the page (the owner's
   stable-window note).
+- The two lookup panels share one shape (the owner's consistency note):
+  the /players tag box and the /clans search panel both render the micro
+  label above the input, the input with its action button, then one muted
+  helper line under the row (the tag box teaching where the tag lives, the
+  clan bar teaching the leading-# rule), so the site's two entry controls
+  read as one family.
 
 ## 4. Component inventory (shared kit)
 
