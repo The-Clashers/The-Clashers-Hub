@@ -19,6 +19,14 @@
 //   tag) so flipping a sort direction never shuffles tied rows at random.
 //   The tiebreaks are ascending in both directions; only the primary
 //   column follows the direction.
+//
+// The card presentation (below 768 px) has no column headers to press, so
+// it drives the same state through a dropdown plus a direction toggle
+// instead of the header cycle. Two more rules cover it: selecting a column
+// from the dropdown never silently flips a direction the user already
+// chose (re-picking the active column is a no-op; a different column
+// starts at asc, like the table), and the toggle flips only the direction,
+// which is why it renders disabled while the roster is in clan order.
 
 import { clanRoleRank } from './clan-role';
 
@@ -71,6 +79,43 @@ export function nextRosterSortState(pressed: RosterSortKey, current: RosterSortS
     return { key: pressed, direction: 'desc' };
   }
   return CLAN_ORDER;
+}
+
+/** A dropdown selection: the clan-order reset or one of the six columns.
+ * The value type of the card presentation's sort dropdown. */
+export type RosterSortSelection = 'clan' | RosterSortKey;
+
+/**
+ * What picking an option in the card presentation's sort dropdown means:
+ * "Clan order" resets, the active column re-picked is a no-op (the
+ * direction is the toggle's job, so a re-pick never silently reverses
+ * it), and any other column starts fresh at asc, the same start the
+ * table's cycle gives a newly pressed column.
+ */
+export function rosterSortForSelection(
+  selection: RosterSortSelection,
+  current: RosterSortState,
+): RosterSortState {
+  if (selection === 'clan') {
+    return CLAN_ORDER;
+  }
+  if (current.key === selection) {
+    return current;
+  }
+  return { key: selection, direction: 'asc' };
+}
+
+/**
+ * What the direction toggle means: flip the direction of the active
+ * column. In clan order there is no direction to flip, so the state
+ * comes back untouched (the toggle renders disabled there anyway; this
+ * branch just keeps the rule total).
+ */
+export function flipRosterSortDirection(current: RosterSortState): RosterSortState {
+  if (current.key === null) {
+    return current;
+  }
+  return { key: current.key, direction: current.direction === 'asc' ? 'desc' : 'asc' };
 }
 
 function memberValue(member: RosterSortableMember, key: RosterSortKey): number {
