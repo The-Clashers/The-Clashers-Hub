@@ -54,8 +54,31 @@ export interface PlayerClan {
   name: string;
 }
 
+/** One unit entry from the player payload's unit arrays (troops, spells,
+ * heroes). The game API returns the same shape for every unit type: a
+ * name, the player's current level, the unit's global maximum level
+ * (null when the API has not caught up to brand-new content), and the
+ * village marker (home vs builderBase). The rushed engine (T-M2-2) reads
+ * these to compute the verdict; the progression grid (T-M2-5) reads them
+ * to render every unit tile. */
+export interface PlayerUnit {
+  name: string;
+  level: number;
+  /** The unit's global maximum level as reported by the API. Null when the
+   * API omits it (brand-new content); the bundled reference data (T-M2-6)
+   * supplies the fallback, and a unit absent from both is skipped with a
+   * footnote (SR-14, SR-17). */
+  maxLevel: number | null;
+  /** "home" for the home village, "builderBase" for the builder base. The
+   * rushed analysis is home-village only (05 section 1); the builder base
+   * gets its own panel, never mixed. */
+  village: string;
+}
+
 /** Shape of a successful /api/player/:tag response, stripped to what the
- * shell reads (FR-06: profile header, Town Hall, league, XP, clan role). */
+ * shell and the analysis engines read (FR-06, FR-07, FR-16). The identity
+ * block feeds the header; the unit arrays feed the rushed engine and the
+ * progression grid. */
 export interface PlayerResponse {
   tag: string;
   name: string;
@@ -73,6 +96,21 @@ export interface PlayerResponse {
   leagueTier?: PlayerLeagueTier;
   /** The classic trophy league; undefined when the payload omits it. */
   league?: PlayerLeague;
+  /** Home-village troops, super troops, siege machines, and pets, all mixed
+   * in the game API's `troops` array. The rushed engine's adapter sorts them
+   * into categories; the client just parses the shape. Builder-base units
+   * carry village="builderBase" and are excluded from the home-village
+   * rushed analysis (05 section 1). */
+  troops?: PlayerUnit[];
+  /** Home-village and builder-base spells. Same shape as troops. */
+  spells?: PlayerUnit[];
+  /** Home-village heroes (Barbarian King, Archer Queen, Grand Warden, Royal
+   * Champion, etc.). */
+  heroes?: PlayerUnit[];
+  /** Hero equipment (the equipment slots on each hero). Read by the
+   * progression grid (FR-16); the rushed engine counts them in the overall
+   * percentage when maxLevel is present. */
+  heroEquipment?: PlayerUnit[];
   /** Seconds since the upstream fetch; injected by the tier on every 200. */
   age: number;
 }
@@ -137,6 +175,27 @@ function toPlayerClan(parsed: unknown): PlayerClan | undefined {
   return { tag, name };
 }
 
+function toPlayerUnit(parsed: unknown): PlayerUnit | null {
+  if (!isRecord(parsed)) return null;
+  const name = typeof parsed.name === 'string' ? parsed.name : '';
+  if (name === '') return null;
+  const level = typeof parsed.level === 'number' ? parsed.level : 0;
+  // maxLevel is null in the raw payload when the API has not caught up to
+  // brand-new content; the engine handles the fallback (SR-14, SR-17).
+  const maxLevel =
+    typeof parsed.maxLevel === 'number' ? parsed.maxLevel : null;
+  const village = typeof parsed.village === 'string' ? parsed.village : 'home';
+  return { name, level, maxLevel, village };
+}
+
+function toPlayerUnitArray(parsed: unknown): PlayerUnit[] | undefined {
+  if (!Array.isArray(parsed)) return undefined;
+  const units = parsed
+    .map(toPlayerUnit)
+    .filter((unit): unit is PlayerUnit => unit !== null);
+  return units.length > 0 ? units : undefined;
+}
+
 function toPlayerResponse(parsed: unknown): PlayerResponse {
   if (!isRecord(parsed)) {
     throw new PlayerFetchError({ kind: 'bad_request', detail: 'response was not a JSON object' });
@@ -155,6 +214,10 @@ function toPlayerResponse(parsed: unknown): PlayerResponse {
     clan: toPlayerClan(parsed.clan),
     leagueTier: toPlayerLeagueTier(parsed.leagueTier),
     league: toPlayerLeague(parsed.league),
+    troops: toPlayerUnitArray(parsed.troops),
+    spells: toPlayerUnitArray(parsed.spells),
+    heroes: toPlayerUnitArray(parsed.heroes),
+    heroEquipment: toPlayerUnitArray(parsed.heroEquipment),
     age: typeof parsed.age === 'number' ? parsed.age : 0,
   };
 }
