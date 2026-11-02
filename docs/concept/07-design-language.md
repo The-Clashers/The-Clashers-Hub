@@ -189,6 +189,14 @@ overscroll.
   judgment. Attacks left reads the current-war endpoint and dashes when
   there is no war to count.
 - **Player detail:** ≥ 1024px two columns (identity + analysis); stacked below.
+  The identity card (the T-M2-1 shell) stacks the name, the tag + clan line,
+  a hairline, then the header stat cells (Town Hall, league, XP, clan role)
+  two per row, the league cell pairing the tier icon with the tier name the
+  same way the roster's rank column reads the ladder (the classic league
+  object is the fallback when the payload carries no tier); breadcrumbs
+  `Home › Players › <name>` sit above with the clan card's clearance. The
+  analysis, heroes, and achievements sections carry designed land-in-M2
+  notices until their cards ship.
 - Breakpoints come from `useWindowDimensions` into a shared `breakpoints`
   helper, no CSS media queries scattered through components; RN paradigm is
   JS-driven layout.
