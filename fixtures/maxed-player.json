@@ -1,0 +1,42 @@
+{
+  "tag": "#MAXED0001",
+  "name": "Maxed Player",
+  "townHallLevel": 16,
+  "expLevel": 300,
+  "role": "leader",
+  "clan": { "tag": "#CLAN0001", "name": "Maxed Clan" },
+  "troops": [
+    { "name": "Barbarian", "level": 14, "maxLevel": 14, "village": "home" },
+    { "name": "Archer", "level": 14, "maxLevel": 14, "village": "home" },
+    { "name": "Giant", "level": 14, "maxLevel": 14, "village": "home" },
+    { "name": "Goblin", "level": 10, "maxLevel": 10, "village": "home" },
+    { "name": "Wall Breaker", "level": 14, "maxLevel": 14, "village": "home" },
+    { "name": "Balloon", "level": 14, "maxLevel": 14, "village": "home" },
+    { "name": "Wizard", "level": 14, "maxLevel": 14, "village": "home" },
+    { "name": "Healer", "level": 12, "maxLevel": 12, "village": "home" },
+    { "name": "Dragon", "level": 14, "maxLevel": 14, "village": "home" },
+    { "name": "P.E.K.K.A", "level": 14, "maxLevel": 14, "village": "home" },
+    { "name": "Valkyrie", "level": 12, "maxLevel": 12, "village": "home" },
+    { "name": "Golem", "level": 16, "maxLevel": 16, "village": "home" },
+    { "name": "Wall Wrecker", "level": 6, "maxLevel": 6, "village": "home" },
+    { "name": "Battle Blimp", "level": 6, "maxLevel": 6, "village": "home" },
+    { "name": "L.A.S.S.I", "level": 15, "maxLevel": 15, "village": "home" },
+    { "name": "Mighty Yak", "level": 15, "maxLevel": 15, "village": "home" }
+  ],
+  "spells": [
+    { "name": "Lightning Spell", "level": 14, "maxLevel": 14, "village": "home" },
+    { "name": "Healing Spell", "level": 12, "maxLevel": 12, "village": "home" },
+    { "name": "Rage Spell", "level": 8, "maxLevel": 8, "village": "home" }
+  ],
+  "heroes": [
+    { "name": "Barbarian King", "level": 90, "maxLevel": 90, "village": "home" },
+    { "name": "Archer Queen", "level": 90, "maxLevel": 90, "village": "home" },
+    { "name": "Grand Warden", "level": 65, "maxLevel": 65, "village": "home" },
+    { "name": "Royal Champion", "level": 40, "maxLevel": 40, "village": "home" }
+  ],
+  "heroEquipment": [
+    { "name": "Giant Gauntlet", "level": 27, "maxLevel": 27, "village": "home" },
+    { "name": "Rocket Spear", "level": 27, "maxLevel": 27, "village": "home" }
+  ],
+  "age": 0
+}

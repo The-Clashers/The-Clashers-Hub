@@ -1,0 +1,27 @@
+{
+  "tag": "#NULL0001",
+  "name": "Null MaxLevel Player",
+  "townHallLevel": 16,
+  "expLevel": 220,
+  "role": "admin",
+  "clan": { "tag": "#CLAN0001", "name": "Maxed Clan" },
+  "troops": [
+    { "name": "Barbarian", "level": 14, "maxLevel": 14, "village": "home" },
+    { "name": "Archer", "level": 12, "maxLevel": 14, "village": "home" },
+    { "name": "Giant", "level": 14, "maxLevel": 14, "village": "home" },
+    { "name": "Brand New Troop", "level": 3, "maxLevel": null, "village": "home" },
+    { "name": "Another New Troop", "level": 1, "maxLevel": null, "village": "home" },
+    { "name": "Wall Wrecker", "level": 6, "maxLevel": 6, "village": "home" },
+    { "name": "L.A.S.S.I", "level": 15, "maxLevel": 15, "village": "home" }
+  ],
+  "spells": [
+    { "name": "Lightning Spell", "level": 14, "maxLevel": 14, "village": "home" },
+    { "name": "New Spell", "level": 2, "maxLevel": null, "village": "home" }
+  ],
+  "heroes": [
+    { "name": "Barbarian King", "level": 90, "maxLevel": 90, "village": "home" },
+    { "name": "Archer Queen", "level": 85, "maxLevel": 90, "village": "home" }
+  ],
+  "heroEquipment": [],
+  "age": 0
+}
