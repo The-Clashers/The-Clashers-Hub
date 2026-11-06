@@ -203,6 +203,111 @@ describe('fetchPlayer', () => {
     expect(player.league).toBeUndefined();
   });
 
+  it('parses the achievements array off the same single response (SR-15)', async () => {
+    const fetchImpl = (async () =>
+      stubResponse(200, {
+        tag: '#YPCC8QYU2',
+        name: 'Yeon',
+        townHallLevel: 18,
+        expLevel: 220,
+        age: 0,
+        // Rows mirroring the live payload: a 3-star row past its target, a
+        // 2-star row under it, a locked 0-star row, and the duplicate-name
+        // row the live payload really carries (Keep Your Account Safe!).
+        achievements: [
+          { name: 'Gold Grab', stars: 3, value: 2000000000, target: 100000000, info: 'Steal 100000000 Gold', village: 'home' },
+          { name: 'Conqueror', stars: 2, value: 3622, target: 5000, info: 'Win 5000 multiplayer battles', village: 'home' },
+          { name: 'Keep Your Account Safe!', stars: 0, value: 0, target: 1, info: 'Link your account to a Supercell ID', village: 'home' },
+          { name: 'Keep Your Account Safe!', stars: 3, value: 1, target: 1, info: 'Link your account to a Supercell ID', village: 'home' },
+          { name: 'Master Engineering', stars: 3, value: 10, target: 5, info: 'Reach builder hall level 5', village: 'builderBase' },
+        ],
+      })) as typeof fetch;
+
+    const player = await fetchPlayer('#YPCC8QYU2', { fetchImpl });
+
+    expect(player.achievements).toHaveLength(5);
+    expect(player.achievements?.[0]).toEqual({
+      name: 'Gold Grab',
+      stars: 3,
+      value: 2_000_000_000,
+      target: 100_000_000,
+      info: 'Steal 100000000 Gold',
+      village: 'home',
+    });
+    // The duplicate-name rows both parse: the live payload really carries
+    // one locked row and one complete row under the same name, so the card
+    // keys rows on more than the name and the parse keeps both.
+    expect(player.achievements?.[2]).toEqual({
+      name: 'Keep Your Account Safe!',
+      stars: 0,
+      value: 0,
+      target: 1,
+      info: 'Link your account to a Supercell ID',
+      village: 'home',
+    });
+    expect(player.achievements?.[3]).toEqual({
+      name: 'Keep Your Account Safe!',
+      stars: 3,
+      value: 1,
+      target: 1,
+      info: 'Link your account to a Supercell ID',
+      village: 'home',
+    });
+    expect(player.achievements?.[4]?.village).toBe('builderBase');
+  });
+
+  it('degrades malformed achievement entries to their defaults and drops nameless ones', async () => {
+    const fetchImpl = (async () =>
+      stubResponse(200, {
+        tag: '#X',
+        name: 'Odd Achievements',
+        townHallLevel: 9,
+        expLevel: 60,
+        age: 1,
+        achievements: [
+          // Missing stars/value/target: the tolerant defaults.
+          { name: 'Sparse Row', info: 'Win some battles', village: 'home' },
+          // Missing info and village: empty caption, home floor.
+          { name: 'Bare Row', stars: 1, value: 4, target: 10 },
+          // No name: dropped, the same rule the unit parser keeps.
+          { stars: 2, value: 30, target: 50, info: 'Nameless', village: 'home' },
+          'not an achievement',
+        ],
+      })) as typeof fetch;
+
+    const player = await fetchPlayer('#X', { fetchImpl });
+
+    expect(player.achievements).toEqual([
+      { name: 'Sparse Row', stars: 0, value: 0, target: 0, info: 'Win some battles', village: 'home' },
+      { name: 'Bare Row', stars: 1, value: 4, target: 10, info: '', village: 'home' },
+    ]);
+  });
+
+  it('leaves achievements undefined when the payload omits the array or sends it empty', async () => {
+    const omitted = (async () =>
+      stubResponse(200, {
+        tag: '#X',
+        name: 'No Achievements',
+        townHallLevel: 2,
+        expLevel: 8,
+        age: 0,
+      })) as typeof fetch;
+    const playerOmitted = await fetchPlayer('#X', { fetchImpl: omitted });
+    expect(playerOmitted.achievements).toBeUndefined();
+
+    const empty = (async () =>
+      stubResponse(200, {
+        tag: '#X',
+        name: 'Empty Achievements',
+        townHallLevel: 2,
+        expLevel: 8,
+        age: 0,
+        achievements: [],
+      })) as typeof fetch;
+    const playerEmpty = await fetchPlayer('#X', { fetchImpl: empty });
+    expect(playerEmpty.achievements).toBeUndefined();
+  });
+
   it('maps a 404 with the tag to the not_found branch', async () => {
     const fetchImpl = (async () => stubResponse(404, { error: 'not_found' })) as typeof fetch;
     await expect(fetchPlayer('#NOPE', { fetchImpl })).rejects.toThrowError(PlayerFetchError);

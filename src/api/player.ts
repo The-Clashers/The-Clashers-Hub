@@ -11,10 +11,10 @@
 //
 // The full game API player payload is the biggest one in the product (unit
 // arrays, heroes, spells, achievements, builder-base stats). The M2 shell
-// (T-M2-1, FR-06) reads only the identity block: name, tag, Town Hall, the
+// (T-M2-1, FR-06) read the identity block first: name, tag, Town Hall, the
 // league display, XP, the clan block, and the role. The analysis cards that
-// follow (rushed engine, heroes, achievements, progression grid) will grow
-// this module rather than replace it, the same promise the war client makes.
+// followed (rushed engine, achievements) grow this module rather than
+// replace it, the same promise the war client makes.
 
 /** Player tag in canonical form: leading #, uppercase, matches server/tags.ts. */
 export type PlayerTag = string;
@@ -75,10 +75,38 @@ export interface PlayerUnit {
   village: string;
 }
 
+/** One achievement entry from the player payload's `achievements` array.
+ * The game API returns the same shape for every achievement: a name, the
+ * stars already earned (0 to 3), the current value, the target that completes
+ * the achievement, the requirement text, and the village marker. The
+ * achievements card (T-M2-3) renders these rows with progress rails and
+ * stars; like the unit arrays, they come off the single player response,
+ * no extra fetch (SR-15). */
+export interface PlayerAchievement {
+  name: string;
+  /** Stars already earned, 0 to 3. The API sends the count the player holds;
+   * a 0-star row is a real row (locked or in progress), not a missing one. */
+  stars: number;
+  /** The achievement's current value (e.g. obstacles removed). Can exceed
+   * the target once the third star is in. */
+  value: number;
+  /** The value that completes the achievement. The live payload always
+   * carries a positive number; 0 is the tolerant floor for a malformed
+   * entry, handled by the progress helper. */
+  target: number;
+  /** The requirement text ("Win 150 Stars on the Campaign Map"). The card
+   * renders it as the row's caption. */
+  info: string;
+  /** "home" | "builderBase" | "clanCapital": the village the achievement
+   * belongs to. The card groups rows by it. */
+  village: string;
+}
+
 /** Shape of a successful /api/player/:tag response, stripped to what the
- * shell and the analysis engines read (FR-06, FR-07, FR-16). The identity
- * block feeds the header; the unit arrays feed the rushed engine and the
- * progression grid. */
+ * shell and the analysis engines read (FR-06, FR-07, FR-08, FR-16). The
+ * identity block feeds the header; the unit arrays feed the rushed engine
+ * and the progression grid; the achievements array feeds the achievements
+ * card. */
 export interface PlayerResponse {
   tag: string;
   name: string;
@@ -111,6 +139,10 @@ export interface PlayerResponse {
    * progression grid (FR-16); the rushed engine counts them in the overall
    * percentage when maxLevel is present. */
   heroEquipment?: PlayerUnit[];
+  /** The player's achievements with stars, value, and target. Read by the
+   * achievements card (FR-08); comes off the same single response the shell
+   * fetched, never a second call (SR-15). */
+  achievements?: PlayerAchievement[];
   /** Seconds since the upstream fetch; injected by the tier on every 200. */
   age: number;
 }
@@ -196,6 +228,30 @@ function toPlayerUnitArray(parsed: unknown): PlayerUnit[] | undefined {
   return units.length > 0 ? units : undefined;
 }
 
+function toPlayerAchievement(parsed: unknown): PlayerAchievement | null {
+  if (!isRecord(parsed)) return null;
+  const name = typeof parsed.name === 'string' ? parsed.name : '';
+  if (name === '') return null;
+  // The same tolerance the unit parser keeps: a nameless entry is dropped,
+  // numbers degrade to their defaults (stars 0, value 0, target 0), and the
+  // requirement text is kept even when the API sends an empty string (the
+  // row can live without a caption; it cannot live without a name).
+  const stars = typeof parsed.stars === 'number' ? parsed.stars : 0;
+  const value = typeof parsed.value === 'number' ? parsed.value : 0;
+  const target = typeof parsed.target === 'number' ? parsed.target : 0;
+  const info = typeof parsed.info === 'string' ? parsed.info : '';
+  const village = typeof parsed.village === 'string' ? parsed.village : 'home';
+  return { name, stars, value, target, info, village };
+}
+
+function toPlayerAchievementArray(parsed: unknown): PlayerAchievement[] | undefined {
+  if (!Array.isArray(parsed)) return undefined;
+  const achievements = parsed
+    .map(toPlayerAchievement)
+    .filter((achievement): achievement is PlayerAchievement => achievement !== null);
+  return achievements.length > 0 ? achievements : undefined;
+}
+
 function toPlayerResponse(parsed: unknown): PlayerResponse {
   if (!isRecord(parsed)) {
     throw new PlayerFetchError({ kind: 'bad_request', detail: 'response was not a JSON object' });
@@ -218,6 +274,7 @@ function toPlayerResponse(parsed: unknown): PlayerResponse {
     spells: toPlayerUnitArray(parsed.spells),
     heroes: toPlayerUnitArray(parsed.heroes),
     heroEquipment: toPlayerUnitArray(parsed.heroEquipment),
+    achievements: toPlayerAchievementArray(parsed.achievements),
     age: typeof parsed.age === 'number' ? parsed.age : 0,
   };
 }
