@@ -75,6 +75,22 @@ export interface PlayerUnit {
   village: string;
 }
 
+/** One hero entry from the player payload's `heroes` array. The game API
+ * nests the equipment the player has equipped on that hero inside the
+ * hero's own entry (observed on the live payload: the Barbarian King
+ * carries "Spiky Ball" 27/27 and "Earthquake Boots" 18/18 there), so the
+ * hero card (T-M2-4, FR-09) reads equipment where the API exposes it:
+ * per hero, under the hero it belongs to. The flat `heroEquipment` array
+ * the payload also carries lists every piece the player owns whether
+ * equipped or not; that inventory reading belongs to the progression grid
+ * (FR-16), not the hero panel. */
+export interface PlayerHero extends PlayerUnit {
+  /** The equipment equipped on this hero, in API order. Undefined when the
+   * payload omits the array or sends it empty (a hero with nothing
+   * equipped, or a builder-base hero, which has no equipment system). */
+  equipment?: PlayerUnit[];
+}
+
 /** One achievement entry from the player payload's `achievements` array.
  * The game API returns the same shape for every achievement: a name, the
  * stars already earned (0 to 3), the current value, the target that completes
@@ -133,8 +149,9 @@ export interface PlayerResponse {
   /** Home-village and builder-base spells. Same shape as troops. */
   spells?: PlayerUnit[];
   /** Home-village heroes (Barbarian King, Archer Queen, Grand Warden, Royal
-   * Champion, etc.). */
-  heroes?: PlayerUnit[];
+   * Champion, etc.) and builder-base heroes (Battle Machine, Battle
+   * Copter), each carrying the equipment the API nests on it. */
+  heroes?: PlayerHero[];
   /** Hero equipment (the equipment slots on each hero). Read by the
    * progression grid (FR-16); the rushed engine counts them in the overall
    * percentage when maxLevel is present. */
@@ -228,6 +245,31 @@ function toPlayerUnitArray(parsed: unknown): PlayerUnit[] | undefined {
   return units.length > 0 ? units : undefined;
 }
 
+function toPlayerHero(parsed: unknown): PlayerHero | null {
+  if (!isRecord(parsed)) return null;
+  const name = typeof parsed.name === 'string' ? parsed.name : '';
+  if (name === '') return null;
+  // The same tolerance the unit parser keeps; the nested equipment array
+  // reuses it, so a nameless equipment entry is dropped and a malformed
+  // one degrades to its defaults rather than breaking the hero above it.
+  const level = typeof parsed.level === 'number' ? parsed.level : 0;
+  const maxLevel =
+    typeof parsed.maxLevel === 'number' ? parsed.maxLevel : null;
+  const village = typeof parsed.village === 'string' ? parsed.village : 'home';
+  const equipment = toPlayerUnitArray(parsed.equipment);
+  const hero: PlayerHero = { name, level, maxLevel, village };
+  if (equipment) hero.equipment = equipment;
+  return hero;
+}
+
+function toPlayerHeroArray(parsed: unknown): PlayerHero[] | undefined {
+  if (!Array.isArray(parsed)) return undefined;
+  const heroes = parsed
+    .map(toPlayerHero)
+    .filter((hero): hero is PlayerHero => hero !== null);
+  return heroes.length > 0 ? heroes : undefined;
+}
+
 function toPlayerAchievement(parsed: unknown): PlayerAchievement | null {
   if (!isRecord(parsed)) return null;
   const name = typeof parsed.name === 'string' ? parsed.name : '';
@@ -272,7 +314,7 @@ function toPlayerResponse(parsed: unknown): PlayerResponse {
     league: toPlayerLeague(parsed.league),
     troops: toPlayerUnitArray(parsed.troops),
     spells: toPlayerUnitArray(parsed.spells),
-    heroes: toPlayerUnitArray(parsed.heroes),
+    heroes: toPlayerHeroArray(parsed.heroes),
     heroEquipment: toPlayerUnitArray(parsed.heroEquipment),
     achievements: toPlayerAchievementArray(parsed.achievements),
     age: typeof parsed.age === 'number' ? parsed.age : 0,
