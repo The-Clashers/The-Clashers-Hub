@@ -74,9 +74,37 @@ const player = {
     { name: 'Barbarian', level: 12, maxLevel: 12, village: 'home' },
     { name: 'Archer', level: 9, maxLevel: 12, village: 'home' },
   ],
+  // The heroes the hero panel (T-M2-4) reads: one maxed with two maxed
+  // equipment pieces nested on it (the ledger treatment), one climbing
+  // with an in-progress piece (the eye-catcher), one brand-new hero with
+  // the null-maxLevel shape (the footnote), and a builder-base hero (the
+  // second village group). The flat heroEquipment array below is the
+  // every-piece-owned inventory the progression grid (FR-16) will read;
+  // the hero panel ignores it and reads only the nested per-hero entries.
   heroes: [
-    { name: 'Barbarian King', level: 60, maxLevel: 80, village: 'home' },
-    { name: 'Queen', level: 21, maxLevel: 80, village: 'home' },
+    {
+      name: 'Barbarian King',
+      level: 80,
+      maxLevel: 80,
+      village: 'home',
+      equipment: [
+        { name: 'Spiky Ball', level: 27, maxLevel: 27, village: 'home' },
+        { name: 'Earthquake Boots', level: 18, maxLevel: 18, village: 'home' },
+      ],
+    },
+    {
+      name: 'Archer Queen',
+      level: 21,
+      maxLevel: 80,
+      village: 'home',
+      equipment: [{ name: 'Giant Gauntlet', level: 20, maxLevel: 27, village: 'home' }],
+    },
+    { name: 'Minion Prince', level: 9, maxLevel: null, village: 'home' },
+    { name: 'Battle Machine', level: 30, maxLevel: 35, village: 'builderBase' },
+  ],
+  heroEquipment: [
+    { name: 'Giant Gauntlet', level: 20, maxLevel: 27, village: 'home' },
+    { name: 'Snake Bracelet', level: 12, maxLevel: 27, village: 'home' },
   ],
   achievements: [{ name: 'Keep Your Account Safe', stars: 3, value: 1, target: 1 }],
 };
