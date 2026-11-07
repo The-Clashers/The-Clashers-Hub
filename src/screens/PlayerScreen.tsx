@@ -12,6 +12,7 @@ import { useTheme, createBaseStyles, breakpointFor } from '../theme';
 import Breadcrumbs from '../components/Breadcrumbs';
 import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';
+import LevelRail from '../components/LevelRail';
 import PillButton from '../components/PillButton';
 import ProgressRail from '../components/ProgressRail';
 import SkeletonBlock, { useSkeletonPulse } from '../components/SkeletonBlock';
@@ -22,8 +23,10 @@ import {
   formatProgressPair,
   groupAchievementsByVillage,
 } from '../lib/achievement-progress';
+import { heroProgress, formatLevelPair } from '../lib/hero-progress';
 import { clanRoleLabel } from '../lib/clan-role';
 import { canonicalTagFromRoute } from '../lib/tag';
+import { groupByVillage } from '../lib/village';
 
 // The player detail shell (T-M2-1, FR-06, FR-14). The roster's tap-through
 // and the tag boxes both land here (golden paths A and B), on the shareable
@@ -40,12 +43,13 @@ import { canonicalTagFromRoute } from '../lib/tag';
 // ladder they show. The role label comes from lib/clan-role.ts, the one
 // table the roster reads, so "admin" says Elder here too.
 //
-// The analysis column holds the three sections the M2 cards will fill
-// (rushed analysis, heroes, achievements). Until they ship, each section
-// renders the designed land-in-M2 notice, the same shape the clan screen's
-// War and Log tabs carry: titled, explained, pointing at the card that
-// fills it, so the screen reads end to end today and a reviewer knows what
-// is missing by design rather than by oversight.
+// The analysis column holds the three M2 sections (rushed analysis,
+// heroes, achievements). The hero and achievements cards ship with this
+// screen's M2 passes; until the rushed engine card (T-M2-2) lands, that
+// one section renders the designed land-in-M2 notice, the same shape the
+// clan screen's War and Log tabs carry: titled, explained, pointing at
+// the card that fills it, so the screen reads end to end today and a
+// reviewer knows what is missing by design rather than by oversight.
 //
 // Breadcrumbs locate the page the way the clan detail's do (07 section 3):
 // Home > Players > <player name>, the tag from the URL until the name is in
@@ -70,8 +74,9 @@ const SKELETON_META_WIDTH = 170;
 // The header stat cells the skeleton draws, matching the grid's count.
 const SKELETON_STAT_CELLS = 4;
 
-// The analysis sections the skeleton draws, matching the three land-in-M2
-// notices the success state renders.
+// The analysis sections the skeleton draws, matching the three sections
+// the success state renders (the rushed notice, the hero card, the
+// achievements card).
 const SKELETON_SECTIONS = 3;
 
 // Micro-label tracking: the one-off 0.6 px tracking the design language
@@ -278,10 +283,7 @@ function PlayerSuccess({ player }: PlayerSuccessProps) {
         title="Rushed analysis lands with the M2 engine"
         body="The overall rushed gauge, the per-category bars, and the top-deficit list render here once the rushed engine card (T-M2-2) ships."
       />
-      <EmptyState
-        title="Hero panel lands in M2"
-        body="Hero levels versus maximum, and equipment where the game API exposes it, render here with the hero card (T-M2-4)."
-      />
+      <HeroCard heroes={player.heroes} />
       <AchievementsCard achievements={player.achievements} />
     </>
   );
@@ -305,6 +307,154 @@ interface HeaderStat {
   label: string;
   value: string;
   iconUri?: string;
+}
+
+// ---------- hero card (T-M2-4, FR-09, SR-15) ----------
+
+interface HeroCardProps {
+  /** The parsed heroes from the single player response. Undefined only
+   * when the payload carries none; the card renders its quiet empty
+   * notice then, the same within-success degradation the achievements
+   * card keeps. */
+  heroes: PlayerResponse['heroes'];
+}
+
+// The hero panel: levels versus maximum, and equipment where the game API
+// exposes it. The rows come off the player response the shell already
+// fetched: no second call, no second loading state, the fetch is the
+// shell's own (SR-15).
+//
+// Rows group by village under quiet headers (the grouping rule the
+// achievements card established, now shared through lib/village.ts): home
+// heroes and builder-base heroes never mix, groups keep
+// first-appearance order, rows keep API order. One row per hero: the name
+// and the level/maximum pair share one line (heroes carry no requirement
+// text the way achievements do, so the line has room), the LevelRail
+// under it, and the equipment the API nests on the hero entry as quiet
+// indented rows below — equipment renders under the hero it is equipped
+// on, the only place the payload exposes it per hero; the flat
+// heroEquipment inventory belongs to the progression grid (FR-16).
+//
+// A maxed hero mutes to the ledger treatment the completed achievement
+// row takes (secondary name, muted pair), so the heroes still climbing
+// draw the eye; on a maxed account the card reads as a quiet ledger. A
+// hero with a null maxLevel (brand-new content the API has not caught up
+// to, SR-14's shape) renders its level alone with no rail and no pair,
+// and the card footnotes the count instead of inventing a maximum.
+//
+// Rows key on village-name-index, the same stable identity the
+// achievement rows key on (STD-18): the payload could carry duplicate
+// names, and the name alone is not a stable identity.
+function HeroCard({ heroes }: HeroCardProps) {
+  const { theme } = useTheme();
+  const base = useMemo(() => createBaseStyles(theme), [theme]);
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
+  if (!heroes || heroes.length === 0) {
+    return (
+      <EmptyState
+        title="No heroes in this payload"
+        body="The game API returned no heroes for this player. Refresh in a moment; even a brand-new account reaches its first hero within the opening quests."
+      />
+    );
+  }
+
+  const groups = groupByVillage(heroes);
+  const maxedCount = heroes.filter((hero) => heroProgress(hero).isMaxed).length;
+  const withoutMaxCount = heroes.filter((hero) => hero.maxLevel === null).length;
+
+  return (
+    <View
+      style={[base.panelRaised, styles.heroCard]}
+      accessibilityLabel={`Heroes, ${heroes.length} rows`}
+    >
+      <View style={styles.heroHeader}>
+        <Text style={base.title}>Heroes</Text>
+        <Text style={styles.heroCount}>
+          {formatProgressPair(maxedCount, heroes.length)} maxed
+        </Text>
+      </View>
+
+      {groups.map((group, groupIndex) => (
+        <View key={group.village} style={styles.heroGroup}>
+          {groupIndex > 0 ? <View style={styles.heroDivider} aria-hidden /> : null}
+          <Text style={styles.heroGroupLabel}>{group.label}</Text>
+          <View style={styles.heroRows}>
+            {group.rows.map((hero, index) => (
+              <HeroRow
+                key={`${group.village}-${hero.name}-${index}`}
+                hero={hero}
+              />
+            ))}
+          </View>
+        </View>
+      ))}
+
+      {withoutMaxCount > 0 ? (
+        <Text style={styles.heroFootnote}>
+          {withoutMaxCount === 1
+            ? '1 hero is shown without a maximum: the game API has not caught up to it yet.'
+            : `${withoutMaxCount} heroes are shown without a maximum: the game API has not caught up to them yet.`}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+interface HeroRowProps {
+  hero: NonNullable<PlayerResponse['heroes']>[number];
+}
+
+function HeroRow({ hero }: HeroRowProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
+  const progress = heroProgress(hero);
+
+  // The row's own label: the name with the level/maximum pair (and the
+  // maxed verdict when it holds). The rail adds its fill percent; the
+  // equipment rows carry their own labels.
+  const rowLabel = progress.hasMax
+    ? `${hero.name}, level ${hero.level} of ${progress.maxLevel}${progress.isMaxed ? ', maxed' : ''}`
+    : `${hero.name}, level ${hero.level}`;
+
+  return (
+    <View style={styles.heroRow} accessibilityLabel={rowLabel}>
+      <View style={styles.heroText}>
+        <Text style={progress.isMaxed ? styles.heroNameDone : styles.heroName} numberOfLines={1}>
+          {hero.name}
+        </Text>
+        <Text style={progress.isMaxed ? styles.heroPairDone : styles.heroPair} numberOfLines={1}>
+          {progress.hasMax ? formatLevelPair(hero.level, progress.maxLevel) : `Lv ${hero.level}`}
+        </Text>
+      </View>
+      {progress.hasMax ? <LevelRail fill={progress.fill} /> : null}
+      {hero.equipment ? (
+        <View style={styles.heroEquipment}>
+          {hero.equipment.map((item, index) => (
+            <View
+              key={`${item.name}-${index}`}
+              style={styles.equipmentRow}
+              accessibilityLabel={
+                item.maxLevel !== null
+                  ? `${item.name}, level ${item.level} of ${item.maxLevel}`
+                  : `${item.name}, level ${item.level}`
+              }
+            >
+              <Text style={styles.equipmentName} numberOfLines={1}>
+                {item.name}
+              </Text>
+              <Text style={styles.equipmentPair} numberOfLines={1}>
+                {item.maxLevel !== null
+                  ? formatLevelPair(item.level, item.maxLevel)
+                  : `Lv ${item.level}`}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
 }
 
 // ---------- achievements card (T-M2-3, FR-08, SR-15) ----------
@@ -478,8 +628,9 @@ function PlayerLoading({ busyRetrying }: PlayerLoadingProps) {
   const sections = (
     <>
       {Array.from({ length: SKELETON_SECTIONS }, (_, index) => (
-        // Each block mirrors the EmptyState notice it stands in for: the
-        // shared state panel with a title line and a body line.
+        // Each block mirrors the section it stands in for (the rushed
+        // notice or a card's head): the shared state panel with a title
+        // line and a body line.
         <View key={index} style={base.statePanel}>
           <SkeletonBlock width="55%" height={theme.fontSize.xl} pulse={pulse} />
           <SkeletonBlock width="92%" height={theme.fontSize.body} pulse={pulse} />
@@ -737,6 +888,130 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       gap: t.spacing[3],
       marginTop: t.spacing[6],
       marginBottom: t.spacing[8],
+    },
+
+    // ---------- hero card ----------
+    // The card carries the panelRaised chrome the identity and
+    // achievements cards use, so the analysis surfaces read as one family.
+    heroCard: {
+      gap: t.spacing[5],
+    },
+    heroHeader: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      justifyContent: 'space-between',
+      flexWrap: 'wrap',
+      columnGap: t.spacing[3],
+    },
+    // The "2 / 5 maxed" line: tabular figures, the count that matters at
+    // a glance. "Maxed" whispers beside it, the same voice the
+    // achievements count keeps.
+    heroCount: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.sm,
+      fontWeight: t.fontWeight.regular,
+      color: c.textMuted,
+      fontVariant: ['tabular-nums'],
+    },
+    heroGroup: {
+      gap: t.spacing[3],
+    },
+    heroDivider: {
+      height: 1,
+      backgroundColor: c.hairline,
+    },
+    // The group header: the shell's micro-label treatment (uppercase,
+    // tracked, muted), the same voice the stat cells keep.
+    heroGroupLabel: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.xs,
+      fontWeight: t.fontWeight.medium,
+      color: c.textMuted,
+      textTransform: 'uppercase',
+      letterSpacing: LABEL_TRACKING,
+    },
+    heroRows: {
+      gap: t.spacing[4],
+    },
+    // One row: the name + pair line on top, the level rail under it, the
+    // equipment rows indented below.
+    heroRow: {
+      gap: t.spacing[2],
+    },
+    // The name and the pair share one line (heroes carry no requirement
+    // text the way achievements do, so the line has room); the pair
+    // right-aligns so the tabular figures stack down the card.
+    heroText: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      justifyContent: 'space-between',
+      columnGap: t.spacing[3],
+      minWidth: 0,
+    },
+    heroName: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.sm,
+      fontWeight: t.fontWeight.semibold,
+      color: c.textPrimary,
+    },
+    // The maxed row's demotion: secondary ink, the ledger treatment the
+    // completed achievement row takes.
+    heroNameDone: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.sm,
+      fontWeight: t.fontWeight.regular,
+      color: c.textSecondary,
+    },
+    heroPair: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.xs,
+      fontWeight: t.fontWeight.medium,
+      color: c.textSecondary,
+      fontVariant: ['tabular-nums'],
+    },
+    heroPairDone: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.xs,
+      fontWeight: t.fontWeight.regular,
+      color: c.textMuted,
+      fontVariant: ['tabular-nums'],
+    },
+    // The equipment block: indented one step so the rows read as
+    // belonging to the hero above them, never as peers of the hero rows.
+    heroEquipment: {
+      paddingLeft: t.spacing[4],
+      gap: t.spacing[1],
+    },
+    equipmentRow: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      justifyContent: 'space-between',
+      columnGap: t.spacing[3],
+      minWidth: 0,
+    },
+    // Equipment rows keep the quiet treatment always (secondary name,
+    // muted pair): they are inventory detail under their hero, and the
+    // pair itself carries the maxed reading ("27 / 27").
+    equipmentName: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.xs,
+      fontWeight: t.fontWeight.regular,
+      color: c.textSecondary,
+    },
+    equipmentPair: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.xs,
+      fontWeight: t.fontWeight.regular,
+      color: c.textMuted,
+      fontVariant: ['tabular-nums'],
+    },
+    // The quiet footnote for heroes without an exposed maximum.
+    heroFootnote: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.xs,
+      fontWeight: t.fontWeight.regular,
+      lineHeight: Math.round(t.lineHeight.normal * t.fontSize.xs),
+      color: c.textMuted,
     },
 
     // ---------- achievements card ----------

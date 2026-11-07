@@ -7,7 +7,7 @@ import {
   railFill,
   starSlots,
 } from './achievement-progress';
-import type { PlayerAchievement } from '../api/player';
+import { groupByVillage } from './village';
 
 // Table-driven tests (NFR-07) for the achievement progress math. The tables
 // mirror the real payload shapes the live proxy served while the card was
@@ -125,81 +125,12 @@ describe('formatProgressPair', () => {
   });
 });
 
-// Hand-built rows mirroring the live payload's interleave (home, builder
-// base, home again, then clan capital): the grouping tests need rows whose
-// village order is the interesting part, not the counter values.
-function row(name: string, village: string): PlayerAchievement {
-  return { name, stars: 3, value: 10, target: 10, info: `Do ${name}`, village };
-}
-
-describe('groupAchievementsByVillage', () => {
-  it('groups an interleaved payload into village blocks in first-appearance order', () => {
-    // The live payload's order: home rows, then builder base, then home
-    // again, then clan capital, then home again. One card, three blocks.
-    const achievements: PlayerAchievement[] = [
-      row('Bigger Coffers', 'home'),
-      row('Get those Goblins!', 'home'),
-      row('Master Engineering', 'builderBase'),
-      row('Un-Build It', 'builderBase'),
-      row('Keep Your Account Safe!', 'home'),
-      row('Aggressive Capitalism', 'clanCapital'),
-      row('Bigger & Better', 'home'),
-    ];
-
-    const groups = groupAchievementsByVillage(achievements);
-
-    expect(groups.map((group) => group.village)).toEqual([
-      'home',
-      'builderBase',
-      'clanCapital',
-    ]);
-    expect(groups.map((group) => group.label)).toEqual([
-      'Home Village',
-      'Builder Base',
-      'Clan Capital',
-    ]);
-  });
-
-  it('keeps API order inside each group', () => {
-    const achievements: PlayerAchievement[] = [
-      row('Bigger Coffers', 'home'),
-      row('Master Engineering', 'builderBase'),
-      row('Nice and Tidy', 'home'),
-    ];
-
-    const groups = groupAchievementsByVillage(achievements);
-
-    expect(groups[0].rows.map((entry) => entry.name)).toEqual([
-      'Bigger Coffers',
-      'Nice and Tidy',
-    ]);
-    expect(groups[1].rows.map((entry) => entry.name)).toEqual([
-      'Master Engineering',
-    ]);
-  });
-
-  it('never mutates the input array', () => {
-    const achievements: PlayerAchievement[] = [
-      row('Bigger Coffers', 'home'),
-      row('Master Engineering', 'builderBase'),
-    ];
-    const before = JSON.stringify(achievements);
-
-    groupAchievementsByVillage(achievements);
-
-    expect(JSON.stringify(achievements)).toBe(before);
-  });
-
-  it('labels an unknown village marker as itself, the tolerant floor', () => {
-    const groups = groupAchievementsByVillage([
-      row('Something New', 'nightCapital',
-    )]);
-
-    expect(groups).toHaveLength(1);
-    expect(groups[0].label).toBe('nightCapital');
-  });
-
-  it('returns an empty list for an empty payload', () => {
-    expect(groupAchievementsByVillage([])).toEqual([]);
+// The village grouping tests moved to lib/village.test.ts when the rule
+// moved to its own module (the hero card, T-M2-4, needed the identical
+// behavior); what stays here locks the delegation itself so the two cards
+// can never drift onto different rules.
+describe('village grouping delegation', () => {
+  it('re-exports the shared rule from lib/village', () => {
+    expect(groupAchievementsByVillage).toBe(groupByVillage);
   });
 });

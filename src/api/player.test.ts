@@ -308,6 +308,157 @@ describe('fetchPlayer', () => {
     expect(playerEmpty.achievements).toBeUndefined();
   });
 
+  it('parses the heroes array with the equipment the API nests on each entry (SR-15)', async () => {
+    const fetchImpl = (async () =>
+      stubResponse(200, {
+        tag: '#YPCC8QYU2',
+        name: 'Yeon',
+        townHallLevel: 18,
+        expLevel: 220,
+        age: 0,
+        // Rows mirroring the live payload: the Barbarian King carries the
+        // equipment equipped on him nested inside his own entry, a
+        // builder-base hero sits in the same array, and a brand-new hero
+        // carries the null-maxLevel shape.
+        heroes: [
+          {
+            name: 'Barbarian King',
+            level: 87,
+            maxLevel: 110,
+            village: 'home',
+            equipment: [
+              { name: 'Spiky Ball', level: 27, maxLevel: 27, village: 'home' },
+              { name: 'Earthquake Boots', level: 18, maxLevel: 18, village: 'home' },
+            ],
+          },
+          {
+            name: 'Archer Queen',
+            level: 90,
+            maxLevel: 90,
+            village: 'home',
+            equipment: [{ name: 'Giant Gauntlet', level: 20, maxLevel: 27, village: 'home' }],
+          },
+          // A hero with nothing equipped: no equipment key at all.
+          { name: 'Royal Champion', level: 40, maxLevel: 40, village: 'home' },
+          // Brand-new content the API has not caught up to.
+          { name: 'Minion Prince', level: 9, maxLevel: null, village: 'home' },
+          { name: 'Battle Machine', level: 30, maxLevel: 35, village: 'builderBase' },
+        ],
+      })) as typeof fetch;
+
+    const player = await fetchPlayer('#YPCC8QYU2', { fetchImpl });
+
+    expect(player.heroes).toHaveLength(5);
+    expect(player.heroes?.[0]).toEqual({
+      name: 'Barbarian King',
+      level: 87,
+      maxLevel: 110,
+      village: 'home',
+      equipment: [
+        { name: 'Spiky Ball', level: 27, maxLevel: 27, village: 'home' },
+        { name: 'Earthquake Boots', level: 18, maxLevel: 18, village: 'home' },
+      ],
+    });
+    // The equipment rides the hero it belongs to; the pair the card
+    // renders under the Archer Queen is the nested Giant Gauntlet, not
+    // the flat heroEquipment inventory (that array belongs to the
+    // progression grid, FR-16).
+    expect(player.heroes?.[1].equipment).toEqual([
+      { name: 'Giant Gauntlet', level: 20, maxLevel: 27, village: 'home' },
+    ]);
+    // No equipment key on a hero the payload sends bare.
+    expect(player.heroes?.[2].equipment).toBeUndefined();
+    // The null maxLevel rides through as null (the card footnotes it).
+    expect(player.heroes?.[3].maxLevel).toBeNull();
+    expect(player.heroes?.[4]?.village).toBe('builderBase');
+  });
+
+  it('degrades malformed hero and equipment entries to their defaults and drops nameless ones', async () => {
+    const fetchImpl = (async () =>
+      stubResponse(200, {
+        tag: '#X',
+        name: 'Odd Heroes',
+        townHallLevel: 9,
+        expLevel: 60,
+        age: 1,
+        heroes: [
+          // Missing level and village: the tolerant defaults.
+          {
+            name: 'Sparse Hero',
+            maxLevel: 90,
+            equipment: [
+              // Missing level: defaults to 0; a missing maxLevel floors to null.
+              { name: 'Sparse Equipment', village: 'home' },
+              // No name: dropped, the same rule the unit parser keeps.
+              { level: 12, maxLevel: 27, village: 'home' },
+              'not equipment',
+            ],
+          },
+          // No name: the whole hero is dropped, equipment and all.
+          { level: 10, maxLevel: 90, village: 'home', equipment: [{ name: 'Orphaned', level: 1, maxLevel: 27 }] },
+          'not a hero',
+        ],
+      })) as typeof fetch;
+
+    const player = await fetchPlayer('#X', { fetchImpl });
+
+    expect(player.heroes).toEqual([
+      {
+        name: 'Sparse Hero',
+        level: 0,
+        maxLevel: 90,
+        village: 'home',
+        equipment: [{ name: 'Sparse Equipment', level: 0, maxLevel: null, village: 'home' }],
+      },
+    ]);
+  });
+
+  it('leaves heroes undefined when the payload omits the array or sends it empty', async () => {
+    const omitted = (async () =>
+      stubResponse(200, {
+        tag: '#X',
+        name: 'No Heroes',
+        townHallLevel: 2,
+        expLevel: 8,
+        age: 0,
+      })) as typeof fetch;
+    const playerOmitted = await fetchPlayer('#X', { fetchImpl: omitted });
+    expect(playerOmitted.heroes).toBeUndefined();
+
+    const empty = (async () =>
+      stubResponse(200, {
+        tag: '#X',
+        name: 'Empty Heroes',
+        townHallLevel: 2,
+        expLevel: 8,
+        age: 0,
+        heroes: [],
+      })) as typeof fetch;
+    const playerEmpty = await fetchPlayer('#X', { fetchImpl: empty });
+    expect(playerEmpty.heroes).toBeUndefined();
+  });
+
+  it('drops a hero whose equipment array is empty rather than keeping an empty key', async () => {
+    // A hero with an empty equipment array (nothing equipped, the API sends
+    // [] sometimes) parses without the key: the same convention the unit
+    // arrays keep, an omitted array and an empty one mean the same thing.
+    const fetchImpl = (async () =>
+      stubResponse(200, {
+        tag: '#X',
+        name: 'Bare Equipment',
+        townHallLevel: 9,
+        expLevel: 60,
+        age: 0,
+        heroes: [{ name: 'Grand Warden', level: 65, maxLevel: 65, village: 'home', equipment: [] }],
+      })) as typeof fetch;
+
+    const player = await fetchPlayer('#X', { fetchImpl });
+
+    expect(player.heroes).toEqual([
+      { name: 'Grand Warden', level: 65, maxLevel: 65, village: 'home' },
+    ]);
+  });
+
   it('maps a 404 with the tag to the not_found branch', async () => {
     const fetchImpl = (async () => stubResponse(404, { error: 'not_found' })) as typeof fetch;
     await expect(fetchPlayer('#NOPE', { fetchImpl })).rejects.toThrowError(PlayerFetchError);
