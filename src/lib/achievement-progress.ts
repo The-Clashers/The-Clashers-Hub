@@ -6,6 +6,10 @@
 // star slots are pre-computed here so the render stays a lookup and the
 // rules are testable without React (STD-09), the same split RatioFlag keeps
 // against lib/donation-balance.
+//
+// The village grouping the card also needs moved to its own module
+// (lib/village.ts) when the hero card (T-M2-4) needed the identical rule;
+// see the bottom of this file for the delegation.
 
 import type { PlayerAchievement } from '../api/player';
 //
@@ -91,52 +95,17 @@ function formatInteger(value: number): string {
 
 // ---------- village grouping ----------
 
-// The quiet labels the card renders above each group. The three villages
-// the game API names today plus the tolerant floor: an unknown marker
-// renders as itself, so a new village the API invents still gets a header
-// instead of being dropped or lumped into home.
-const VILLAGE_LABELS: Readonly<Record<string, string>> = {
-  home: 'Home Village',
-  builderBase: 'Builder Base',
-  clanCapital: 'Clan Capital',
-};
+// The grouping rule lives in lib/village.ts now: the hero card (T-M2-4)
+// groups village-marked rows with the identical first-appearance-order
+// rule the achievements card established, and the progression grid (T-M2-5)
+// will too, so the rule has exactly one owner. The re-export below keeps
+// the achievements card's imports unchanged.
 
-/** One village's block in the card: the header label and the rows in API
- * order. The row type is the parsed api shape (a type-only import, so the
+export { groupByVillage as groupAchievementsByVillage } from './village';
+
+import type { VillageGroup } from './village';
+
+/** The achievements card's village group: the shared group type with its
+ * rows typed to the parsed achievement shape (a type-only import, so the
  * module still has no runtime dependency on the client). */
-export interface AchievementGroup {
-  /** The raw village marker from the payload ("home", "builderBase",
-   * "clanCapital"). */
-  village: string;
-  /** The display label ("Home Village", "Builder Base", "Clan Capital"). */
-  label: string;
-  /** The group's rows in API order. */
-  rows: ReadonlyArray<PlayerAchievement>;
-}
-
-/** Groups the achievements by village for the card. The live payload
- * interleaves villages (home, then builder base, then home again, then clan
- * capital), and a flat render would mix them; grouping puts every row under
- * its own quiet header. Groups keep first-appearance order (home first on
- * every payload observed), rows keep API order inside their group, and the
- * input is never mutated. */
-export function groupAchievementsByVillage(
-  achievements: ReadonlyArray<PlayerAchievement>,
-): AchievementGroup[] {
-  const groups: AchievementGroup[] = [];
-  const byVillage = new Map<string, AchievementGroup>();
-  for (const achievement of achievements) {
-    let group = byVillage.get(achievement.village);
-    if (!group) {
-      group = {
-        village: achievement.village,
-        label: VILLAGE_LABELS[achievement.village] ?? achievement.village,
-        rows: [],
-      };
-      byVillage.set(achievement.village, group);
-      groups.push(group);
-    }
-    (group.rows as PlayerAchievement[]).push(achievement);
-  }
-  return groups;
-}
+export type AchievementGroup = VillageGroup<PlayerAchievement>;
