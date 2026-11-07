@@ -210,8 +210,23 @@ overscroll.
   the honest reading of a finished list. The rows key on
   village-name-index because the live payload carries duplicate names
   (one locked "Keep Your Account Safe!" beside the completed one). The
-  rushed analysis and heroes sections carry their designed land-in-M2
-  notices until their cards ship.
+  hero card (T-M2-4) renders second in the analysis column on the same
+  panelRaised chrome: a "N / M maxed" count line in tabular figures
+  under the title, rows grouped by village through the shared rule the
+  achievements card established (moved to `lib/village.ts`, groups keep
+  first-appearance order), one row per hero with the name and the
+  level/maximum pair sharing one line (heroes carry no requirement text,
+  so the line has room) above a `LevelRail` — the fill sized by the
+  level/max fraction, no star markers, the same 6 px track and gold fill
+  the `ProgressRail` draws. The equipment the API nests on each hero
+  entry renders as quiet indented rows under that hero (name + pair, no
+  rails): equipment belongs to the hero it is equipped on, and the flat
+  `heroEquipment` inventory belongs to the progression grid (FR-16). A
+  maxed hero mutes to the ledger treatment the completed achievement row
+  takes; a hero with a null maxLevel (brand-new content) renders its
+  level alone with no rail, and the card footnotes the count instead of
+  inventing a maximum. The rushed analysis section carries its designed
+  land-in-M2 notice until its card ships.
 - Breakpoints come from `useWindowDimensions` into a shared `breakpoints`
   helper, no CSS media queries scattered through components; RN paradigm is
   JS-driven layout.
@@ -248,6 +263,7 @@ overscroll.
 | `RosterTable` / `RosterCard` | the clan roster, table & card presentations |
 | `AttentionTable` / `AttentionCard` | the Needs Attention tab's worst-first view, table & card presentations |
 | `ProgressRail` | achievement value/target bar with star markers |
+| `LevelRail` | the hero panel's level-versus-maximum bar: the fill without star markers, the same 6 px track and gold fill `ProgressRail` draws |
 | `CategoryBars` | rushed per-category horizontal bars |
 | `Gauge` | overall rushed % dial (the flagship number) |
 | `ProgressionGrid` | player progression tiles: `UnitIcon`, level, maxed-for-Town-Hall chip |
