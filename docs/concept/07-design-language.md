@@ -214,14 +214,20 @@ overscroll.
   panelRaised chrome: a "N / M maxed" count line in tabular figures
   under the title, rows grouped by village through the shared rule the
   achievements card established (moved to `lib/village.ts`, groups keep
-  first-appearance order), one row per hero with the name and the
+  first-appearance order), one row per hero with the bundled unit icon
+  anchoring the name line (`UnitIcon`, 32 px slot, the map in
+  `lib/icon-map.ts` resolving every hero the API names, placeholder.svg
+  when the game ships content the map has not met) beside the name and the
   level/maximum pair sharing one line (heroes carry no requirement text,
   so the line has room) above a `LevelRail` — the fill sized by the
   level/max fraction, no star markers, the same 6 px track and gold fill
   the `ProgressRail` draws. The equipment the API nests on each hero
-  entry renders as quiet indented rows under that hero (name + pair, no
-  rails): equipment belongs to the hero it is equipped on, and the flat
-  `heroEquipment` inventory belongs to the progression grid (FR-16). A
+  entry renders as quiet indented rows under that hero (small 20 px icon,
+  name + pair, no rails): equipment belongs to the hero it is equipped
+  on, and the flat `heroEquipment` inventory belongs to the progression
+  grid (FR-16). The icons stay at full strength through the maxed mute:
+  the mute is text hierarchy (the ledger reading), and dimming a unit's
+  picture would read as broken, not quiet. A
   maxed hero mutes to the ledger treatment the completed achievement row
   takes; a hero with a null maxLevel (brand-new content) renders its
   level alone with no rail, and the card footnotes the count instead of
@@ -267,7 +273,7 @@ overscroll.
 | `CategoryBars` | rushed per-category horizontal bars |
 | `Gauge` | overall rushed % dial (the flagship number) |
 | `ProgressionGrid` | player progression tiles: `UnitIcon`, level, maxed-for-Town-Hall chip |
-| `UnitIcon` | bundled game-icon lookup with the placeholder fallback, fixed 32 px slot |
+| `UnitIcon` | bundled game-icon lookup behind `lib/icon-map.ts` with the placeholder fallback, fixed 32 px slot (20 px small variant on quiet rows like the hero panel's equipment); shipped on the hero panel, reused by the `ProgressionGrid` tiles |
 | `RefreshControl` | manual refresh with cooldown and the "cached, Ns ago" hint |
 | `WarResultChip` | win/loss/tie pill |
 | `CompareRow` | metric row with both values + delta arrow |
