@@ -16,6 +16,7 @@ import LevelRail from '../components/LevelRail';
 import PillButton from '../components/PillButton';
 import ProgressRail from '../components/ProgressRail';
 import SkeletonBlock, { useSkeletonPulse } from '../components/SkeletonBlock';
+import UnitIcon from '../components/UnitIcon';
 import { fetchPlayer, PlayerFetchError, type PlayerResponse } from '../api/player';
 import { busyRetryDelayMs, shouldRetryBusy } from '../lib/busy-retry';
 import {
@@ -327,11 +328,14 @@ interface HeroCardProps {
 // Rows group by village under quiet headers (the grouping rule the
 // achievements card established, now shared through lib/village.ts): home
 // heroes and builder-base heroes never mix, groups keep
-// first-appearance order, rows keep API order. One row per hero: the name
-// and the level/maximum pair share one line (heroes carry no requirement
-// text the way achievements do, so the line has room), the LevelRail
-// under it, and the equipment the API nests on the hero entry as quiet
-// indented rows below — equipment renders under the hero it is equipped
+// first-appearance order, rows keep API order. One row per hero: the
+// bundled unit icon anchors the name line (lib/icon-map.ts resolves the
+// hero's picture, placeholder.svg when the game ships content the map has
+// not met), the name and the level/maximum pair share the line beside it
+// (heroes carry no requirement text the way achievements do, so the line
+// has room), the LevelRail under it, and the equipment the API nests on
+// the hero entry as quiet indented rows below with their own smaller
+// icons — equipment renders under the hero it is equipped
 // on, the only place the payload exposes it per hero; the flat
 // heroEquipment inventory belongs to the progression grid (FR-16).
 //
@@ -420,13 +424,16 @@ function HeroRow({ hero }: HeroRowProps) {
 
   return (
     <View style={styles.heroRow} accessibilityLabel={rowLabel}>
-      <View style={styles.heroText}>
-        <Text style={progress.isMaxed ? styles.heroNameDone : styles.heroName} numberOfLines={1}>
-          {hero.name}
-        </Text>
-        <Text style={progress.isMaxed ? styles.heroPairDone : styles.heroPair} numberOfLines={1}>
-          {progress.hasMax ? formatLevelPair(hero.level, progress.maxLevel) : `Lv ${hero.level}`}
-        </Text>
+      <View style={styles.heroLine}>
+        <UnitIcon kind="hero" name={hero.name} />
+        <View style={styles.heroText}>
+          <Text style={progress.isMaxed ? styles.heroNameDone : styles.heroName} numberOfLines={1}>
+            {hero.name}
+          </Text>
+          <Text style={progress.isMaxed ? styles.heroPairDone : styles.heroPair} numberOfLines={1}>
+            {progress.hasMax ? formatLevelPair(hero.level, progress.maxLevel) : `Lv ${hero.level}`}
+          </Text>
+        </View>
       </View>
       {progress.hasMax ? <LevelRail fill={progress.fill} /> : null}
       {hero.equipment ? (
@@ -441,14 +448,17 @@ function HeroRow({ hero }: HeroRowProps) {
                   : `${item.name}, level ${item.level}`
               }
             >
-              <Text style={styles.equipmentName} numberOfLines={1}>
-                {item.name}
-              </Text>
-              <Text style={styles.equipmentPair} numberOfLines={1}>
-                {item.maxLevel !== null
-                  ? formatLevelPair(item.level, item.maxLevel)
-                  : `Lv ${item.level}`}
-              </Text>
+              <UnitIcon kind="equipment" name={item.name} size="sm" />
+              <View style={styles.equipmentText}>
+                <Text style={styles.equipmentName} numberOfLines={1}>
+                  {item.name}
+                </Text>
+                <Text style={styles.equipmentPair} numberOfLines={1}>
+                  {item.maxLevel !== null
+                    ? formatLevelPair(item.level, item.maxLevel)
+                    : `Lv ${item.level}`}
+                </Text>
+              </View>
             </View>
           ))}
         </View>
@@ -933,19 +943,30 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     heroRows: {
       gap: t.spacing[4],
     },
-    // One row: the name + pair line on top, the level rail under it, the
-    // equipment rows indented below.
+    // One row: the icon + name line on top, the level rail full width
+    // under it, the equipment rows indented below.
     heroRow: {
       gap: t.spacing[2],
     },
-    // The name and the pair share one line (heroes carry no requirement
-    // text the way achievements do, so the line has room); the pair
-    // right-aligns so the tabular figures stack down the card.
+    // The name line: the hero's unit icon anchors it (32 px slot, 07
+    // section 4), the text block takes the remaining width. Center-aligned
+    // so the icon sits level with the name whatever the pair's digits.
+    heroLine: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      columnGap: t.spacing[3],
+      minWidth: 0,
+    },
+    // The name and the pair share the line beside the icon (heroes carry
+    // no requirement text the way achievements do, so the line has room);
+    // the block flexes so the pair right-aligns to the card's edge, not
+    // the icon's, and the tabular figures stack down the card.
     heroText: {
       flexDirection: 'row',
       alignItems: 'baseline',
       justifyContent: 'space-between',
       columnGap: t.spacing[3],
+      flex: 1,
       minWidth: 0,
     },
     heroName: {
@@ -982,11 +1003,23 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       paddingLeft: t.spacing[4],
       gap: t.spacing[1],
     },
+    // The equipment row: the small icon slot (20 px, the quiet variant)
+    // beside the name + pair line, center-aligned the way the hero line
+    // keeps, one scale down.
     equipmentRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      columnGap: t.spacing[2],
+      minWidth: 0,
+    },
+    // The name and pair share the remaining line; the pair right-aligns
+    // to the same card edge the hero pairs stack against.
+    equipmentText: {
       flexDirection: 'row',
       alignItems: 'baseline',
       justifyContent: 'space-between',
-      columnGap: t.spacing[3],
+      columnGap: t.spacing[2],
+      flex: 1,
       minWidth: 0,
     },
     // Equipment rows keep the quiet treatment always (secondary name,
