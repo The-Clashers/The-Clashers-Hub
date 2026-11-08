@@ -71,8 +71,40 @@ const player = {
   league: { name: 'Titan League I' },
   clan: { tag: '#MOCKCLAN', name: 'Mock Clan', clanLevel: 12 },
   troops: [
+    // Home village troops: a mix of maxed, climbing, and a super troop so
+    // the progression grid exercises every tile state.
     { name: 'Barbarian', level: 12, maxLevel: 12, village: 'home' },
     { name: 'Archer', level: 9, maxLevel: 12, village: 'home' },
+    { name: 'Goblin', level: 8, maxLevel: 10, village: 'home' },
+    { name: 'Giant', level: 11, maxLevel: 12, village: 'home' },
+    { name: 'Wall Breaker', level: 10, maxLevel: 12, village: 'home' },
+    { name: 'Balloon', level: 8, maxLevel: 12, village: 'home' },
+    { name: 'Wizard', level: 9, maxLevel: 12, village: 'home' },
+    { name: 'Healer', level: 6, maxLevel: 8, village: 'home' },
+    { name: 'Dragon', level: 7, maxLevel: 10, village: 'home' },
+    { name: 'P.E.K.K.A', level: 8, maxLevel: 10, village: 'home' },
+    { name: 'Valkyrie', level: 6, maxLevel: 8, village: 'home' },
+    { name: 'Golem', level: 8, maxLevel: 10, village: 'home' },
+    { name: 'Super Barbarian', level: 1, maxLevel: 9, village: 'home' },
+    { name: 'Sneaky Goblin', level: 1, maxLevel: 6, village: 'home' },
+    // Siege machines and pets (route into petsSiege).
+    { name: 'Wall Wrecker', level: 4, maxLevel: 6, village: 'home' },
+    { name: 'Battle Blimp', level: 3, maxLevel: 6, village: 'home' },
+    { name: 'L.A.S.S.I', level: 10, maxLevel: 15, village: 'home' },
+    { name: 'Electro Owl', level: 15, maxLevel: 15, village: 'home' },
+    // Builder base units (the second village group).
+    { name: 'Raged Barbarian', level: 18, maxLevel: 20, village: 'builderBase' },
+    { name: 'Sneaky Archer', level: 16, maxLevel: 20, village: 'builderBase' },
+    { name: 'Boxer Giant', level: 14, maxLevel: 20, village: 'builderBase' },
+    { name: 'Power P.E.K.K.A', level: 12, maxLevel: 20, village: 'builderBase' },
+  ],
+  spells: [
+    { name: 'Lightning Spell', level: 9, maxLevel: 12, village: 'home' },
+    { name: 'Healing Spell', level: 7, maxLevel: 8, village: 'home' },
+    { name: 'Rage Spell', level: 5, maxLevel: 8, village: 'home' },
+    { name: 'Freeze Spell', level: 6, maxLevel: 8, village: 'home' },
+    { name: 'Poison Spell', level: 5, maxLevel: 6, village: 'home' },
+    { name: 'Earthquake Spell', level: 4, maxLevel: 5, village: 'home' },
   ],
   // The heroes the hero panel (T-M2-4) reads: one maxed with two maxed
   // equipment pieces nested on it (the ledger treatment), one climbing
