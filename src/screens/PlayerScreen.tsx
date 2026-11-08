@@ -76,10 +76,13 @@ const SKELETON_META_WIDTH = 170;
 // The header stat cells the skeleton draws, matching the grid's count.
 const SKELETON_STAT_CELLS = 4;
 
-// The analysis sections the skeleton draws, matching the three sections
+// The analysis sections the skeleton draws, matching the four sections
 // the success state renders (the rushed notice, the hero card, the
-// achievements card).
-const SKELETON_SECTIONS = 3;
+// achievements card, the progression grid). Each skeleton block mirrors
+// the section it stands in for: a title line and a body line inside the
+// shared state panel, so the layout-matched skeleton (06 section 3)
+// keeps its shape through the loading state.
+const SKELETON_SECTIONS = 4;
 
 // Micro-label tracking: the one-off 0.6 px tracking the design language
 // pairs with uppercase micro labels (StatChip keeps the same local value).
