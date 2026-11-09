@@ -16,14 +16,41 @@ export type WarFrequency =
   | 'lessThanOncePerWeek'
   | 'never';
 
-/** Search filters, all optional except the name. Undefined means "any". */
+/** The clan membership states the game API reports on search items. */
+export type ClanType = 'open' | 'inviteOnly' | 'closed';
+
+/** Search filters, all optional except the name. Undefined means "any".
+ *
+ * Two kinds live here, deliberately in one shape so the screen's draft and
+ * the query key stay a single object:
+ * - Server-side filters (min/max members, clan level, points, war frequency,
+ *   location, label) ride the tier request: upstream filters the whole
+ *   listing, so pagination and the counts stay exact.
+ * - Client-side filters (type, chat language, join requirements) have no
+ *   upstream param, so the tier never sees them; applyClientFilters narrows
+ *   the loaded pages and the screen keeps pagination honest with a
+ *   "N shown of M loaded" line. */
 export interface SearchFilters {
   name: string;
   minMembers?: number;
+  maxMembers?: number;
   minClanLevel?: number;
+  minClanPoints?: number;
   warFrequency?: WarFrequency;
   locationId?: number;
+  labelId?: number;
+  clanType?: ClanType;
+  chatLanguage?: string;
+  maxRequiredTrophies?: number;
+  maxRequiredTownhall?: number;
 }
+
+/** The minimum clan-name length the game API accepts (it rejects shorter
+ * names with a 400 badName); the tier mirrors the floor. Both name-input
+ * surfaces (the clans screen's bar and the nav lookup box) teach the same
+ * sentence before any request is made. */
+export const SEARCH_NAME_MIN_CHARS = 3;
+export const SEARCH_NAME_MIN_COPY = 'Clan names need at least three characters.';
 
 /** One result card, stripped to the fields the card renders. */
 export interface SearchClanItem {
@@ -36,6 +63,18 @@ export interface SearchClanItem {
   locationName?: string;
   /** Raw upstream value; the screen maps it to a short label. */
   warFrequency?: string;
+  /** Membership state; the client-side type filter matches it directly. */
+  type?: string;
+  /** The parental-control flag; the card renders it as a tag, not a stat. */
+  isFamilyFriendly?: boolean;
+  /** Join gates for the requirement filters ("clans I can actually join").
+   * Absent when the clan sets none, which passes every threshold. */
+  requiredTrophies?: number;
+  requiredTownhallLevel?: number;
+  /** The clan's chat language, when it reports one; the language filter
+   * matches on the code ("EN"), the card could show the name. */
+  chatLanguageCode?: string;
+  chatLanguageName?: string;
   badgeUrls?: ClanBadgeUrls;
 }
 
@@ -82,15 +121,21 @@ export const SEARCH_PAGE_LIMIT = 30;
  * Builds the query string for a search request. Pure and unit-tested: the
  * screen and the infinite query both go through it, so the request shape
  * (which filters appear, where the cursor goes) is decided in exactly one
- * place. Filters that are undefined are omitted, never sent as empty.
+ * place. Server-side filters that are undefined are omitted, never sent as
+ * empty; the client-side filters never appear here at all — the tier has no
+ * corresponding upstream params, so they ride the query key only and
+ * applyClientFilters does the narrowing.
  */
 export function buildSearchQuery(filters: SearchFilters, after?: string | null): string {
   const params = new URLSearchParams();
   params.set('name', filters.name.trim());
   if (filters.minMembers !== undefined) params.set('minMembers', String(filters.minMembers));
+  if (filters.maxMembers !== undefined) params.set('maxMembers', String(filters.maxMembers));
   if (filters.minClanLevel !== undefined) params.set('minClanLevel', String(filters.minClanLevel));
+  if (filters.minClanPoints !== undefined) params.set('minClanPoints', String(filters.minClanPoints));
   if (filters.warFrequency !== undefined) params.set('warFrequency', filters.warFrequency);
   if (filters.locationId !== undefined) params.set('locationId', String(filters.locationId));
+  if (filters.labelId !== undefined) params.set('labelId', String(filters.labelId));
   params.set('limit', String(SEARCH_PAGE_LIMIT));
   if (after) params.set('after', after);
   return params.toString();
@@ -116,6 +161,7 @@ function toSearchClanItem(parsed: unknown): SearchClanItem {
   const location = isRecord(parsed.location) && typeof parsed.location.name === 'string'
     ? parsed.location.name
     : undefined;
+  const chatLanguage = isRecord(parsed.chatLanguage) ? parsed.chatLanguage : undefined;
   return {
     tag: typeof parsed.tag === 'string' ? parsed.tag : '',
     name: typeof parsed.name === 'string' ? parsed.name : '',
@@ -123,6 +169,14 @@ function toSearchClanItem(parsed: unknown): SearchClanItem {
     members: typeof parsed.members === 'number' ? parsed.members : 0,
     locationName: location,
     warFrequency: typeof parsed.warFrequency === 'string' ? parsed.warFrequency : undefined,
+    type: typeof parsed.type === 'string' ? parsed.type : undefined,
+    isFamilyFriendly: typeof parsed.isFamilyFriendly === 'boolean' ? parsed.isFamilyFriendly : undefined,
+    requiredTrophies: typeof parsed.requiredTrophies === 'number' ? parsed.requiredTrophies : undefined,
+    requiredTownhallLevel:
+      typeof parsed.requiredTownhallLevel === 'number' ? parsed.requiredTownhallLevel : undefined,
+    chatLanguageCode:
+      typeof chatLanguage?.languageCode === 'string' ? chatLanguage.languageCode : undefined,
+    chatLanguageName: typeof chatLanguage?.name === 'string' ? chatLanguage.name : undefined,
     badgeUrls,
   };
 }
@@ -146,6 +200,49 @@ export function parseSearchPayload(parsed: unknown): SearchPage {
     after,
     age,
   };
+}
+
+/** True when any client-side filter is in force (the ones with no upstream
+ * param). The screen uses it to switch the meta line to "N shown of M
+ * loaded" and to keep pagination alive through an emptied view. */
+export function hasClientFilters(filters: SearchFilters): boolean {
+  return (
+    filters.clanType !== undefined ||
+    filters.chatLanguage !== undefined ||
+    filters.maxRequiredTrophies !== undefined ||
+    filters.maxRequiredTownhall !== undefined
+  );
+}
+
+/**
+ * Narrows loaded search pages by the client-side filters. Pure and
+ * unit-tested: the screen memoizes it over the accumulated pages and the
+ * submitted filters. A clan that reports no join gate passes every
+ * requirement threshold — "no requirement" is the easiest clan to join, so
+ * it is always an honest match; a threshold of 0 (the "None" option) then
+ * selects exactly those gate-less clans.
+ */
+export function applyClientFilters(
+  items: ReadonlyArray<SearchClanItem>,
+  filters: SearchFilters,
+): SearchClanItem[] {
+  if (!hasClientFilters(filters)) return [...items];
+  return items.filter((item) => {
+    if (filters.clanType !== undefined && item.type !== filters.clanType) return false;
+    if (filters.chatLanguage !== undefined && item.chatLanguageCode !== filters.chatLanguage) {
+      return false;
+    }
+    if (filters.maxRequiredTrophies !== undefined && (item.requiredTrophies ?? 0) > filters.maxRequiredTrophies) {
+      return false;
+    }
+    if (
+      filters.maxRequiredTownhall !== undefined &&
+      (item.requiredTownhallLevel ?? 0) > filters.maxRequiredTownhall
+    ) {
+      return false;
+    }
+    return true;
+  });
 }
 
 function classifyError(status: number, body: unknown): SearchFetchError {
