@@ -52,7 +52,7 @@ describe('fetchClan', () => {
     ],
     badgeUrls: { small: 's.png', medium: 'm.png', large: 'l.png' },
     location: { id: 32000006, name: 'International', isCountry: false },
-    requiredTrophies: 5000,
+    requiredLeagueTier: { id: 105000017, name: 'Witch League 17' },
     requiredTownhallLevel: 14,
     warFrequency: 'always',
     warWinStreak: 10,
@@ -104,7 +104,7 @@ describe('fetchClan', () => {
       badgeUrls: { small: 's.png', medium: 'm.png', large: 'l.png' },
       location: { id: 32000006, name: 'International', isCountry: false },
       requirements: {
-        requiredTrophies: 5000,
+        requiredLeagueTier: { id: 105000017, name: 'Witch League 17' },
         requiredTownhallLevel: 14,
         warFrequency: 'always',
       },
@@ -123,6 +123,8 @@ describe('fetchClan', () => {
         name: 'No Frills',
         clanLevel: 1,
         members: 1,
+        // The legacy trophy number still arrives post rank rework; the
+        // parse deliberately does not read it.
         requiredTrophies: 0,
         warWinStreak: 0,
         warWins: 0,
@@ -137,7 +139,7 @@ describe('fetchClan', () => {
     expect(clan.badgeUrls).toBeUndefined();
     expect(clan.location).toBeUndefined();
     expect(clan.requirements).toEqual({
-      requiredTrophies: 0,
+      requiredLeagueTier: undefined,
       requiredTownhallLevel: undefined,
       warFrequency: undefined,
     });
@@ -244,20 +246,23 @@ describe('fetchClan', () => {
     expect(clan.memberList).toEqual([]);
   });
 
-  it('keeps requiredTrophies and warFrequency readable when only those are set', async () => {
+  it('reads the league requirement and warFrequency when only those are set', async () => {
     const fetchImpl = (async () =>
       stubResponse(200, {
         tag: '#X',
         name: 'No TH gate',
         clanLevel: 2,
         members: 5,
-        requiredTrophies: 1000,
+        requiredLeagueTier: { id: 105000028, name: 'Dragon League 28' },
         warFrequency: 'oncePerWeek',
         age: 3,
       })) as typeof fetch;
 
     const clan = await fetchClan('#X', { fetchImpl });
-    expect(clan.requirements.requiredTrophies).toBe(1000);
+    expect(clan.requirements.requiredLeagueTier).toEqual({
+      id: 105000028,
+      name: 'Dragon League 28',
+    });
     expect(clan.requirements.requiredTownhallLevel).toBeUndefined();
     expect(clan.requirements.warFrequency).toBe('oncePerWeek');
   });

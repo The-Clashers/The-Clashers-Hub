@@ -40,6 +40,12 @@ import { useTheme } from '../theme';
 // above it), so the trigger's viewport coordinates stay stable while open,
 // and a window resize simply closes the list.
 
+// How tall the portaled listbox may grow before it scrolls, and the
+// chrome (border plus bottom padding) added on top of the option rows
+// when sizing it to its content.
+const LISTBOX_MAX_HEIGHT = 288;
+const LISTBOX_CHROME = 2;
+
 export interface DropdownOption<V> {
   value: V;
   label: string;
@@ -222,7 +228,17 @@ export default function Dropdown<V>({
   };
 
   // The portaled listbox: fixed-positioned under the trigger, at the overlay
-  // level so nothing in the app tree paints over it.
+  // level so nothing in the app tree paints over it. The box only scrolls
+  // when its content genuinely overflows: overflow auto (not scroll, which
+  // paints the scrollbar track on every list, even a five-option one that
+  // fits) and a maxHeight sized to the option count, so a short list renders
+  // exactly as tall as it is with no scrollbar at all. A long list (the
+  // location, language, and league ladders) still caps and scrolls — that
+  // scrollbar is honest; the one on a list that fit was not.
+  const listMaxHeight = Math.min(
+    LISTBOX_MAX_HEIGHT,
+    options.length * theme.layout.touchTargetMin + theme.spacing[1] + LISTBOX_CHROME,
+  );
   const listbox = open && anchor ? (
     <View
       nativeID={listboxId}
@@ -230,7 +246,12 @@ export default function Dropdown<V>({
       aria-labelledby={labelId}
       style={[
         styles.listbox,
-        { top: anchor.top + theme.spacing[2], left: anchor.left, width: anchor.width },
+        {
+          top: anchor.top + theme.spacing[2],
+          left: anchor.left,
+          width: anchor.width,
+          maxHeight: listMaxHeight,
+        },
       ]}
     >
       {options.map((option, index) => {
@@ -374,18 +395,20 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       borderRightColor: 'transparent',
       borderTopColor: c.textMuted,
     },
-    // The portaled listbox. position:fixed is a react-native-web runtime
-    // value; the RN 0.88 style types only know absolute/relative, hence the
-    // cast. zIndex at the overlay level beats anything in the app tree.
+    // The portaled listbox. position:fixed and overflow:auto are
+    // react-native-web runtime values; the RN 0.88 style types only know
+    // absolute/relative and visible/hidden/scroll, hence the casts. zIndex
+    // at the overlay level beats anything in the app tree. maxHeight stays
+    // here as the ceiling; the component tightens it to the option count.
     listbox: {
       position: 'fixed' as unknown as 'relative',
       zIndex: t.zIndex.overlay,
-      maxHeight: 288,
+      maxHeight: LISTBOX_MAX_HEIGHT,
       borderRadius: t.radius[2],
       borderWidth: 1,
       borderColor: c.panelBorderStrong,
       backgroundColor: c.panelRaised,
-      overflow: 'scroll',
+      overflow: 'auto' as unknown as 'scroll',
       paddingBottom: t.spacing[1],
     },
     option: {

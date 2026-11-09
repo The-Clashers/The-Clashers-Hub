@@ -1,8 +1,8 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { useNavigate, useSearchParams } from 'react-router';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { useTheme, createBaseStyles } from '../theme';
+import { useTheme, createBaseStyles, breakpointFor } from '../theme';
 import Dropdown, { type DropdownOption } from '../components/Dropdown';
 import ClanCard from '../components/ClanCard';
 import SkeletonCard from '../components/Skeleton';
@@ -27,6 +27,8 @@ import {
 import { LOCATION_FILTERS } from '../api/locations';
 import { CLAN_LABEL_FILTERS } from '../api/labels';
 import { CHAT_LANGUAGE_FILTERS } from '../api/chat-languages';
+import { RANKED_LEAGUE_TIERS, leagueTierName } from '../api/league-tiers';
+import { HOME_CAP_MAX_TOWN_HALL } from '../lib/town-hall-caps';
 
 // The clans search screen (T-M1-1, FR-01, SR-08), the /clans page since
 // the nav revision split the old entry route into real pages. A visitor
@@ -51,26 +53,35 @@ import { CHAT_LANGUAGE_FILTERS } from '../api/chat-languages';
 // input and its action button, then one helper line under the row that
 // teaches the # rule, so the two lookup panels read as one family.
 //
-// The filter row grew into two tiers (the game API exposes more filters
-// than fit comfortably above the fold on a phone): the primary grid
-// carries the four a first search wants (clan size, minimum clan level,
-// war frequency, location), and a "More filters" toggle reveals the
-// second grid (minimum clan points, clan label, clan type, chat
-// language, and the two join requirements). The applied state stays
-// glanceable with the row collapsed: a removable chip sits over the
-// results for every applied filter, hidden tier included, and pressing
-// a chip's x re-runs the search without it.
+// The filters live behind one "Filters" disclosure with an applied count
+// (the owner's rework of the old two-tier row): a name search is the golden
+// path, so the panel above the fold is the name box and nothing else; the
+// disclosure opens one grid of the narrowing controls — the dropdowns (clan
+// size, war frequency, location, clan label, clan type, chat language,
+// league required) and the two number boxes (minimum clan level, Town Hall
+// required capped at the reference max). The applied state stays glanceable
+// with the row collapsed: a removable chip sits over the results for every
+// applied filter, disclosure open or not, and pressing a chip's x re-runs
+// the search without it.
 //
 // The filters split by where they run, and the screen keeps the two
 // honest:
-// - Server-side filters (size, level, points, war frequency, location,
-//   label) ride the tier request; upstream narrows the whole listing, so
-//   counts and pagination stay exact.
-// - Client-side filters (clan type, chat language, trophies and Town
-//   Hall requirements) have no upstream param, so they narrow the loaded
-//   pages only: the meta line reads "N shown of M loaded" while they are
-//   in force, and an emptied view keeps paginating (the sentinel and a
-//   Load more action) instead of reading as "no results".
+// - Server-side filters (size, level, war frequency, location, label)
+//   ride the tier request; upstream narrows the whole listing, so counts
+//   and pagination stay exact.
+// - Client-side filters (clan type, chat language, and the two join
+//   requirements) have no upstream param, so they narrow the loaded pages
+//   only: the meta line reads "N shown of M loaded" while they are in
+//   force, and an emptied view keeps paginating (the sentinel and a Load
+//   more action) instead of reading as "no results".
+//
+// The join requirements speak the rank rework: the game replaced the old
+// trophy threshold with a league requirement, so the requirement filter is
+// a ranked-ladder dropdown ("clans whose required league is at most mine")
+// fed by the bundled ladder table, and the Town Hall requirement is a
+// number box capped at the highest hall the reference data covers. The
+// number boxes clamp as they type, so the draft can never hold a value the
+// tier would reject or the game cannot mean.
 //
 // The screen owns layout, composition, and the route's state; the pieces
 // it renders come from the shared kit (07 section 4): ClanCard,
@@ -147,19 +158,6 @@ function boundsToSize(filters: { minMembers?: number; maxMembers?: number }): Cl
   return undefined;
 }
 
-const LEVEL_OPTIONS: ReadonlyArray<DropdownOption<number | undefined>> = [
-  { label: 'Any', value: undefined },
-  ...[5, 10, 15, 20].map((value) => ({ label: String(value), value })),
-];
-
-const POINTS_OPTIONS: ReadonlyArray<DropdownOption<number | undefined>> = [
-  { label: 'Any', value: undefined },
-  { label: '10,000+', value: 10_000 },
-  { label: '20,000+', value: 20_000 },
-  { label: '30,000+', value: 30_000 },
-  { label: '40,000+', value: 40_000 },
-];
-
 // The dropdown offers the same labels the result card's War stat renders,
 // from the one shared table in lib/war-frequency.ts.
 const FREQUENCY_OPTIONS: ReadonlyArray<DropdownOption<WarFrequency | undefined>> = [
@@ -194,30 +192,28 @@ const LANGUAGE_OPTIONS: ReadonlyArray<DropdownOption<string | undefined>> = [
   ...CHAT_LANGUAGE_FILTERS.map((language) => ({ label: language.name, value: language.code })),
 ];
 
-// The join gates read as caps: "clans I can actually join" asks for clans
-// whose requirement is at most my trophies / my Town Hall. "None" (0) is
-// its own option because gate-less clans are a thing people search for
-// directly, and applyClientFilters treats an absent gate as passing every
-// cap, so 0 selects exactly those.
-const TROPHY_OPTIONS: ReadonlyArray<DropdownOption<number | undefined>> = [
+// The league requirement reads as a cap on the ranked ladder ("clans I can
+// actually join" asks for clans whose required league is at most mine), the
+// same semantics the old trophy cap carried. "None" (0) is its own option
+// because gate-less clans are a thing people search for directly, and
+// applyClientFilters treats an absent gate as passing every cap, so 0
+// selects exactly those. The ladder itself is the bundled table in
+// src/api/league-tiers.ts.
+const LEAGUE_OPTIONS: ReadonlyArray<DropdownOption<number | undefined>> = [
   { label: 'Any', value: undefined },
   { label: 'None', value: 0 },
-  { label: 'Up to 1,000', value: 1_000 },
-  { label: 'Up to 2,000', value: 2_000 },
-  { label: 'Up to 3,000', value: 3_000 },
-  { label: 'Up to 4,000', value: 4_000 },
-  { label: 'Up to 5,000', value: 5_000 },
+  ...RANKED_LEAGUE_TIERS.filter((tier) => tier.tier > 0).map((tier) => ({
+    label: tier.name,
+    value: tier.tier,
+  })),
 ];
 
-const TOWNHALL_OPTIONS: ReadonlyArray<DropdownOption<number | undefined>> = [
-  { label: 'Any', value: undefined },
-  { label: 'None', value: 0 },
-  { label: 'Up to 10', value: 10 },
-  { label: 'Up to 12', value: 12 },
-  { label: 'Up to 14', value: 14 },
-  { label: 'Up to 16', value: 16 },
-  { label: 'Up to 18', value: 18 },
-];
+// The two number boxes' honest bounds: the tier accepts a clan level of
+// 1 through 30, and the Town Hall requirement cannot exceed the highest
+// hall the reference data covers (lib/town-hall-caps.ts, the same module
+// the progression grid reads).
+const CLAN_LEVEL_MIN = 1;
+const CLAN_LEVEL_MAX = 30;
 
 const CLAN_TYPE_LABELS: Record<ClanType, string> = {
   open: 'Open',
@@ -237,19 +233,14 @@ function filtersEqual(a: SearchFilters, b: SearchFilters): boolean {
     a.minMembers === b.minMembers &&
     a.maxMembers === b.maxMembers &&
     a.minClanLevel === b.minClanLevel &&
-    a.minClanPoints === b.minClanPoints &&
     a.warFrequency === b.warFrequency &&
     a.locationId === b.locationId &&
     a.labelId === b.labelId &&
     a.clanType === b.clanType &&
     a.chatLanguage === b.chatLanguage &&
-    a.maxRequiredTrophies === b.maxRequiredTrophies &&
+    a.maxRequiredLeagueTier === b.maxRequiredLeagueTier &&
     a.maxRequiredTownhall === b.maxRequiredTownhall
   );
-}
-
-function formatCount(value: number): string {
-  return value.toLocaleString('en-US');
 }
 
 function nameForId(options: ReadonlyArray<{ id: number; name: string }>, id: number): string | undefined {
@@ -264,10 +255,16 @@ function nameForLanguage(code: string): string | undefined {
 // cache layers decay together, the same pairing the hello screen uses.
 const SEARCH_STALE_TIME_MS = 60_000;
 
-// The filter dropdowns wrap on their own: two per row on a phone, one
-// row of four from tablet up. flexBasis drives the break, so no breakpoint
-// JS and no media queries; cells grow to share the row.
-const FILTER_CELL_BASIS = 140;
+// The filter cells wrap on their own, and the cell basis follows the
+// shared breakpoint helper the design language mandates (07 section 3,
+// JS-driven layout): two per row on a small phone (the 360 px
+// compatibility floor leaves ~247 px of row, so the basis has to sit under
+// half of that), and roomier cells from the mobile tier up so labels like
+// TOWN HALL REQUIRED never wrap. Cells grow to share whatever row they
+// land in. Micro labels that cannot fit a half-width cell wrap to a second
+// line rather than truncating: a wrapped label reads, a cut one guesses.
+const FILTER_CELL_BASIS_SMALL = 116;
+const FILTER_CELL_BASIS_WIDE = 150;
 
 // Six skeleton cards fill the fold without implying anything about how many
 // results are coming.
@@ -286,9 +283,15 @@ const SENTINEL_LOOKAHEAD = '400px 0px';
 export default function SearchScreen() {
   const { theme } = useTheme();
   const base = useMemo(() => createBaseStyles(theme), [theme]);
-  const styles = useMemo(() => createStyles(theme), [theme]);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  // The filter cell basis follows the shared breakpoint tiers: half-width
+  // cells on a small phone, roomier cells from mobile up (the JS-driven
+  // layout rule, same helper the roster's presentation switch uses).
+  const { width } = useWindowDimensions();
+  const filterCellBasis =
+    breakpointFor(width) === 'small' ? FILTER_CELL_BASIS_SMALL : FILTER_CELL_BASIS_WIDE;
+  const styles = useMemo(() => createStyles(theme, filterCellBasis), [theme, filterCellBasis]);
 
   const [nameDraft, setNameDraft] = useState('');
   const [filterDraft, setFilterDraft] = useState<SearchFilterDraft>({});
@@ -300,9 +303,10 @@ export default function SearchScreen() {
   // null until the first submit: the screen starts in the idle state, not in
   // loading. The query is disabled while this is null.
   const [submitted, setSubmitted] = useState<SearchFilters | null>(null);
-  // The second filter tier stays collapsed until asked for; the chip row
-  // over the results keeps its applied state visible either way.
-  const [showMoreFilters, setShowMoreFilters] = useState(false);
+  // The filter grid stays collapsed until asked for; the applied count on
+  // the toggle and the chip row over the results keep the applied state
+  // visible either way.
+  const [showFilters, setShowFilters] = useState(false);
 
   // The nav lookup's name handoff: /clans?name=<text> seeds the input and
   // runs the search once on arrival, then the param is stripped so a
@@ -387,7 +391,7 @@ export default function SearchScreen() {
     removeChip({
       clanType: undefined,
       chatLanguage: undefined,
-      maxRequiredTrophies: undefined,
+      maxRequiredLeagueTier: undefined,
       maxRequiredTownhall: undefined,
     });
   };
@@ -454,13 +458,12 @@ export default function SearchScreen() {
     (submitted.minMembers !== undefined ||
       submitted.maxMembers !== undefined ||
       submitted.minClanLevel !== undefined ||
-      submitted.minClanPoints !== undefined ||
       submitted.warFrequency !== undefined ||
       submitted.locationId !== undefined ||
       submitted.labelId !== undefined ||
       submitted.clanType !== undefined ||
       submitted.chatLanguage !== undefined ||
-      submitted.maxRequiredTrophies !== undefined ||
+      submitted.maxRequiredLeagueTier !== undefined ||
       submitted.maxRequiredTownhall !== undefined);
 
   // ---------- the applied-filter chips ----------
@@ -483,13 +486,6 @@ export default function SearchScreen() {
         key: 'level',
         label: `Level ${submitted.minClanLevel}+`,
         remove: () => removeChip({ minClanLevel: undefined }),
-      });
-    }
-    if (submitted.minClanPoints !== undefined) {
-      appliedChips.push({
-        key: 'points',
-        label: `${formatCount(submitted.minClanPoints)}+ points`,
-        remove: () => removeChip({ minClanPoints: undefined }),
       });
     }
     if (submitted.warFrequency !== undefined) {
@@ -527,14 +523,17 @@ export default function SearchScreen() {
         remove: () => removeChip({ chatLanguage: undefined }),
       });
     }
-    if (submitted.maxRequiredTrophies !== undefined) {
+    if (submitted.maxRequiredLeagueTier !== undefined) {
       appliedChips.push({
-        key: 'trophies',
+        key: 'league',
         label:
-          submitted.maxRequiredTrophies === 0
-            ? 'No trophy requirement'
-            : `Up to ${formatCount(submitted.maxRequiredTrophies)} trophies`,
-        remove: () => removeChip({ maxRequiredTrophies: undefined }),
+          submitted.maxRequiredLeagueTier === 0
+            ? 'No league requirement'
+            : `Up to ${
+                leagueTierName(submitted.maxRequiredLeagueTier) ??
+                `league tier ${submitted.maxRequiredLeagueTier}`
+              }`,
+        remove: () => removeChip({ maxRequiredLeagueTier: undefined }),
       });
     }
     if (submitted.maxRequiredTownhall !== undefined) {
@@ -653,59 +652,60 @@ export default function SearchScreen() {
               </Text>
             </View>
 
-            <View style={styles.filterGrid}>
-              <View style={styles.filterCell}>
-                <Dropdown
-                  label="Clan size"
-                  options={CLAN_SIZE_OPTIONS}
-                  value={boundsToSize(filterDraft)}
-                  onSelect={(key) => setFilters(sizeToBounds(key))}
-                />
-              </View>
-              <View style={styles.filterCell}>
-                <Dropdown
-                  label="Minimum clan level"
-                  options={LEVEL_OPTIONS}
-                  value={filterDraft.minClanLevel}
-                  onSelect={(minClanLevel) => setFilters({ minClanLevel })}
-                />
-              </View>
-              <View style={styles.filterCell}>
-                <Dropdown
-                  label="War frequency"
-                  options={FREQUENCY_OPTIONS}
-                  value={filterDraft.warFrequency}
-                  onSelect={(warFrequency) => setFilters({ warFrequency })}
-                />
-              </View>
-              <View style={styles.filterCell}>
-                <Dropdown
-                  label="Location"
-                  options={LOCATION_OPTIONS}
-                  value={filterDraft.locationId}
-                  onSelect={(locationId) => setFilters({ locationId })}
-                />
-              </View>
+            {/* The filter disclosure: one toggle row replaces the old
+                two-tier layout (primary grid always visible + a More
+                filters expander), so the panel above the fold is the name
+                box and nothing else. The applied count keeps the collapsed
+                row honest, and the chip row over the results carries the
+                removable detail. */}
+            <View style={styles.filterToolbar}>
+              <PillButton
+                label={showFilters ? 'Hide filters' : 'Filters'}
+                variant="secondary"
+                onPress={() => setShowFilters((open) => !open)}
+                hint="Reveals the filters that narrow a name search: clan size, clan level, war frequency, location, clan label, clan type, chat language, and the two join requirements."
+              />
+              {appliedChips.length > 0 ? (
+                <Text style={base.caption}>
+                  {appliedChips.length === 1 ? '1 applied' : `${appliedChips.length} applied`}
+                </Text>
+              ) : null}
             </View>
-
-            {/* The second tier: revealed on demand so the panel above the
-                fold stays four controls on a phone, while the chip row over
-                the results keeps the applied state visible when it is
-                collapsed. */}
-            <PillButton
-              label={showMoreFilters ? 'Fewer filters' : 'More filters'}
-              variant="secondary"
-              onPress={() => setShowMoreFilters((open) => !open)}
-              hint="Reveals the extra filters: minimum clan points, clan label, clan type, chat language, and the join requirements."
-            />
-            {showMoreFilters ? (
+            {showFilters ? (
               <View style={styles.filterGrid}>
                 <View style={styles.filterCell}>
                   <Dropdown
-                    label="Minimum clan points"
-                    options={POINTS_OPTIONS}
-                    value={filterDraft.minClanPoints}
-                    onSelect={(minClanPoints) => setFilters({ minClanPoints })}
+                    label="Clan size"
+                    options={CLAN_SIZE_OPTIONS}
+                    value={boundsToSize(filterDraft)}
+                    onSelect={(key) => setFilters(sizeToBounds(key))}
+                  />
+                </View>
+                <View style={styles.filterCell}>
+                  <FilterNumberCell
+                    label="Min clan level"
+                    value={filterDraft.minClanLevel}
+                    onValue={(minClanLevel) => setFilters({ minClanLevel })}
+                    min={CLAN_LEVEL_MIN}
+                    max={CLAN_LEVEL_MAX}
+                    placeholder={`Any (${CLAN_LEVEL_MIN}-${CLAN_LEVEL_MAX})`}
+                    hint="Keeps clans at or above this level. Leave empty for any."
+                  />
+                </View>
+                <View style={styles.filterCell}>
+                  <Dropdown
+                    label="War frequency"
+                    options={FREQUENCY_OPTIONS}
+                    value={filterDraft.warFrequency}
+                    onSelect={(warFrequency) => setFilters({ warFrequency })}
+                  />
+                </View>
+                <View style={styles.filterCell}>
+                  <Dropdown
+                    label="Location"
+                    options={LOCATION_OPTIONS}
+                    value={filterDraft.locationId}
+                    onSelect={(locationId) => setFilters({ locationId })}
                   />
                 </View>
                 <View style={styles.filterCell}>
@@ -734,18 +734,21 @@ export default function SearchScreen() {
                 </View>
                 <View style={styles.filterCell}>
                   <Dropdown
-                    label="Trophies required"
-                    options={TROPHY_OPTIONS}
-                    value={filterDraft.maxRequiredTrophies}
-                    onSelect={(maxRequiredTrophies) => setFilters({ maxRequiredTrophies })}
+                    label="League required"
+                    options={LEAGUE_OPTIONS}
+                    value={filterDraft.maxRequiredLeagueTier}
+                    onSelect={(maxRequiredLeagueTier) => setFilters({ maxRequiredLeagueTier })}
                   />
                 </View>
                 <View style={styles.filterCell}>
-                  <Dropdown
+                  <FilterNumberCell
                     label="Town Hall required"
-                    options={TOWNHALL_OPTIONS}
                     value={filterDraft.maxRequiredTownhall}
-                    onSelect={(maxRequiredTownhall) => setFilters({ maxRequiredTownhall })}
+                    onValue={(maxRequiredTownhall) => setFilters({ maxRequiredTownhall })}
+                    min={0}
+                    max={HOME_CAP_MAX_TOWN_HALL}
+                    placeholder={`Any (0-${HOME_CAP_MAX_TOWN_HALL})`}
+                    hint={`Keeps clans whose Town Hall requirement is at most this level, 0 through ${HOME_CAP_MAX_TOWN_HALL}. Zero selects clans that ask for nothing.`}
                   />
                 </View>
               </View>
@@ -893,6 +896,101 @@ export default function SearchScreen() {
       </View>
     </View>
   );
+}
+
+// ---------- the filter number cells ----------
+
+interface FilterNumberCellProps {
+  /** Micro label above the box, same rhythm the Dropdown's label carries. */
+  label: string;
+  /** The draft value; undefined renders empty ("any"). */
+  value: number | undefined;
+  onValue: (value: number | undefined) => void;
+  /** Inclusive bounds the box clamps to while typing, so the draft can
+   * never hold a value the tier would reject or the game cannot mean. */
+  min: number;
+  max: number;
+  placeholder: string;
+  /** Extra instruction for screen readers. */
+  hint: string;
+}
+
+// A numeric filter cell for the disclosure grid: the same micro-label-above,
+// input-chrome-below rhythm the Dropdown cells carry (the owner's rework of
+// the level and Town Hall filters from dropdowns to number boxes), so the
+// grid reads as one family of controls. Digits only, clamped to [min, max]
+// as they are typed, empty meaning "any" — apply-on-submit stays the
+// screen's rule, exactly like a dropdown pick.
+function FilterNumberCell({
+  label,
+  value,
+  onValue,
+  min,
+  max,
+  placeholder,
+  hint,
+}: FilterNumberCellProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createNumberCellStyles(theme), [theme]);
+  return (
+    <View style={styles.wrap}>
+      <Text style={styles.label}>{label}</Text>
+      <TextInput
+        value={value === undefined ? '' : String(value)}
+        onChangeText={(text) => {
+          const digits = text.replace(/[^0-9]/g, '');
+          if (digits === '') {
+            onValue(undefined);
+            return;
+          }
+          const parsed = Number.parseInt(digits, 10);
+          onValue(Math.min(Math.max(parsed, min), max));
+        }}
+        keyboardType="number-pad"
+        maxLength={2}
+        placeholder={placeholder}
+        placeholderTextColor={theme.colors.textMuted}
+        accessibilityLabel={label}
+        accessibilityHint={hint}
+        inputMode="numeric"
+        style={styles.input}
+      />
+    </View>
+  );
+}
+
+function createNumberCellStyles(t: ReturnType<typeof useTheme>['theme']) {
+  const c = t.colors;
+  return StyleSheet.create({
+    wrap: {
+      gap: t.spacing[2],
+    },
+    // The same micro label the Dropdown and the name box render.
+    label: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.xs,
+      fontWeight: t.fontWeight.medium,
+      color: c.textMuted,
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+    },
+    // The same input chrome the name input and the Dropdown trigger carry,
+    // so the mixed grid reads as one control family.
+    input: {
+      minHeight: t.layout.touchTargetMin,
+      paddingHorizontal: t.spacing[4],
+      paddingVertical: t.spacing[2],
+      borderRadius: t.radius[2],
+      borderWidth: 1,
+      borderColor: c.panelBorderStrong,
+      backgroundColor: c.panelRaised,
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.md,
+      color: c.textPrimary,
+      outlineColor: c.focusRing,
+      outlineOffset: t.layout.focusRingOffset,
+    },
+  });
 }
 
 // ---------- applied-filter chips ----------
@@ -1117,7 +1215,7 @@ function createFooterStyles(t: ReturnType<typeof useTheme>['theme']) {
 
 // ---------- styles ----------
 
-function createStyles(t: ReturnType<typeof useTheme>['theme']) {
+function createStyles(t: ReturnType<typeof useTheme>['theme'], filterCellBasis: number) {
   const c = t.colors;
   return StyleSheet.create({
     column: {
@@ -1188,6 +1286,13 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontSize: t.fontSize.sm,
       color: c.warning,
     },
+    filterToolbar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      columnGap: t.spacing[3],
+      rowGap: t.spacing[2],
+    },
     filterGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
@@ -1197,7 +1302,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     filterCell: {
       flexGrow: 1,
       flexShrink: 1,
-      flexBasis: FILTER_CELL_BASIS,
+      flexBasis: filterCellBasis,
       minWidth: 0,
     },
     dirtyHint: {

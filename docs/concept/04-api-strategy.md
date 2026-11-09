@@ -58,8 +58,19 @@ of the semester touches nothing but this app.
   carries our own sentence; the two name-input surfaces teach the rule
   inline before any request is made. Not rate limiting — that is a 429,
   a first-class busy state on this tier.
+- **Join requirements speak the ranked ladder now.** The 2025 rank rework
+  replaced the old trophy threshold with `requiredLeagueTier`: a
+  `{id, name}` tier object riding both search items and clan details, its
+  id numbering the ladder from 105000000 (Unranked) through 105000036
+  (Legend League I), its name the themed tier ("Witch League 17"). The
+  search filter reads it as a ladder cap ("clans whose required league is
+  at most mine") and the clan detail card renders it as the requirement.
+  The legacy `requiredTrophies` number still arrives from the API but
+  reads as zeroed history, so nothing parses it — the same call the
+  roster's rank column made when it dropped the legacy `league` object
+  for `leagueTier`.
 - **Some listing fields have no upstream filter.** Clan type, chat
-  language, join requirements (trophies / Town Hall), and the
+  language, join requirements (league / Town Hall), and the
   family-friendly flag all ride search items but have no `GET /clans`
   query param, so those filters run client-side over the loaded pages
   and the UI keeps its counts honest ("N shown of M loaded").

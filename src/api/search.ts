@@ -8,6 +8,8 @@
 // returns a page (items + the cursor for the next page) rather than a single
 // object.
 
+import { leagueTierNumber } from './league-tiers';
+
 /** The five war frequency values the game API (and the tier) accept. */
 export type WarFrequency =
   | 'always'
@@ -23,25 +25,24 @@ export type ClanType = 'open' | 'inviteOnly' | 'closed';
  *
  * Two kinds live here, deliberately in one shape so the screen's draft and
  * the query key stay a single object:
- * - Server-side filters (min/max members, clan level, points, war frequency,
+ * - Server-side filters (min/max members, clan level, war frequency,
  *   location, label) ride the tier request: upstream filters the whole
  *   listing, so pagination and the counts stay exact.
- * - Client-side filters (type, chat language, join requirements) have no
- *   upstream param, so the tier never sees them; applyClientFilters narrows
- *   the loaded pages and the screen keeps pagination honest with a
- *   "N shown of M loaded" line. */
+ * - Client-side filters (type, chat language, league and Town Hall join
+ *   requirements) have no upstream param, so the tier never sees them;
+ *   applyClientFilters narrows the loaded pages and the screen keeps
+ *   pagination honest with a "N shown of M loaded" line. */
 export interface SearchFilters {
   name: string;
   minMembers?: number;
   maxMembers?: number;
   minClanLevel?: number;
-  minClanPoints?: number;
   warFrequency?: WarFrequency;
   locationId?: number;
   labelId?: number;
   clanType?: ClanType;
   chatLanguage?: string;
-  maxRequiredTrophies?: number;
+  maxRequiredLeagueTier?: number;
   maxRequiredTownhall?: number;
 }
 
@@ -68,14 +69,23 @@ export interface SearchClanItem {
   /** The parental-control flag; the card renders it as a tag, not a stat. */
   isFamilyFriendly?: boolean;
   /** Join gates for the requirement filters ("clans I can actually join").
-   * Absent when the clan sets none, which passes every threshold. */
-  requiredTrophies?: number;
+   * The 2025 rank rework replaced the old trophy threshold with a league
+   * requirement: `requiredLeagueTier` carries the ranked ladder tier a clan
+   * asks for ("Wizard League 10"), absent when the clan sets none. The
+   * Town Hall gate is unchanged. An absent gate passes every cap. */
+  requiredLeagueTier?: RequiredLeagueTier;
   requiredTownhallLevel?: number;
   /** The clan's chat language, when it reports one; the language filter
    * matches on the code ("EN"), the card could show the name. */
   chatLanguageCode?: string;
   chatLanguageName?: string;
   badgeUrls?: ClanBadgeUrls;
+}
+
+/** A ranked ladder tier as the game API reports it on join requirements. */
+export interface RequiredLeagueTier {
+  id: number;
+  name: string;
 }
 
 export interface ClanBadgeUrls {
@@ -132,7 +142,6 @@ export function buildSearchQuery(filters: SearchFilters, after?: string | null):
   if (filters.minMembers !== undefined) params.set('minMembers', String(filters.minMembers));
   if (filters.maxMembers !== undefined) params.set('maxMembers', String(filters.maxMembers));
   if (filters.minClanLevel !== undefined) params.set('minClanLevel', String(filters.minClanLevel));
-  if (filters.minClanPoints !== undefined) params.set('minClanPoints', String(filters.minClanPoints));
   if (filters.warFrequency !== undefined) params.set('warFrequency', filters.warFrequency);
   if (filters.locationId !== undefined) params.set('locationId', String(filters.locationId));
   if (filters.labelId !== undefined) params.set('labelId', String(filters.labelId));
@@ -162,6 +171,13 @@ function toSearchClanItem(parsed: unknown): SearchClanItem {
     ? parsed.location.name
     : undefined;
   const chatLanguage = isRecord(parsed.chatLanguage) ? parsed.chatLanguage : undefined;
+  const requiredLeagueTier = isRecord(parsed.requiredLeagueTier)
+    ? {
+        id: typeof parsed.requiredLeagueTier.id === 'number' ? parsed.requiredLeagueTier.id : 0,
+        name:
+          typeof parsed.requiredLeagueTier.name === 'string' ? parsed.requiredLeagueTier.name : '',
+      }
+    : undefined;
   return {
     tag: typeof parsed.tag === 'string' ? parsed.tag : '',
     name: typeof parsed.name === 'string' ? parsed.name : '',
@@ -171,7 +187,7 @@ function toSearchClanItem(parsed: unknown): SearchClanItem {
     warFrequency: typeof parsed.warFrequency === 'string' ? parsed.warFrequency : undefined,
     type: typeof parsed.type === 'string' ? parsed.type : undefined,
     isFamilyFriendly: typeof parsed.isFamilyFriendly === 'boolean' ? parsed.isFamilyFriendly : undefined,
-    requiredTrophies: typeof parsed.requiredTrophies === 'number' ? parsed.requiredTrophies : undefined,
+    requiredLeagueTier,
     requiredTownhallLevel:
       typeof parsed.requiredTownhallLevel === 'number' ? parsed.requiredTownhallLevel : undefined,
     chatLanguageCode:
@@ -209,7 +225,7 @@ export function hasClientFilters(filters: SearchFilters): boolean {
   return (
     filters.clanType !== undefined ||
     filters.chatLanguage !== undefined ||
-    filters.maxRequiredTrophies !== undefined ||
+    filters.maxRequiredLeagueTier !== undefined ||
     filters.maxRequiredTownhall !== undefined
   );
 }
@@ -220,7 +236,10 @@ export function hasClientFilters(filters: SearchFilters): boolean {
  * submitted filters. A clan that reports no join gate passes every
  * requirement threshold — "no requirement" is the easiest clan to join, so
  * it is always an honest match; a threshold of 0 (the "None" option) then
- * selects exactly those gate-less clans.
+ * selects exactly those gate-less clans. The league cap reads the ladder
+ * position off the tier id (never the name); an id outside the known ladder
+ * is a requirement we cannot rank, so it is not provably at-or-below any
+ * cap and drops out while a cap is in force.
  */
 export function applyClientFilters(
   items: ReadonlyArray<SearchClanItem>,
@@ -232,8 +251,10 @@ export function applyClientFilters(
     if (filters.chatLanguage !== undefined && item.chatLanguageCode !== filters.chatLanguage) {
       return false;
     }
-    if (filters.maxRequiredTrophies !== undefined && (item.requiredTrophies ?? 0) > filters.maxRequiredTrophies) {
-      return false;
+    if (filters.maxRequiredLeagueTier !== undefined) {
+      const tier =
+        item.requiredLeagueTier === undefined ? 0 : leagueTierNumber(item.requiredLeagueTier.id);
+      if (tier === null || tier > filters.maxRequiredLeagueTier) return false;
     }
     if (
       filters.maxRequiredTownhall !== undefined &&
