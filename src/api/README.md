@@ -11,8 +11,10 @@ for the planned layout.
 | `clan.ts` | `GET /api/clan/:tag` | `screens/ClanScreen.tsx` |
 | `player.ts` | `GET /api/player/:tag` | `screens/PlayerScreen.tsx` |
 | `war.ts` | `GET /api/clan/:tag/war` | `screens/ClanScreen.tsx` |
-| `search.ts` | `GET /api/search?name=…` (+ filters, cursor) | `screens/SearchScreen.tsx` |
+| `search.ts` | `GET /api/search?name=…` (+ server-side filters, cursor) | `screens/SearchScreen.tsx`, `components/LookupSearch.tsx` (the three-character floor constants) |
 | `locations.ts` | nothing (bundled filter constants, ids verified live) | `screens/SearchScreen.tsx` |
+| `labels.ts` | nothing (bundled clan-label filter constants, ids verified from live captures) | `screens/SearchScreen.tsx` |
+| `chat-languages.ts` | nothing (bundled chat-language filter constants, codes matched client-side) | `screens/SearchScreen.tsx` |
 
 Each client:
 

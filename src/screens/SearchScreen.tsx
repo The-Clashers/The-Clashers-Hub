@@ -1,9 +1,9 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigate, useSearchParams } from 'react-router';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useTheme, createBaseStyles } from '../theme';
-import Dropdown from '../components/Dropdown';
+import Dropdown, { type DropdownOption } from '../components/Dropdown';
 import ClanCard from '../components/ClanCard';
 import SkeletonCard from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
@@ -13,73 +13,156 @@ import { clanRouteFor, normalizeTagInput, TAG_REJECT_COPY } from '../lib/tag';
 import { WAR_FREQUENCY_LABELS } from '../lib/war-frequency';
 import { busyRetryDelayMs, shouldRetryBusy } from '../lib/busy-retry';
 import {
+  applyClientFilters,
   fetchSearchPage,
+  hasClientFilters,
+  SEARCH_NAME_MIN_CHARS,
+  SEARCH_NAME_MIN_COPY,
   SearchFetchError,
+  type ClanType,
   type SearchFilters,
   type SearchPage,
   type WarFrequency,
 } from '../api/search';
 import { LOCATION_FILTERS } from '../api/locations';
+import { CLAN_LABEL_FILTERS } from '../api/labels';
+import { CHAT_LANGUAGE_FILTERS } from '../api/chat-languages';
 
 // The clans search screen (T-M1-1, FR-01, SR-08), the /clans page since
 // the nav revision split the old entry route into real pages. A visitor
 // types a clan name OR pastes a clan tag (the # prefix is what tells the
 // two apart, since names and bare tags share the same alphabet),
-// optionally narrows a name search with the filter row (minimum members,
-// minimum clan level, war frequency, location), submits, and gets a card
-// list that pages through the upstream cursor as it scrolls. A tag skips
-// the listing entirely and opens the clan detail screen directly, the
-// same destination the result cards link to. The nav lookup box hands
+// optionally narrows a name search with the filter row, submits, and gets
+// a card list that pages through the upstream cursor as it scrolls. A tag
+// skips the listing entirely and opens the clan detail screen directly,
+// the same destination the result cards link to. The nav lookup box hands
 // name searches to this page through ?name=, which the screen consumes
 // once and then strips so a reload starts idle.
 //
 // The player tag lookup moved to /players (and the nav box); the brand
 // and the theme toggle moved to the NavBar; the M0 review-surface links
-// (Hello clan, Review the tokens) retired from this screen's footer on
-// the owner's call, the tokens review now living on the contributors
-// page where design QA actually happens, and the /hello smoke screen is
-// retired outright since /clan/:tag renders everything it showed.
+// retired from this screen's footer on the owner's call, the tokens
+// review now living on the contributors page where design QA actually
+// happens, and the /hello smoke screen is retired outright since
+// /clan/:tag renders everything it showed.
 //
 // The search panel carries the same shape the player tag box carries
 // (the owner's consistency note): a micro label above the input, the
 // input and its action button, then one helper line under the row that
 // teaches the # rule, so the two lookup panels read as one family.
 //
-// The screen owns layout, composition, and the route's state; the pieces it
-// renders come from the shared kit (07 section 4): ClanCard, SkeletonCard,
-// EmptyState, ErrorState, PillButton, Dropdown. Every state the
-// design language requires is designed: loading skeleton, error branches
-// with a next action, empty results with a relax-filters suggestion, and
-// the success list.
+// The filter row grew into two tiers (the game API exposes more filters
+// than fit comfortably above the fold on a phone): the primary grid
+// carries the four a first search wants (clan size, minimum clan level,
+// war frequency, location), and a "More filters" toggle reveals the
+// second grid (minimum clan points, clan label, clan type, chat
+// language, and the two join requirements). The applied state stays
+// glanceable with the row collapsed: a removable chip sits over the
+// results for every applied filter, hidden tier included, and pressing
+// a chip's x re-runs the search without it.
 //
-// Two behaviors are deliberate and load-bearing:
+// The filters split by where they run, and the screen keeps the two
+// honest:
+// - Server-side filters (size, level, points, war frequency, location,
+//   label) ride the tier request; upstream narrows the whole listing, so
+//   counts and pagination stay exact.
+// - Client-side filters (clan type, chat language, trophies and Town
+//   Hall requirements) have no upstream param, so they narrow the loaded
+//   pages only: the meta line reads "N shown of M loaded" while they are
+//   in force, and an emptied view keeps paginating (the sentinel and a
+//   Load more action) instead of reading as "no results".
+//
+// The screen owns layout, composition, and the route's state; the pieces
+// it renders come from the shared kit (07 section 4): ClanCard,
+// SkeletonCard, EmptyState, ErrorState, PillButton, Dropdown. Every state
+// the design language requires is designed: loading skeleton, error
+// branches with a next action, empty results with a relax-filters
+// suggestion, and the success list.
+//
+// Three behaviors are deliberate and load-bearing:
 //
 // - Filters apply on submit, not while they are picked. Every distinct
-//   filter combination is a distinct cache key on the tier, so live
-//   re-searching on every change would burn upstream calls the TTL cache
-//   cannot absorb. A "changed since the last search" hint keeps that honest.
+//   server-side filter combination is a distinct cache key on the tier,
+//   so live re-searching on every change would burn upstream calls the
+//   TTL cache cannot absorb. A "changed since the last search" hint
+//   keeps that honest. Removing an applied chip is the one exception,
+//   and it is not really an exception: the chip is the applied state,
+//   so pressing its x is a submit.
 // - The results render in page flow (the owner's call, the same scroll
-//   model the roster tab uses): the browser scrollbar owns the scrolling,
-//   the page grows as pages append, and a sentinel under the last card
-//   loads the next page when it nears the viewport. The page still lands
-//   30 clans at a time (the tier's page limit), so a first screenful
-//   costs one upstream call and the rest load a few more at the bottom.
+//   model the roster tab uses): the browser scrollbar owns the
+//   scrolling, the page grows as pages append, and a sentinel under the
+//   last card loads the next page when it nears the viewport. The page
+//   still lands 30 clans at a time (the tier's page limit), so a first
+//   screenful costs one upstream call and the rest load a few more at
+//   the bottom.
+// - The game API rejects clan names shorter than three characters (a
+//   400 badName upstream; the tier mirrors the floor so the same
+//   rejection costs ~1 ms there). The submit path teaches the rule
+//   inline before any request is made — the same hint rhythm the #
+//   tag rule uses — and the clear-on-fix logic keeps the hint up until
+//   the name actually reaches three characters.
 
 // ---------- filter option tables ----------
 
-const MEMBER_OPTIONS: ReadonlyArray<{ label: string; value: number | undefined }> = [
+/** What the "Clan size" control picks: one bracket, not one number, so
+ * minimum and maximum members stay one control in the UI while the tier
+ * still receives the two upstream params separately. */
+type ClanSizeKey = 'lte10' | 'mid10to30' | 'mid30to49' | 'full';
+
+const CLAN_SIZE_OPTIONS: ReadonlyArray<DropdownOption<ClanSizeKey | undefined>> = [
   { label: 'Any', value: undefined },
-  ...[10, 20, 30, 40, 50].map((value) => ({ label: String(value), value })),
+  { label: 'Up to 10', value: 'lte10' },
+  { label: '10–30', value: 'mid10to30' },
+  { label: '30–49', value: 'mid30to49' },
+  { label: 'Full (50)', value: 'full' },
 ];
 
-const LEVEL_OPTIONS: ReadonlyArray<{ label: string; value: number | undefined }> = [
+/** The bracket a size selection maps to. Every branch spells both bounds
+ * (undefined included) so spreading the result over the draft clears the
+ * pair, never leaves a stale half behind. */
+function sizeToBounds(
+  key: ClanSizeKey | undefined,
+): Pick<SearchFilters, 'minMembers' | 'maxMembers'> {
+  switch (key) {
+    case 'lte10':
+      return { minMembers: undefined, maxMembers: 10 };
+    case 'mid10to30':
+      return { minMembers: 10, maxMembers: 30 };
+    case 'mid30to49':
+      return { minMembers: 30, maxMembers: 49 };
+    case 'full':
+      return { minMembers: 50, maxMembers: undefined };
+    default:
+      return { minMembers: undefined, maxMembers: undefined };
+  }
+}
+
+/** The bracket a min/max pair renders as (compound ranges first, so a
+ * half-set pair never reads as a narrower bracket than it is). */
+function boundsToSize(filters: { minMembers?: number; maxMembers?: number }): ClanSizeKey | undefined {
+  if (filters.minMembers === 10 && filters.maxMembers === 30) return 'mid10to30';
+  if (filters.minMembers === 30 && filters.maxMembers === 49) return 'mid30to49';
+  if (filters.minMembers === 50) return 'full';
+  if (filters.minMembers === undefined && filters.maxMembers === 10) return 'lte10';
+  return undefined;
+}
+
+const LEVEL_OPTIONS: ReadonlyArray<DropdownOption<number | undefined>> = [
   { label: 'Any', value: undefined },
   ...[5, 10, 15, 20].map((value) => ({ label: String(value), value })),
 ];
 
+const POINTS_OPTIONS: ReadonlyArray<DropdownOption<number | undefined>> = [
+  { label: 'Any', value: undefined },
+  { label: '10,000+', value: 10_000 },
+  { label: '20,000+', value: 20_000 },
+  { label: '30,000+', value: 30_000 },
+  { label: '40,000+', value: 40_000 },
+];
+
 // The dropdown offers the same labels the result card's War stat renders,
 // from the one shared table in lib/war-frequency.ts.
-const FREQUENCY_OPTIONS: ReadonlyArray<{ label: string; value: WarFrequency | undefined }> = [
+const FREQUENCY_OPTIONS: ReadonlyArray<DropdownOption<WarFrequency | undefined>> = [
   { label: 'Any', value: undefined },
   ...(Object.keys(WAR_FREQUENCY_LABELS) as WarFrequency[]).map((value) => ({
     label: WAR_FREQUENCY_LABELS[value],
@@ -87,26 +170,101 @@ const FREQUENCY_OPTIONS: ReadonlyArray<{ label: string; value: WarFrequency | un
   })),
 ];
 
-const LOCATION_OPTIONS: ReadonlyArray<{ label: string; value: number | undefined }> = [
+const LOCATION_OPTIONS: ReadonlyArray<DropdownOption<number | undefined>> = [
   { label: 'Any', value: undefined },
   ...LOCATION_FILTERS.map((location) => ({ label: location.name, value: location.id })),
 ];
+
+const LABEL_OPTIONS: ReadonlyArray<DropdownOption<number | undefined>> = [
+  { label: 'Any', value: undefined },
+  ...CLAN_LABEL_FILTERS.map((label) => ({ label: label.name, value: label.id })),
+];
+
+// The membership states the game API reports; a closed clan is still worth
+// finding (you can request to join), so all three are offered.
+const TYPE_OPTIONS: ReadonlyArray<DropdownOption<ClanType | undefined>> = [
+  { label: 'Any', value: undefined },
+  { label: 'Open', value: 'open' },
+  { label: 'Invite only', value: 'inviteOnly' },
+  { label: 'Closed', value: 'closed' },
+];
+
+const LANGUAGE_OPTIONS: ReadonlyArray<DropdownOption<string | undefined>> = [
+  { label: 'Any', value: undefined },
+  ...CHAT_LANGUAGE_FILTERS.map((language) => ({ label: language.name, value: language.code })),
+];
+
+// The join gates read as caps: "clans I can actually join" asks for clans
+// whose requirement is at most my trophies / my Town Hall. "None" (0) is
+// its own option because gate-less clans are a thing people search for
+// directly, and applyClientFilters treats an absent gate as passing every
+// cap, so 0 selects exactly those.
+const TROPHY_OPTIONS: ReadonlyArray<DropdownOption<number | undefined>> = [
+  { label: 'Any', value: undefined },
+  { label: 'None', value: 0 },
+  { label: 'Up to 1,000', value: 1_000 },
+  { label: 'Up to 2,000', value: 2_000 },
+  { label: 'Up to 3,000', value: 3_000 },
+  { label: 'Up to 4,000', value: 4_000 },
+  { label: 'Up to 5,000', value: 5_000 },
+];
+
+const TOWNHALL_OPTIONS: ReadonlyArray<DropdownOption<number | undefined>> = [
+  { label: 'Any', value: undefined },
+  { label: 'None', value: 0 },
+  { label: 'Up to 10', value: 10 },
+  { label: 'Up to 12', value: 12 },
+  { label: 'Up to 14', value: 14 },
+  { label: 'Up to 16', value: 16 },
+  { label: 'Up to 18', value: 18 },
+];
+
+const CLAN_TYPE_LABELS: Record<ClanType, string> = {
+  open: 'Open',
+  inviteOnly: 'Invite only',
+  closed: 'Closed',
+};
+
+/** The draft every filter control edits: the submitted filters minus the
+ * name (the name input owns its own draft). One object, because eleven
+ * independent useStates would drown the screen in setters and the clear
+ * and dirty logic in field lists. */
+type SearchFilterDraft = Omit<SearchFilters, 'name'>;
 
 function filtersEqual(a: SearchFilters, b: SearchFilters): boolean {
   return (
     a.name === b.name &&
     a.minMembers === b.minMembers &&
+    a.maxMembers === b.maxMembers &&
     a.minClanLevel === b.minClanLevel &&
+    a.minClanPoints === b.minClanPoints &&
     a.warFrequency === b.warFrequency &&
-    a.locationId === b.locationId
+    a.locationId === b.locationId &&
+    a.labelId === b.labelId &&
+    a.clanType === b.clanType &&
+    a.chatLanguage === b.chatLanguage &&
+    a.maxRequiredTrophies === b.maxRequiredTrophies &&
+    a.maxRequiredTownhall === b.maxRequiredTownhall
   );
+}
+
+function formatCount(value: number): string {
+  return value.toLocaleString('en-US');
+}
+
+function nameForId(options: ReadonlyArray<{ id: number; name: string }>, id: number): string | undefined {
+  return options.find((option) => option.id === id)?.name;
+}
+
+function nameForLanguage(code: string): string | undefined {
+  return CHAT_LANGUAGE_FILTERS.find((language) => language.code === code)?.name;
 }
 
 // The client staleTime mirrors the tier's 60 s search TTL (SR-08) so the two
 // cache layers decay together, the same pairing the hello screen uses.
 const SEARCH_STALE_TIME_MS = 60_000;
 
-// The four filter dropdowns wrap on their own: two per row on a phone, one
+// The filter dropdowns wrap on their own: two per row on a phone, one
 // row of four from tablet up. flexBasis drives the break, so no breakpoint
 // JS and no media queries; cells grow to share the row.
 const FILTER_CELL_BASIS = 140;
@@ -133,17 +291,18 @@ export default function SearchScreen() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [nameDraft, setNameDraft] = useState('');
-  const [minMembers, setMinMembers] = useState<number | undefined>(undefined);
-  const [minClanLevel, setMinClanLevel] = useState<number | undefined>(undefined);
-  const [warFrequency, setWarFrequency] = useState<WarFrequency | undefined>(undefined);
-  const [locationId, setLocationId] = useState<number | undefined>(undefined);
+  const [filterDraft, setFilterDraft] = useState<SearchFilterDraft>({});
   // The one hint line under the search bar: the empty prompt on a blank
-  // submit, or the tag rule's sentence when a # input is not a valid tag.
-  // Null when there is nothing to complain about.
+  // submit, the tag rule's sentence when a # input is not a valid tag, or
+  // the three-character rule when a name is too short. Null when there is
+  // nothing to complain about.
   const [searchHint, setSearchHint] = useState<string | null>(null);
   // null until the first submit: the screen starts in the idle state, not in
   // loading. The query is disabled while this is null.
   const [submitted, setSubmitted] = useState<SearchFilters | null>(null);
+  // The second filter tier stays collapsed until asked for; the chip row
+  // over the results keeps its applied state visible either way.
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
 
   // The nav lookup's name handoff: /clans?name=<text> seeds the input and
   // runs the search once on arrival, then the param is stripped so a
@@ -161,16 +320,20 @@ export default function SearchScreen() {
     const name = nameParam.trim();
     setNameDraft(name);
     setSearchHint(null);
-    setSubmitted({ name, minMembers, minClanLevel, warFrequency, locationId });
+    setSubmitted({ name, ...filterDraft });
     setSearchParams({}, { replace: true });
     // The filter values are read once, at seed time, which runs on arrival
     // while the filters still hold their defaults; a later filter change
     // re-submits through the Search button like any other search.
   }, [searchParams]);
 
+  const setFilters = (patch: Partial<SearchFilterDraft>) => {
+    setFilterDraft((draft) => ({ ...draft, ...patch }));
+  };
+
   const draftFilters = useMemo<SearchFilters>(
-    () => ({ name: nameDraft.trim(), minMembers, minClanLevel, warFrequency, locationId }),
-    [nameDraft, minMembers, minClanLevel, warFrequency, locationId],
+    () => ({ name: nameDraft.trim(), ...filterDraft }),
+    [nameDraft, filterDraft],
   );
   const dirty = submitted !== null && !filtersEqual(submitted, draftFilters);
 
@@ -195,16 +358,38 @@ export default function SearchScreen() {
       }
       return;
     }
+    // The game API rejects shorter names outright (400 badName), so the
+    // rule is taught here, before any request is made.
+    if (raw.length < SEARCH_NAME_MIN_CHARS) {
+      setSearchHint(SEARCH_NAME_MIN_COPY);
+      return;
+    }
     setSearchHint(null);
-    setSubmitted({ name: raw, minMembers, minClanLevel, warFrequency, locationId });
+    setSubmitted({ name: raw, ...filterDraft });
   };
 
   const clearFilters = () => {
-    setMinMembers(undefined);
-    setMinClanLevel(undefined);
-    setWarFrequency(undefined);
-    setLocationId(undefined);
+    setFilterDraft({});
     setSubmitted((previous) => (previous === null ? previous : { name: previous.name }));
+  };
+
+  // Removing one applied chip re-submits immediately: the chip is the
+  // applied state (pressing its x is a submit), and the draft moves with
+  // it so the panel never disagrees with what the results show.
+  const removeChip = (patch: Partial<SearchFilterDraft>) => {
+    setFilterDraft((draft) => ({ ...draft, ...patch }));
+    setSubmitted((previous) => (previous === null ? previous : { ...previous, ...patch }));
+  };
+
+  // Clears only the four client-side filters (the ones that empty the view
+  // without touching the request); server-side filters and the name stay.
+  const clearClientFilters = () => {
+    removeChip({
+      clanType: undefined,
+      chatLanguage: undefined,
+      maxRequiredTrophies: undefined,
+      maxRequiredTownhall: undefined,
+    });
   };
 
   const query = useInfiniteQuery({
@@ -241,10 +426,19 @@ export default function SearchScreen() {
     },
   });
 
-  const items = useMemo(
+  // Everything loaded so far, and what the client-side filters leave of it.
+  // The distinction is the honesty contract: counts over loadedItems are
+  // exact for server-side filters, and the meta line switches to "N shown
+  // of M loaded" whenever the narrowing happens here.
+  const loadedItems = useMemo(
     () => (query.data ? query.data.pages.flatMap((page) => page.items) : []),
     [query.data],
   );
+  const shownItems = useMemo(
+    () => (submitted !== null ? applyClientFilters(loadedItems, submitted) : loadedItems),
+    [loadedItems, submitted],
+  );
+  const clientFiltering = submitted !== null && hasClientFilters(submitted);
   const firstPageAge = query.data?.pages[0]?.age ?? 0;
 
   // True while the first load is auto-retrying a busy answer: the skeleton
@@ -258,19 +452,115 @@ export default function SearchScreen() {
   const hasActiveFilters =
     submitted !== null &&
     (submitted.minMembers !== undefined ||
+      submitted.maxMembers !== undefined ||
       submitted.minClanLevel !== undefined ||
+      submitted.minClanPoints !== undefined ||
       submitted.warFrequency !== undefined ||
-      submitted.locationId !== undefined);
+      submitted.locationId !== undefined ||
+      submitted.labelId !== undefined ||
+      submitted.clanType !== undefined ||
+      submitted.chatLanguage !== undefined ||
+      submitted.maxRequiredTrophies !== undefined ||
+      submitted.maxRequiredTownhall !== undefined);
+
+  // ---------- the applied-filter chips ----------
+
+  // One chip per applied filter, in the results area (they describe the
+  // search that produced the list, and they stay visible with the second
+  // tier collapsed). Each carries the patch that clears it.
+  const appliedChips: Array<{ key: string; label: string; remove: () => void }> = [];
+  if (submitted !== null) {
+    const sizeKey = boundsToSize(submitted);
+    if (sizeKey !== undefined) {
+      appliedChips.push({
+        key: 'size',
+        label: CLAN_SIZE_OPTIONS.find((option) => option.value === sizeKey)?.label ?? 'Clan size',
+        remove: () => removeChip({ minMembers: undefined, maxMembers: undefined }),
+      });
+    }
+    if (submitted.minClanLevel !== undefined) {
+      appliedChips.push({
+        key: 'level',
+        label: `Level ${submitted.minClanLevel}+`,
+        remove: () => removeChip({ minClanLevel: undefined }),
+      });
+    }
+    if (submitted.minClanPoints !== undefined) {
+      appliedChips.push({
+        key: 'points',
+        label: `${formatCount(submitted.minClanPoints)}+ points`,
+        remove: () => removeChip({ minClanPoints: undefined }),
+      });
+    }
+    if (submitted.warFrequency !== undefined) {
+      appliedChips.push({
+        key: 'frequency',
+        label: WAR_FREQUENCY_LABELS[submitted.warFrequency],
+        remove: () => removeChip({ warFrequency: undefined }),
+      });
+    }
+    if (submitted.locationId !== undefined) {
+      appliedChips.push({
+        key: 'location',
+        label: nameForId(LOCATION_FILTERS, submitted.locationId) ?? 'Location',
+        remove: () => removeChip({ locationId: undefined }),
+      });
+    }
+    if (submitted.labelId !== undefined) {
+      appliedChips.push({
+        key: 'label',
+        label: nameForId(CLAN_LABEL_FILTERS, submitted.labelId) ?? 'Clan label',
+        remove: () => removeChip({ labelId: undefined }),
+      });
+    }
+    if (submitted.clanType !== undefined) {
+      appliedChips.push({
+        key: 'type',
+        label: CLAN_TYPE_LABELS[submitted.clanType],
+        remove: () => removeChip({ clanType: undefined }),
+      });
+    }
+    if (submitted.chatLanguage !== undefined) {
+      appliedChips.push({
+        key: 'language',
+        label: nameForLanguage(submitted.chatLanguage) ?? submitted.chatLanguage,
+        remove: () => removeChip({ chatLanguage: undefined }),
+      });
+    }
+    if (submitted.maxRequiredTrophies !== undefined) {
+      appliedChips.push({
+        key: 'trophies',
+        label:
+          submitted.maxRequiredTrophies === 0
+            ? 'No trophy requirement'
+            : `Up to ${formatCount(submitted.maxRequiredTrophies)} trophies`,
+        remove: () => removeChip({ maxRequiredTrophies: undefined }),
+      });
+    }
+    if (submitted.maxRequiredTownhall !== undefined) {
+      appliedChips.push({
+        key: 'townhall',
+        label:
+          submitted.maxRequiredTownhall === 0
+            ? 'No Town Hall requirement'
+            : `Town Hall ${submitted.maxRequiredTownhall} max`,
+        remove: () => removeChip({ maxRequiredTownhall: undefined }),
+      });
+    }
+  }
 
   // ---------- the load-more sentinel ----------
 
   // The sentinel's DOM id. DOM access goes through nativeID +
   // getElementById, the house pattern (refs on View fight the RN 0.88
   // types; see Dropdown's note). The sentinel renders only in the success
-  // branch, under the last card; the observer is recreated whenever the
+  // branches, under the last card; the observer is recreated whenever the
   // pagination state moves, and IntersectionObserver fires on creation, so
   // a bottom that stays in view keeps loading the next page until it
   // leaves it, the same continuous contract the list's onEndReached kept.
+  // The dependency is the LOADED count, not the shown count: while client
+  // filters empty the view the sentinel must keep observing so pages keep
+  // arriving for the filters to match against.
   const sentinelId = useId();
   const {
     hasNextPage,
@@ -294,7 +584,7 @@ export default function SearchScreen() {
     return () => observer.disconnect();
   }, [
     sentinelId,
-    items.length,
+    loadedItems.length,
     hasNextPage,
     isFetchingNextPage,
     isFetchNextPageError,
@@ -323,14 +613,14 @@ export default function SearchScreen() {
                   onChangeText={(text) => {
                     setNameDraft(text);
                     // Clear the hint as soon as the problem is fixed: a name
-                    // once the input is non-blank, a # input once it
-                    // normalizes to a valid tag. Mirrors the tag box's
-                    // clear-on-fix so both inputs behave the same.
+                    // once it reaches the three-character floor, a # input
+                    // once it normalizes to a valid tag. Mirrors the tag
+                    // box's clear-on-fix so both inputs behave the same.
                     if (searchHint === null) return;
                     const trimmed = text.trim();
                     const fixed = trimmed.startsWith('#')
                       ? normalizeTagInput(trimmed).ok
-                      : trimmed.length > 0;
+                      : trimmed.length >= SEARCH_NAME_MIN_CHARS;
                     if (fixed) setSearchHint(null);
                   }}
                   onSubmitEditing={submit}
@@ -366,37 +656,100 @@ export default function SearchScreen() {
             <View style={styles.filterGrid}>
               <View style={styles.filterCell}>
                 <Dropdown
-                  label="Minimum members"
-                  options={MEMBER_OPTIONS}
-                  value={minMembers}
-                  onSelect={setMinMembers}
+                  label="Clan size"
+                  options={CLAN_SIZE_OPTIONS}
+                  value={boundsToSize(filterDraft)}
+                  onSelect={(key) => setFilters(sizeToBounds(key))}
                 />
               </View>
               <View style={styles.filterCell}>
                 <Dropdown
                   label="Minimum clan level"
                   options={LEVEL_OPTIONS}
-                  value={minClanLevel}
-                  onSelect={setMinClanLevel}
+                  value={filterDraft.minClanLevel}
+                  onSelect={(minClanLevel) => setFilters({ minClanLevel })}
                 />
               </View>
               <View style={styles.filterCell}>
                 <Dropdown
                   label="War frequency"
                   options={FREQUENCY_OPTIONS}
-                  value={warFrequency}
-                  onSelect={setWarFrequency}
+                  value={filterDraft.warFrequency}
+                  onSelect={(warFrequency) => setFilters({ warFrequency })}
                 />
               </View>
               <View style={styles.filterCell}>
                 <Dropdown
                   label="Location"
                   options={LOCATION_OPTIONS}
-                  value={locationId}
-                  onSelect={setLocationId}
+                  value={filterDraft.locationId}
+                  onSelect={(locationId) => setFilters({ locationId })}
                 />
               </View>
             </View>
+
+            {/* The second tier: revealed on demand so the panel above the
+                fold stays four controls on a phone, while the chip row over
+                the results keeps the applied state visible when it is
+                collapsed. */}
+            <PillButton
+              label={showMoreFilters ? 'Fewer filters' : 'More filters'}
+              variant="secondary"
+              onPress={() => setShowMoreFilters((open) => !open)}
+              hint="Reveals the extra filters: minimum clan points, clan label, clan type, chat language, and the join requirements."
+            />
+            {showMoreFilters ? (
+              <View style={styles.filterGrid}>
+                <View style={styles.filterCell}>
+                  <Dropdown
+                    label="Minimum clan points"
+                    options={POINTS_OPTIONS}
+                    value={filterDraft.minClanPoints}
+                    onSelect={(minClanPoints) => setFilters({ minClanPoints })}
+                  />
+                </View>
+                <View style={styles.filterCell}>
+                  <Dropdown
+                    label="Clan label"
+                    options={LABEL_OPTIONS}
+                    value={filterDraft.labelId}
+                    onSelect={(labelId) => setFilters({ labelId })}
+                  />
+                </View>
+                <View style={styles.filterCell}>
+                  <Dropdown
+                    label="Clan type"
+                    options={TYPE_OPTIONS}
+                    value={filterDraft.clanType}
+                    onSelect={(clanType) => setFilters({ clanType })}
+                  />
+                </View>
+                <View style={styles.filterCell}>
+                  <Dropdown
+                    label="Chat language"
+                    options={LANGUAGE_OPTIONS}
+                    value={filterDraft.chatLanguage}
+                    onSelect={(chatLanguage) => setFilters({ chatLanguage })}
+                  />
+                </View>
+                <View style={styles.filterCell}>
+                  <Dropdown
+                    label="Trophies required"
+                    options={TROPHY_OPTIONS}
+                    value={filterDraft.maxRequiredTrophies}
+                    onSelect={(maxRequiredTrophies) => setFilters({ maxRequiredTrophies })}
+                  />
+                </View>
+                <View style={styles.filterCell}>
+                  <Dropdown
+                    label="Town Hall required"
+                    options={TOWNHALL_OPTIONS}
+                    value={filterDraft.maxRequiredTownhall}
+                    onSelect={(maxRequiredTownhall) => setFilters({ maxRequiredTownhall })}
+                  />
+                </View>
+              </View>
+            ) : null}
             {dirty ? (
               <Text style={styles.dirtyHint}>
                 Changed since the last search. Press Search to apply.
@@ -436,7 +789,7 @@ export default function SearchScreen() {
                 onRetry={() => void query.refetch()}
                 isRetrying={query.isFetching}
               />
-            ) : items.length === 0 ? (
+            ) : shownItems.length === 0 && !clientFiltering ? (
               <EmptyState
                 title="No clans matched"
                 body={`Nothing matched "${submitted.name}"${
@@ -446,11 +799,75 @@ export default function SearchScreen() {
                   hasActiveFilters ? <PillButton label="Clear the filters" onPress={clearFilters} /> : undefined
                 }
               />
+            ) : shownItems.length === 0 ? (
+              // The client-side filters emptied everything loaded so far.
+              // This is NOT the "no results" state: the listing keeps
+              // paginating (the sentinel stays mounted, Load more is
+              // offered) so the filters get more clans to match against,
+              // and clearing just these filters is one press away.
+              <View style={styles.filteredEmptyWrap}>
+                <EmptyState
+                  title="No clans match these filters yet"
+                  body={`None of the ${loadedItems.length} loaded ${
+                    loadedItems.length === 1 ? 'clan' : 'clans'
+                  } match the extra filters (clan type, chat language, or requirements). ${
+                    hasNextPage
+                      ? 'More clans load as you scroll, or fetch the next page now.'
+                      : 'The listing is exhausted, so nothing else can match.'
+                  }`}
+                  action={
+                    <View style={styles.emptyActions}>
+                      {hasNextPage ? (
+                        <PillButton
+                          label={isFetchingNextPage ? 'Loading more…' : 'Load more clans'}
+                          onPress={() => void fetchNextPage()}
+                          disabled={isFetchingNextPage}
+                          hint="Fetches the next page of the listing so these filters have more clans to match."
+                        />
+                      ) : null}
+                      <PillButton
+                        label="Clear these filters"
+                        variant="secondary"
+                        onPress={clearClientFilters}
+                        hint="Drops the clan type, language, and requirement filters, keeping the name and the server-side filters."
+                      />
+                    </View>
+                  }
+                />
+                {/* The sentinel stays alive here on purpose: an empty view
+                    is exactly when the observer must keep pulling pages
+                    (the pagination contract, not a dead end). */}
+                <View nativeID={sentinelId} aria-hidden />
+                <ResultsFooter
+                  hasNextPage={query.hasNextPage ?? false}
+                  isFetchingNextPage={query.isFetchingNextPage}
+                  isFetchNextPageError={query.isFetchNextPageError}
+                  failureReason={query.failureReason}
+                  onRetry={() => void query.fetchNextPage()}
+                />
+              </View>
             ) : (
               <>
+                {appliedChips.length > 0 ? (
+                  <View style={styles.chipsRow} accessibilityLabel="Applied filters">
+                    {appliedChips.map((chip) => (
+                      <AppliedFilterChip key={chip.key} label={chip.label} onRemove={chip.remove} />
+                    ))}
+                    <PillButton
+                      label="Clear all"
+                      variant="secondary"
+                      onPress={clearFilters}
+                      hint="Resets every filter and re-runs the search with the name alone."
+                    />
+                  </View>
+                ) : null}
                 <View style={styles.resultsMeta}>
                   <Text style={base.caption}>
-                    {items.length === 1 ? '1 clan' : `${items.length} clans`}
+                    {clientFiltering
+                      ? `${shownItems.length} shown of ${loadedItems.length} loaded`
+                      : shownItems.length === 1
+                        ? '1 clan'
+                        : `${shownItems.length} clans`}
                   </Text>
                   <Text style={base.caption}>fetched {firstPageAge}s ago</Text>
                 </View>
@@ -458,7 +875,7 @@ export default function SearchScreen() {
                     child of the column, the browser scrollbar owns the
                     scrolling, and the sentinel under the last card pulls
                     the next page when it nears the viewport. */}
-                {items.map((item) => (
+                {shownItems.map((item) => (
                   <ClanCard key={item.tag} clan={item} onPress={() => navigate(clanRouteFor(item.tag))} />
                 ))}
                 <View nativeID={sentinelId} aria-hidden />
@@ -476,6 +893,66 @@ export default function SearchScreen() {
       </View>
     </View>
   );
+}
+
+// ---------- applied-filter chips ----------
+
+interface AppliedFilterChipProps {
+  label: string;
+  onRemove: () => void;
+}
+
+function AppliedFilterChip({ label, onRemove }: AppliedFilterChipProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createChipStyles(theme), [theme]);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Remove filter: ${label}`}
+      accessibilityHint="Clears this one filter and re-runs the search immediately."
+      onPress={onRemove}
+      style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}
+    >
+      <Text style={styles.chipLabel}>{label}</Text>
+      <Text style={styles.chipMark} aria-hidden>
+        ×
+      </Text>
+    </Pressable>
+  );
+}
+
+function createChipStyles(t: ReturnType<typeof useTheme>['theme']) {
+  const c = t.colors;
+  return StyleSheet.create({
+    chip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      columnGap: t.spacing[2],
+      minHeight: t.layout.touchTargetMin,
+      paddingHorizontal: t.spacing[4],
+      borderRadius: t.radius[1],
+      borderWidth: 1,
+      borderColor: c.panelBorderStrong,
+      backgroundColor: c.panelRaised,
+      outlineColor: c.focusRing,
+      outlineOffset: t.layout.focusRingOffset,
+    },
+    chipPressed: {
+      backgroundColor: c.panel,
+    },
+    chipLabel: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.sm,
+      fontWeight: t.fontWeight.medium,
+      color: c.textPrimary,
+    },
+    chipMark: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.sm,
+      fontWeight: t.fontWeight.bold,
+      color: c.textMuted,
+    },
+  });
 }
 
 // ---------- error copy (this screen's slice of the contract) ----------
@@ -735,10 +1212,31 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     resultsArea: {
       marginTop: t.spacing[5],
     },
+    // The applied-filter chip row: one removable chip per applied filter
+    // (plus Clear all), wrapping on a phone the same way the filter cells
+    // do. It sits above the meta line because it describes the search
+    // that produced the list.
+    chipsRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      gap: t.spacing[2],
+      marginBottom: t.spacing[3],
+    },
     resultsMeta: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       marginBottom: t.spacing[2],
+    },
+    // The emptied-by-client-filters view: the EmptyState, the live
+    // sentinel, and the footer stack with the list's own card rhythm.
+    filteredEmptyWrap: {
+      gap: t.spacing[3],
+    },
+    emptyActions: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: t.spacing[3],
     },
     skeletonWrap: {
       gap: t.spacing[3],

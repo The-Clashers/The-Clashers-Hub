@@ -31,7 +31,13 @@ describe('classifyUpstream', () => {
     expect(classifyUpstream(500, '')).toEqual({ kind: 'unreachable' });
   });
 
-  it('falls back to a generic detail when the body has no reason', () => {
+  it('prefers the upstream message sentence over the reason code in a 400 detail', () => {
+    expect(
+      classifyUpstream(400, '{"reason":"badName","message":"clanName must have at least three characters"}'),
+    ).toEqual({ kind: 'badRequest', detail: 'clanName must have at least three characters' });
+  });
+
+  it('falls back to a generic detail when the body has no reason or message', () => {
     expect(classifyUpstream(400, 'not json')).toEqual({ kind: 'badRequest', detail: 'upstream rejected the request' });
   });
 });
@@ -76,13 +82,32 @@ describe('parseSearchQuery', () => {
     expect(parseSearchQuery(new URL('http://x/api/search?name=%20'))).toMatchObject({ ok: false });
   });
 
+  it('rejects a name shorter than the game API three-character floor', () => {
+    const short = parseSearchQuery(new URL('http://x/api/search?name=PH'));
+    expect(short).toEqual({ ok: false, detail: 'name must be at least three characters' });
+  });
+
   it('rejects out-of-range filters', () => {
     expect(parseSearchQuery(new URL('http://x/api/search?name=abc&minMembers=999'))).toMatchObject({ ok: false });
+    expect(parseSearchQuery(new URL('http://x/api/search?name=abc&maxMembers=0'))).toMatchObject({ ok: false });
+    expect(parseSearchQuery(new URL('http://x/api/search?name=abc&minClanPoints=999999'))).toMatchObject({ ok: false });
+    expect(parseSearchQuery(new URL('http://x/api/search?name=abc&labelId=0'))).toMatchObject({ ok: false });
     expect(parseSearchQuery(new URL('http://x/api/search?name=abc&limit=0'))).toMatchObject({ ok: false });
   });
 
   it('rejects an unknown war frequency', () => {
-    expect(parseSearchQuery(new URL('http://x/api/search?name=a&warFrequency=sometimes'))).toMatchObject({ ok: false });
+    expect(parseSearchQuery(new URL('http://x/api/search?name=abc&warFrequency=sometimes'))).toMatchObject({ ok: false });
+  });
+
+  it('passes the new upstream filters through with distinct cache keys', () => {
+    const result = parseSearchQuery(
+      new URL('http://x/api/search?name=Clan&maxMembers=10&minClanPoints=20000&labelId=56000013'),
+    );
+    if (!result.ok) throw new Error('expected the query to parse');
+    expect(result.query.upstreamPath).toBe('/clans?name=Clan&maxMembers=10&minClanPoints=20000&labelId=56000013');
+    expect(result.query.cacheKey).toContain('maxMembers=10');
+    expect(result.query.cacheKey).toContain('minClanPoints=20000');
+    expect(result.query.cacheKey).toContain('labelId=56000013');
   });
 
   it('builds a canonical cache key and the upstream path from valid filters', () => {

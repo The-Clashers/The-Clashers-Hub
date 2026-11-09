@@ -49,6 +49,13 @@ export default function ClanCard({ clan, onPress }: ClanCardProps) {
           <Text style={styles.name} numberOfLines={1}>
             {clan.name}
           </Text>
+          {clan.isFamilyFriendly ? (
+            // The parental-control flag renders as a tag on the title row,
+            // not a stat chip: it is a property of the clan, not a number it
+            // earned. Only true renders — most clans are false and the row
+            // should not carry a permanent "no".
+            <Text style={styles.familyTag}>Family friendly</Text>
+          ) : null}
           <Text style={styles.tag} numberOfLines={1}>
             {clan.tag}
           </Text>
@@ -113,6 +120,18 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontFamily: t.fontFamily.mono,
       fontSize: t.fontSize.xs,
       color: c.textMuted,
+    },
+    familyTag: {
+      borderWidth: 1,
+      borderColor: c.panelBorderStrong,
+      borderRadius: t.radius[1],
+      paddingHorizontal: t.spacing[2],
+      paddingVertical: 2,
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.xs,
+      fontWeight: t.fontWeight.medium,
+      color: c.textMuted,
+      flexShrink: 0,
     },
     statRow: {
       flexDirection: 'row',

@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigate } from 'react-router';
 import { useTheme } from '../theme';
 import LookupModePicker, { type LookupMode } from './LookupModePicker';
+import { SEARCH_NAME_MIN_CHARS, SEARCH_NAME_MIN_COPY } from '../api/search';
 import {
   clanRouteFor,
   normalizeTagInput,
@@ -64,7 +65,10 @@ export default function LookupSearch({ variant = 'bar', onNavigate }: LookupSear
     // Clan mode: a leading # is the one honest way to say "this is a tag,
     // not a name" (bare tags and names share the alphabet). The tag path
     // goes through the same rule and route builder as every other clan
-    // link in the app; a name hands the text to the clans screen.
+    // link in the app; a name hands the text to the clans screen, which
+    // would only bounce the same rule back, so the game API's
+    // three-character floor is taught here too (the shared constant and
+    // sentence live in the search client).
     if (raw.startsWith('#')) {
       const tag = normalizeTagInput(raw);
       if (tag.ok) {
@@ -77,13 +81,18 @@ export default function LookupSearch({ variant = 'bar', onNavigate }: LookupSear
       }
       return;
     }
+    if (raw.length < SEARCH_NAME_MIN_CHARS) {
+      setHint(SEARCH_NAME_MIN_COPY);
+      return;
+    }
     setHint(null);
     go(`/clans?name=${encodeURIComponent(raw)}`);
   };
 
   // Clear the hint the moment the problem is fixed, the same
-  // clear-on-fix rhythm the tag box and the clan search bar keep: non-blank
-  // text clears a name hint, a valid tag clears a tag hint.
+  // clear-on-fix rhythm the tag box and the clan search bar keep: a name
+  // clears its hint at the three-character floor, a valid tag clears a
+  // tag hint.
   const handleChange = (text: string) => {
     setDraft(text);
     if (hint === null) return;
@@ -91,6 +100,8 @@ export default function LookupSearch({ variant = 'bar', onNavigate }: LookupSear
     if (trimmed.length === 0) return;
     if (mode === 'player' || trimmed.startsWith('#')) {
       if (!normalizeTagInput(trimmed).ok) return;
+    } else if (trimmed.length < SEARCH_NAME_MIN_CHARS) {
+      return;
     }
     setHint(null);
   };

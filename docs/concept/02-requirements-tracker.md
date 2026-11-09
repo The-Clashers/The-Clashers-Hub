@@ -84,7 +84,7 @@ FR-18 are the team's original additions beyond the lab's example set.
 
 | ID | The system shall... | Feature | Priority | Status |
 |---|---|---|---|---|
-| FR-01 | allow a visitor to search clans by name or by clan tag, with filters for minimum members, minimum clan level, war frequency, and location (filters narrow name searches), with paginated results | F-01, F-02 | P0 | Draft |
+| FR-01 | allow a visitor to search clans by name or by clan tag, with server-side filters for clan size (min and max members), minimum clan level, minimum clan points, war frequency, location, and clan label, plus client-side filters for clan type, chat language, and join requirements (trophy and Town Hall caps) that narrow the loaded pages, with paginated results and the family-friendly tag on each card | F-01, F-02 | P0 | Draft |
 | FR-02 | look up any player directly by pasting a player tag, with or without the # prefix | F-03 | P0 | Draft |
 | FR-03 | display a clan detail screen with an identity header (badge, level, description, location, requirements) plus the full roster | F-04 | P0 | Draft |
 | FR-04 | provide a roster table with sortable columns (role, Town Hall, trophies, donations given and received, XP level), tapping a row opens that player | F-05 | P0 | Draft |
@@ -148,7 +148,7 @@ SR-08 to SR-19.
 
 | ID | System requirement | Status |
 |---|---|---|
-| SR-08 | A clan-name search submits to GET /api/search with the filters as query parameters; the tier calls the game API's clan search through the proxy, caches the response for 60 s, and returns JSON; results render as a virtualized card list (badge, level, member count, location, war frequency) with cursor pagination | Draft |
+| SR-08 | A clan-name search submits to GET /api/search with the server-side filters as query parameters (name of at least three characters — the game API's own floor, mirrored by the tier; min/max members, min clan level, min clan points, war frequency, location, label); the tier calls the game API's clan search through the proxy, caches the response for 60 s, and returns JSON; results render as a page-flow card list (badge, level, member count, location, war frequency, family-friendly tag) with cursor pagination; the client-side filters (type, chat language, join requirements) narrow the loaded pages in the browser, the meta line reads "N shown of M loaded" while they run, and an emptied view keeps paginating | Draft |
 | SR-09 | Selecting a clan opens GET /api/clan/:tag (180 s TTL); the clan response includes the complete member list, so the roster renders from a single request with no per-member fetches | Draft |
 | SR-10 | The clan detail screen renders the identity block (badge, name, tag, level, description, location, requirements) and stat chips (members, win streak, war wins, points) above the tabbed content | Draft |
 | SR-11 | The roster table sorts by role, Town Hall, trophies, donations given, donations received, and XP; each row links to that member's player detail; below 768 px the table renders as cards | Draft |
