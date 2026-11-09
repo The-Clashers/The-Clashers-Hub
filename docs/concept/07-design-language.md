@@ -258,11 +258,11 @@ overscroll.
 | `NavBar` | the thin fixed row every page renders: brand, `LookupSearch`, the page links, the theme toggle, plus the in-flow spacer that reserves its height |
 | `LookupSearch` + `LookupModePicker` | the one search box (nav-thin and hero-sized): the mode picker is the small icon dropdown that says player or clan; player mode is tag-only, clan mode takes a name or `#tag` |
 | `Breadcrumbs` | the location line detail screens render instead of a header: `Home › Clans › <name>`, WAI-ARIA breadcrumb pattern |
-| `SearchBar` + `FilterRow` | clans page query controls; the search bar takes a clan name or a `#tag`, the filters render as `Dropdown`s |
+| `SearchBar` + `FilterRow` | clans page query controls; the search bar takes a clan name or a `#tag` (names under three characters taught inline), the filters render as `Dropdown`s in two tiers — a primary grid (clan size, min level, war frequency, location) plus a "More filters" expander (min points, clan label, clan type, chat language, trophies and Town Hall required) |
 | `Dropdown` | select-style control built on RN primitives: button trigger, portaled `listbox`, keyboard-complete (arrows, Enter, Escape, Home/End) |
 | `TagInput` | the player tag box: /player/:tag routing, through the one tag module ([03 §2](./03-features-list.md)) |
 | `PillButton` | the one pill button: search, retry, and footer-link actions all render it; primary gold, secondary raised panel, link role with the trailing arrow for footer-style links |
-| `ClanCard` | search result row: badge, level, members, location |
+| `ClanCard` | search result row: badge, level, members, location, and the family-friendly tag on the title row (a property, not a stat, so no chip) |
 | `StatChip` | label + value pair used on headers and cards |
 | `RatioFlag` | donation-balance chip: shows the member's `ratio : 1` (one decimal), good/warn/dash states |
 | `LeagueRank` | the rank cell the roster and attention tables share: tier icon plus the rank number parsed from the tier name, dash when unranked |

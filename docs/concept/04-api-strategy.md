@@ -41,7 +41,7 @@ of the semester touches nothing but this app.
 
 | Endpoint | Gives us | Notes |
 |---|---|---|
-| `GET /clans` | clan search by name + filters (`minMembers`, `minClanLevel`, `warFrequency`, `locationId`, `limit`, `after`) | the only "search by name" the API has |
+| `GET /clans` | clan search by name + filters (`minMembers`, `maxMembers`, `minClanLevel`, `minClanPoints`, `warFrequency`, `locationId`, `labelId`, `limit`, `after`) | the only "search by name" the API has; names shorter than three characters are rejected with a 400 |
 | `GET /clans/{tag}` | full clan profile **including the whole roster inline** (`memberList`: role, TH, trophies, `leagueTier` (the ranked-ladder tier, the new themed league set with rank numbers; the legacy `league` object still arrives but is not read), donations, donations received, XP, war preference) | roster + donation data in ONE call |
 | `GET /players/{tag}` | player profile: unit arrays with `level` + `maxLevel`, heroes, spells, achievements, league | everything the rushed engine needs ([05](./05-scoring-engines.md)) |
 | `GET /clans/{tag}/currentwar` | live war state, both clans' stars/destruction, per-member attacks | works for every clan |
@@ -51,6 +51,18 @@ of the semester touches nothing but this app.
 
 ## 4. Facts that shaped the UX (and one trap we avoid)
 
+- **Clan names have a three-character floor.** The game API rejects a
+  shorter name with a 400 (`reason: badName`, and its body carries a
+  readable `message` sentence the tier now surfaces as the bad_request
+  detail). The tier mirrors the floor so the rejection costs ~1 ms and
+  carries our own sentence; the two name-input surfaces teach the rule
+  inline before any request is made. Not rate limiting — that is a 429,
+  a first-class busy state on this tier.
+- **Some listing fields have no upstream filter.** Clan type, chat
+  language, join requirements (trophies / Town Hall), and the
+  family-friendly flag all ride search items but have no `GET /clans`
+  query param, so those filters run client-side over the loaded pages
+  and the UI keeps its counts honest ("N shown of M loaded").
 - **There is no player search by name.** Players are fetchable by exact tag
   only, so the paste-a-tag box ([F-03](./03-features-list.md)) is the only
   direct route to a player. Clans are the flexible ones: searchable by name
@@ -77,7 +89,7 @@ TTL cache → maybe call upstream through the proxy → return JSON.
 
 | Route | Upstream | TTL |
 |---|---|---|
-| `GET /api/search?name=&minMembers=&minClanLevel=&limit=&after=` | `/clans` | 60 s |
+| `GET /api/search?name=&minMembers=&maxMembers=&minClanLevel=&minClanPoints=&warFrequency=&locationId=&labelId=&limit=&after=` | `/clans` | 60 s |
 | `GET /api/clan/:tag` | `/clans/{tag}` | 180 s |
 | `GET /api/player/:tag` | `/players/{tag}` | 300 s |
 | `GET /api/clan/:tag/war` | `/clans/{tag}/currentwar` | 120 s (attacks land in bursts) |
