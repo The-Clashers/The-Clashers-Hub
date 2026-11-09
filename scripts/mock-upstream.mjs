@@ -6,9 +6,13 @@
 // The /v1/clans listing honors the upstream filter params the tier
 // forwards (minMembers, maxMembers, minClanLevel, minClanPoints,
 // frequency, locationId, labelId) and its items carry the fields the
-// client-side filters read (type, isFamilyFriendly, requiredTrophies,
+// client-side filters read (type, isFamilyFriendly, requiredLeagueTier,
 // requiredTownhallLevel, chatLanguage), so the whole filter row is
-// exercisable locally end to end.
+// exercisable locally end to end. The requirement fields speak the rank
+// rework: requiredLeagueTier carries the ranked ladder tier a clan asks
+// for (ids 105000000+n, the numbering src/api/league-tiers.ts mirrors),
+// and the legacy requiredTrophies number is gone the way the game dropped
+// it.
 //
 // Special tags and names exercise the whole error contract:
 //   name contains "fail"        -> 500 (upstream_unreachable path)
@@ -37,6 +41,9 @@ const clan = {
   clanPoints: 41230,
   members: 2,
   warFrequency: 'always',
+  // The rank rework's join requirement, as the clan endpoint reports it:
+  // the ranked ladder tier the clan asks for.
+  requiredLeagueTier: { id: 105000017, name: 'Witch League 17' },
   // Surfaced on the clan detail card as the war log status chip; the mock
   // keeps it public so the card and the warlog route agree locally.
   isWarLogPublic: true,
@@ -220,6 +227,9 @@ const MOCK_SEARCH_CLANS = [
     warFrequency: 'always',
     isWarLogPublic: true,
     isFamilyFriendly: true,
+    // The same tier the clan detail fixture reports, so a click-through
+    // from the search listing to the detail card tells one story.
+    requiredLeagueTier: { id: 105000017, name: 'Witch League 17' },
     location: { id: 32000006, name: 'International', isCountry: false },
     chatLanguage: { id: 75000000, name: 'English', languageCode: 'EN' },
     labels: [
@@ -237,7 +247,7 @@ const MOCK_SEARCH_CLANS = [
     warFrequency: 'oncePerWeek',
     isWarLogPublic: true,
     isFamilyFriendly: false,
-    requiredTrophies: 1000,
+    requiredLeagueTier: { id: 105000005, name: 'Barbarian League 5' },
     requiredTownhallLevel: 12,
     location: { id: 32000185, name: 'Philippines', isCountry: true },
     chatLanguage: { id: 75000000, name: 'English', languageCode: 'EN' },
@@ -253,7 +263,7 @@ const MOCK_SEARCH_CLANS = [
     warFrequency: 'always',
     isWarLogPublic: false,
     isFamilyFriendly: false,
-    requiredTrophies: 2000,
+    requiredLeagueTier: { id: 105000017, name: 'Witch League 17' },
     requiredTownhallLevel: 14,
     location: { id: 32000249, name: 'United States', isCountry: true },
     chatLanguage: { id: 75000017, name: 'Spanish', languageCode: 'ES' },
@@ -269,7 +279,6 @@ const MOCK_SEARCH_CLANS = [
     warFrequency: 'lessThanOncePerWeek',
     isWarLogPublic: true,
     isFamilyFriendly: true,
-    requiredTrophies: 0,
     location: { id: 32000038, name: 'Brazil', isCountry: true },
     chatLanguage: { id: 75000035, name: 'Portuguese', languageCode: 'PT' },
     labels: [SEARCH_LABEL_INTERNATIONAL],
@@ -284,7 +293,7 @@ const MOCK_SEARCH_CLANS = [
     warFrequency: 'always',
     isWarLogPublic: true,
     isFamilyFriendly: false,
-    requiredTrophies: 4000,
+    requiredLeagueTier: { id: 105000028, name: 'Dragon League 28' },
     requiredTownhallLevel: 16,
     location: { id: 32000006, name: 'International', isCountry: false },
     chatLanguage: { id: 75000000, name: 'English', languageCode: 'EN' },
@@ -300,7 +309,6 @@ const MOCK_SEARCH_CLANS = [
     warFrequency: 'never',
     isWarLogPublic: true,
     isFamilyFriendly: false,
-    requiredTrophies: 0,
     location: { id: 32000185, name: 'Philippines', isCountry: true },
     chatLanguage: { id: 75000000, name: 'English', languageCode: 'EN' },
     labels: [{ id: 56000000, name: 'Clan Wars' }],
@@ -315,7 +323,7 @@ const MOCK_SEARCH_CLANS = [
     warFrequency: 'moreThanOncePerWeek',
     isWarLogPublic: true,
     isFamilyFriendly: false,
-    requiredTrophies: 3000,
+    requiredLeagueTier: { id: 105000022, name: 'P.E.K.K.A League 22' },
     requiredTownhallLevel: 10,
     location: { id: 32000114, name: 'Indonesia', isCountry: true },
     chatLanguage: { id: 75000017, name: 'Spanish', languageCode: 'ES' },
@@ -334,7 +342,6 @@ const MOCK_SEARCH_CLANS = [
     warFrequency: 'oncePerWeek',
     isWarLogPublic: true,
     isFamilyFriendly: true,
-    requiredTrophies: 0,
     location: { id: 32000006, name: 'International', isCountry: false },
     chatLanguage: { id: 75000000, name: 'English', languageCode: 'EN' },
     labels: [SEARCH_LABEL_INTERNATIONAL],

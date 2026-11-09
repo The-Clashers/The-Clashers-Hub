@@ -313,7 +313,11 @@ function ClanSuccess({ clan, base, styles }: ClanSuccessProps) {
     { label: 'Win streak', value: String(clan.warWinStreak) },
     { label: 'War', value: warFrequencyLabel(clan.requirements.warFrequency) },
     { label: 'War log', value: clan.isWarLogPublic ? 'Public' : 'Private' },
-    { label: 'Trophies req', value: String(clan.requirements.requiredTrophies) },
+    // The rank rework's requirement: the ranked ladder tier the clan asks
+    // for ("Witch League 17"), or a quiet None when it asks for nothing.
+    // The old trophy threshold reads as zeroed history after the rework, so
+    // the league tier is the requirement the game actually enforces.
+    { label: 'League req', value: clan.requirements.requiredLeagueTier?.name ?? 'None' },
     ...(clan.requirements.requiredTownhallLevel !== undefined
       ? [{ label: 'TH req', value: `TH ${clan.requirements.requiredTownhallLevel}` }]
       : []),

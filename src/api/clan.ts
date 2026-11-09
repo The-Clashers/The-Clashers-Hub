@@ -41,11 +41,18 @@ export interface ClanLocation {
 }
 
 /** The join requirements the clan sets. The game API surfaces these on the
- * clan payload directly; the identity header renders them as a small chips
- * row (T-M1-3, F-04). All three are optional in practice: a brand-new clan
- * can have requiredTrophies = 0 and no requiredTownhallLevel. */
+ * clan payload directly; the stat grid renders them as requirement cells
+ * (T-M1-3, F-04). All optional in practice: a brand-new clan asks for
+ * nothing. The 2025 rank rework replaced the old trophy threshold with a
+ * league requirement (`requiredLeagueTier`, the ranked ladder tier the clan
+ * asks for); the legacy `requiredTrophies` number still arrives from the
+ * API but reads as zeroed history, so it is not parsed at all — the same
+ * call the roster's rank column made when it dropped the legacy `league`
+ * object for `leagueTier`. */
 export interface ClanRequirements {
-  requiredTrophies: number;
+  /** The ranked ladder tier the clan requires, undefined when the clan sets
+   * no league requirement. */
+  requiredLeagueTier?: ClanRequirementLeagueTier;
   /** Minimum Town Hall level to join. Not every clan sets one; undefined
    * when the API omits it. */
   requiredTownhallLevel?: number;
@@ -53,6 +60,14 @@ export interface ClanRequirements {
    * through lib/war-frequency.ts so the search filter and the identity
    * header read from the same table. */
   warFrequency?: string;
+}
+
+/** The league tier a clan requires for entry, as the rank rework reports
+ * it: the ladder id (105000000 + tier, the numbering src/api/league-tiers.ts
+ * owns) and the API's own tier name. */
+export interface ClanRequirementLeagueTier {
+  id: number;
+  name: string;
 }
 
 /** The icon URLs the game API nests inside a league tier. Tier icons come in
@@ -164,11 +179,21 @@ function toClanLocation(parsed: unknown): ClanLocation | undefined {
 }
 
 function toClanRequirements(parsed: unknown): ClanRequirements {
-  // parsed is the clan object itself: requiredTrophies and warFrequency live
-  // at the top level, alongside requiredTownhallLevel when the clan sets one.
+  // parsed is the clan object itself: requiredLeagueTier,
+  // requiredTownhallLevel, and warFrequency live at the top level. A tier
+  // object without a readable id is not a requirement we can rank or label,
+  // so it degrades to undefined (the cell renders its quiet "None").
   const source = isRecord(parsed) ? parsed : {};
+  const requiredLeagueTier = isRecord(source.requiredLeagueTier)
+    ? {
+        id: typeof source.requiredLeagueTier.id === 'number' ? source.requiredLeagueTier.id : 0,
+        name:
+          typeof source.requiredLeagueTier.name === 'string' ? source.requiredLeagueTier.name : '',
+      }
+    : undefined;
   return {
-    requiredTrophies: typeof source.requiredTrophies === 'number' ? source.requiredTrophies : 0,
+    requiredLeagueTier:
+      requiredLeagueTier && requiredLeagueTier.id !== 0 ? requiredLeagueTier : undefined,
     requiredTownhallLevel:
       typeof source.requiredTownhallLevel === 'number' ? source.requiredTownhallLevel : undefined,
     warFrequency: typeof source.warFrequency === 'string' ? source.warFrequency : undefined,

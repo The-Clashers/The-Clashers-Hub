@@ -34,7 +34,6 @@ describe('buildSearchQuery', () => {
       minMembers: 20,
       maxMembers: 30,
       minClanLevel: 10,
-      minClanPoints: 20000,
       warFrequency: 'oncePerWeek',
       locationId: 32000185,
       labelId: 56000013,
@@ -43,7 +42,6 @@ describe('buildSearchQuery', () => {
     expect(query).toContain('minMembers=20');
     expect(query).toContain('maxMembers=30');
     expect(query).toContain('minClanLevel=10');
-    expect(query).toContain('minClanPoints=20000');
     expect(query).toContain('warFrequency=oncePerWeek');
     expect(query).toContain('locationId=32000185');
     expect(query).toContain('labelId=56000013');
@@ -55,13 +53,13 @@ describe('buildSearchQuery', () => {
       name: 'A',
       clanType: 'open',
       chatLanguage: 'EN',
-      maxRequiredTrophies: 2000,
+      maxRequiredLeagueTier: 17,
       maxRequiredTownhall: 14,
     });
     expect(query).toBe(`name=A&limit=${SEARCH_PAGE_LIMIT}`);
     expect(query).not.toContain('clanType');
     expect(query).not.toContain('chatLanguage');
-    expect(query).not.toContain('requiredTrophies');
+    expect(query).not.toContain('requiredLeagueTier');
     expect(query).not.toContain('requiredTownhall');
   });
 
@@ -123,7 +121,7 @@ describe('parseSearchPayload', () => {
           ...item,
           type: 'inviteOnly',
           isFamilyFriendly: true,
-          requiredTrophies: 1200,
+          requiredLeagueTier: { id: 105000010, name: 'Wizard League 10' },
           requiredTownhallLevel: 14,
           chatLanguage: { id: 75000000, name: 'English', languageCode: 'EN' },
         },
@@ -132,7 +130,7 @@ describe('parseSearchPayload', () => {
     const parsed = page.items[0];
     expect(parsed.type).toBe('inviteOnly');
     expect(parsed.isFamilyFriendly).toBe(true);
-    expect(parsed.requiredTrophies).toBe(1200);
+    expect(parsed.requiredLeagueTier).toEqual({ id: 105000010, name: 'Wizard League 10' });
     expect(parsed.requiredTownhallLevel).toBe(14);
     expect(parsed.chatLanguageCode).toBe('EN');
     expect(parsed.chatLanguageName).toBe('English');
@@ -169,8 +167,8 @@ describe('SEARCH_NAME_MIN_CHARS', () => {
 
 describe('applyClientFilters', () => {
   const clans: SearchClanItem[] = [
-    { tag: '#A', name: 'A', clanLevel: 1, members: 20, type: 'open', requiredTrophies: 0, chatLanguageCode: 'EN' },
-    { tag: '#B', name: 'B', clanLevel: 2, members: 30, type: 'inviteOnly', requiredTrophies: 1500, chatLanguageCode: 'ES', requiredTownhallLevel: 12 },
+    { tag: '#A', name: 'A', clanLevel: 1, members: 20, type: 'open', requiredLeagueTier: { id: 105000000, name: 'Unranked' }, chatLanguageCode: 'EN' },
+    { tag: '#B', name: 'B', clanLevel: 2, members: 30, type: 'inviteOnly', requiredLeagueTier: { id: 105000017, name: 'Witch League 17' }, chatLanguageCode: 'ES', requiredTownhallLevel: 12 },
     { tag: '#C', name: 'C', clanLevel: 3, members: 40 },
   ];
 
@@ -189,15 +187,37 @@ describe('applyClientFilters', () => {
     expect(shown.map((c) => c.tag)).toEqual(['#B']);
   });
 
-  it('treats an absent join gate as passing every trophy and Town Hall threshold', () => {
-    const shown = applyClientFilters(clans, { name: 'x', maxRequiredTrophies: 1000, maxRequiredTownhall: 10 });
-    // #A has no gates, #C reports neither field, #B asks 1500/TH12.
+  it('treats an absent join gate as passing every league and Town Hall threshold', () => {
+    const shown = applyClientFilters(clans, { name: 'x', maxRequiredLeagueTier: 10, maxRequiredTownhall: 10 });
+    // #A requires nothing (the Unranked tier is tier 0), #C reports neither
+    // field, #B asks Witch League 17 / TH12.
     expect(shown.map((c) => c.tag)).toEqual(['#A', '#C']);
   });
 
   it('selects exactly the gate-less clans at threshold zero (the None option)', () => {
-    const shown = applyClientFilters(clans, { name: 'x', maxRequiredTrophies: 0 });
+    const shown = applyClientFilters(clans, { name: 'x', maxRequiredLeagueTier: 0 });
     expect(shown.map((c) => c.tag)).toEqual(['#A', '#C']);
+  });
+
+  it('keeps clans whose required league is at most the cap (the ladder reads the id)', () => {
+    // Cap at Witch League 17 (tier 17): #B asks exactly that, so it stays.
+    const shown = applyClientFilters(clans, { name: 'x', maxRequiredLeagueTier: 17 });
+    expect(shown.map((c) => c.tag)).toEqual(['#A', '#B', '#C']);
+    // Cap below it drops #B.
+    const tighter = applyClientFilters(clans, { name: 'x', maxRequiredLeagueTier: 16 });
+    expect(tighter.map((c) => c.tag)).toEqual(['#A', '#C']);
+  });
+
+  it('drops a clan whose required tier id sits outside the known ladder', () => {
+    const exotic: SearchClanItem[] = [
+      { tag: '#D', name: 'D', clanLevel: 1, members: 10, requiredLeagueTier: { id: 105000099, name: 'Future League 99' } },
+      { tag: '#E', name: 'E', clanLevel: 1, members: 10 },
+    ];
+    // A requirement we cannot rank is not provably at-or-below any cap.
+    const shown = applyClientFilters(exotic, { name: 'x', maxRequiredLeagueTier: 36 });
+    expect(shown.map((c) => c.tag)).toEqual(['#E']);
+    // Without a cap in force it passes like any other clan.
+    expect(applyClientFilters(exotic, { name: 'x' })).toHaveLength(2);
   });
 
   it('combines client filters and ignores server-side ones', () => {
