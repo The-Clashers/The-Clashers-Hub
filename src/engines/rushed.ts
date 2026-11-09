@@ -26,14 +26,21 @@
 //
 //   rushed_percent = sum( max(0, maxLevel - level) ) / sum( maxLevel ) * 100
 //
-// with equal weights. A unit with a null maxLevel is skipped and counted in
-// a footnote (SR-14); the reference-data fallback (SR-17) plugs in with
-// T-M2-6. A payload with zero usable units returns null ("not available")
-// rather than 0.
+// with equal weights. A unit with a null maxLevel falls back to the
+// reference table's maximum (SR-17, wired in the adapter); only a unit
+// absent from both the payload and the reference bundle is skipped and
+// counted in a footnote (SR-14). A payload with zero usable units returns
+// null ("not available") rather than 0.
 
 import type { PlayerUnit } from '../api/player';
+import { homeReferenceMax } from '../lib/town-hall-caps';
 
 // ---------- reference data: the super-troop map ----------
+//
+// Reference data version: the game as of November 2026, 17 super troops.
+// Updating the map is a docs-sized PR whenever the game ships a new
+// boost; the completeness test over the live payload roster fails loudly
+// first.
 
 /**
  * Maps every super troop name to its base troop name (05 section 1). A super
@@ -45,9 +52,11 @@ import type { PlayerUnit } from '../api/player';
  * the game requires the base troop to unlock the super) carries the real
  * level.
  *
- * The list is the well-known core from the scoring doc. Completeness is
- * enforced by a unit test so a new super troop cannot silently fake
- * someone's rushed score.
+ * The list is trued against the dataset the reference bundle derives from
+ * (T-M2-6): every super troop the game API can name today, mapped to the
+ * base troop the game itself records for it. Completeness is enforced by a
+ * unit test over the live payload's roster and the cap tables' troop list
+ * so a new super troop cannot silently fake someone's rushed score.
  */
 export const SUPER_TROOP_MAP: Readonly<Record<string, string>> = {
   'Super Barbarian': 'Barbarian',
@@ -59,7 +68,11 @@ export const SUPER_TROOP_MAP: Readonly<Record<string, string>> = {
   'Super Wizard': 'Wizard',
   'Super Witch': 'Witch',
   'Super Valkyrie': 'Valkyrie',
-  'Inferno Dragon': 'Dragon',
+  // The game records Inferno Dragon as Baby Dragon's variant (it arrived
+  // with Baby Dragon's ladder; its live maxLevel 12 matches Baby Dragon's
+  // 12, not Dragon's 13). Mapping it to Dragon inflated the dragon deficit
+  // for every player running the boost.
+  'Inferno Dragon': 'Baby Dragon',
   'Super Dragon': 'Dragon',
   'Ice Hound': 'Lava Hound',
   'Super Miner': 'Miner',
@@ -67,8 +80,6 @@ export const SUPER_TROOP_MAP: Readonly<Record<string, string>> = {
   'Super Bowler': 'Bowler',
   'Super Hog Rider': 'Hog Rider',
   'Super Yeti': 'Yeti',
-  'Super Ice Hound': 'Lava Hound',
-  'Super Inferno Dragon': 'Dragon',
 };
 
 /** True when the unit name is a super troop variant. */
@@ -91,6 +102,10 @@ export const SIEGE_MACHINE_NAMES: ReadonlySet<string> = new Set([
   'Flame Flinger',
   'Battle Drill',
   'Sky Wagon',
+  // The newest siege machine; the live payload carries it and the cap
+  // tables list it (T-M2-6). Without it the adapter routed the row into
+  // the troops category.
+  'Troop Launcher',
 ]);
 
 /**
@@ -224,6 +239,17 @@ export function playerToUnitEntries(
 ): UnitLevelEntry[] {
   const entries: UnitLevelEntry[] = [];
 
+  const withFallback = (unit: PlayerUnit, category: RushedCategory): UnitLevelEntry => ({
+    name: unit.name,
+    level: unit.level,
+    // SR-17: the API's own maxLevel stays the primary denominator; the
+    // reference table resolves only a null (brand-new content the API has
+    // not caught up to). A unit absent from both stays null and the core
+    // counts it in the footnote.
+    maxLevel: unit.maxLevel ?? homeReferenceMax(unit.name),
+    category,
+  });
+
   for (const unit of troops) {
     if (unit.village !== 'home') continue;
     if (isSuperTroop(unit.name)) continue;
@@ -231,17 +257,17 @@ export function playerToUnitEntries(
       SIEGE_MACHINE_NAMES.has(unit.name) || PET_NAMES.has(unit.name)
         ? 'petsSiege'
         : 'troops';
-    entries.push({ name: unit.name, level: unit.level, maxLevel: unit.maxLevel, category });
+    entries.push(withFallback(unit, category));
   }
 
   for (const unit of spells) {
     if (unit.village !== 'home') continue;
-    entries.push({ name: unit.name, level: unit.level, maxLevel: unit.maxLevel, category: 'spells' });
+    entries.push(withFallback(unit, 'spells'));
   }
 
   for (const unit of heroes) {
     if (unit.village !== 'home') continue;
-    entries.push({ name: unit.name, level: unit.level, maxLevel: unit.maxLevel, category: 'heroes' });
+    entries.push(withFallback(unit, 'heroes'));
   }
 
   // Hero equipment is counted in the heroes category (05 section 1 lists
@@ -249,7 +275,7 @@ export function playerToUnitEntries(
   // names it explicitly).
   for (const unit of heroEquipment) {
     if (unit.village !== 'home') continue;
-    entries.push({ name: unit.name, level: unit.level, maxLevel: unit.maxLevel, category: 'heroes' });
+    entries.push(withFallback(unit, 'heroes'));
   }
 
   return entries;

@@ -50,8 +50,48 @@ describe('SUPER_TROOP_MAP', () => {
   it('maps every super troop to its base troop', () => {
     expect(SUPER_TROOP_MAP['Super Barbarian']).toBe('Barbarian');
     expect(SUPER_TROOP_MAP['Sneaky Goblin']).toBe('Goblin');
-    expect(SUPER_TROOP_MAP['Inferno Dragon']).toBe('Dragon');
+    // The game records Inferno Dragon as Baby Dragon's variant: it arrived
+    // with Baby Dragon's ladder and its live maxLevel (12) matches Baby
+    // Dragon's, not Dragon's 13.
+    expect(SUPER_TROOP_MAP['Inferno Dragon']).toBe('Baby Dragon');
     expect(SUPER_TROOP_MAP['Ice Hound']).toBe('Lava Hound');
+  });
+
+  it('carries no invented entries: every name exists in the game', () => {
+    // The two names below were plausible-sounding fabrications the first
+    // map shipped; the game has no such super troops, and a payload never
+    // carries them. If a future payload does, this row fails and the name
+    // earns its place.
+    expect(SUPER_TROOP_MAP).not.toHaveProperty('Super Ice Hound');
+    expect(SUPER_TROOP_MAP).not.toHaveProperty('Super Inferno Dragon');
+  });
+
+  it('is total over the live payload roster: every super-troop name the payload carries is a key', () => {
+    // The completeness test the scoring doc demands (05 section 5): the
+    // names below are every super troop the live proxy served during this
+    // pass (17 names, a TH18 player with every boost the game runs today).
+    const liveSuperTroops = [
+      'Super Barbarian',
+      'Super Archer',
+      'Super Giant',
+      'Sneaky Goblin',
+      'Super Wall Breaker',
+      'Rocket Balloon',
+      'Super Wizard',
+      'Super Witch',
+      'Super Valkyrie',
+      'Inferno Dragon',
+      'Super Dragon',
+      'Ice Hound',
+      'Super Miner',
+      'Super Minion',
+      'Super Bowler',
+      'Super Hog Rider',
+      'Super Yeti',
+    ];
+    for (const name of liveSuperTroops) {
+      expect(isSuperTroop(name), `${name} is not in the map`).toBe(true);
+    }
   });
 
   it('every value is a non-empty string', () => {

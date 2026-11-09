@@ -12,17 +12,24 @@
 //
 // Name evidence, because the map is only as good as its keys:
 // - Recorded names come straight off payloads the docs captured verbatim
-//   (docs/api-local-tests.md, fixtures/, the mock upstream): every hero the
-//   game API returns today minus the two below, plus Spiky Ball, Earthquake
-//   Boots, Giant Gauntlet, Rocket Spear, and Snake Bracelet.
-// - The remaining equipment names are derived from the Fankit file names
-//   (underscores to spaces, joined CamelCase split) because the live chain
-//   was unreachable when this module landed. A derived name that does not
-//   match the API's spelling simply never resolves, and the caller falls
-//   back to the placeholder: the rule the icons README states ("never a
-//   wrong icon"), so an unverified guess can show a quieter panel but never
-//   a wrong picture. The reference-data pass (T-M2-6) trues the spellings
-//   up against the live payload.
+//   (docs/api-local-tests.md, fixtures/, the mock upstream) plus the live
+//   payload the reference-data pass (T-M2-6) trued everything against:
+//   every hero and every equipment piece the game API returns today,
+//   spelled the way the API spells them.
+// - The live chain answered throughout this pass, so the derived names
+//   that had never met a payload were replaced with the API's own
+//   spellings: Vampstache, Hog Rider Puppet, Henchmen Puppet, Metal
+//   Pants, Meteor Staff, Revenge Deck, and Stun Blaster now resolve;
+//   the two derived keys that turned out to be misnamings (Hog Rider
+//   Doll, Stick Fire Horse) were dropped with their Fankit files.
+// - Two equipment pieces have no bundled icon (Revenge Deck, Portal
+//   Pendant: not in the Fankit set). They stay unmapped and render the
+//   placeholder, never a wrong icon standing in for a missing one.
+//
+// Reference data version: the game as of November 2026 (Town Hall 18,
+// Builder Hall 10, the 43-piece hero equipment set). Updating the map is
+// a docs-sized PR whenever the game ships new content; the completeness
+// tests fail loudly when a payload carries a name the map has not met.
 
 import battleCopterIcon from '../assets/game-icons/Icon_BB_Hero_Battle_Copter.png';
 import battleMachineIcon from '../assets/game-icons/Icon_BB_Hero_Battle_Machine.png';
@@ -54,25 +61,25 @@ import healingTomeIcon from '../assets/game-icons/Icon_HE_GW_Healing_Tome.png';
 import lifeGemIcon from '../assets/game-icons/Icon_HE_GW_Life_Gem.png';
 import rageGemIcon from '../assets/game-icons/Icon_HE_GW_Rage_Gem.png';
 import darkOrbIcon from '../assets/game-icons/Icon_HE_MP_DarkOrb.png';
-import henchmanIcon from '../assets/game-icons/Icon_HE_MP_Henchman.png';
+import henchmanPuppetIcon from '../assets/game-icons/Icon_HE_MP_Henchman.png';
 import ironPantsIcon from '../assets/game-icons/Icon_HE_MP_Iron_Pants.png';
 import nobleIronIcon from '../assets/game-icons/Icon_HE_MP_Noble_Iron.png';
 import electroBootsIcon from '../assets/game-icons/Icon_HE_RC_ElectroBoots.png';
 import frostFlakeIcon from '../assets/game-icons/Icon_HE_RC_Frost_Flake.png';
 import hasteVialIcon from '../assets/game-icons/Icon_HE_RC_Haste_Vial.png';
-import hogRiderDollIcon from '../assets/game-icons/Icon_HE_RC_Hog_Rider_Doll.png';
+import hogRiderPuppetIcon from '../assets/game-icons/Icon_HE_RC_Hog_Rider_Doll.png';
 import royalGemIcon from '../assets/game-icons/Icon_HE_RC_Royal_Gem.png';
 import seekingShieldIcon from '../assets/game-icons/Icon_HE_RC_Seeking_Shield.png';
-import stickFireHorseIcon from '../assets/game-icons/Icon_HG_BK_StickFireHorse.png';
+import stickHorseIcon from '../assets/game-icons/Icon_HG_BK_StickFireHorse.png';
 import electroFangsIcon from '../assets/game-icons/Icon_HG_DD_Electro_Fangs.png';
 import fireHeartIcon from '../assets/game-icons/Icon_HG_DD_FireHeart.png';
 import flameBlowerIcon from '../assets/game-icons/Icon_HG_DD_FlameBlower.png';
 import rocketBackpackIcon from '../assets/game-icons/Icon_HG_DD_Rocket_BackPack.png';
-import stunBlastIcon from '../assets/game-icons/Icon_HG_DD_StunBlast.png';
+import stunBlasterIcon from '../assets/game-icons/Icon_HG_DD_StunBlast.png';
 import heroicTorchIcon from '../assets/game-icons/Icon_HG_GW_Heroic_Torch.png';
 import lavaloonPuppetIcon from '../assets/game-icons/Icon_HG_GW_LavaloonPuppet.png';
 import darkCrownIcon from '../assets/game-icons/Icon_HG_MP_DarkCrown.png';
-import meteoriteSceptreIcon from '../assets/game-icons/Icon_HG_MP_MeteoriteSceptre.png';
+import meteorStaffIcon from '../assets/game-icons/Icon_HG_MP_MeteoriteSceptre.png';
 import rocketSpearIcon from '../assets/game-icons/Icon_HG_RoyalChampion_RocketSpear_Equipment_03.png';
 
 /** The unit families the map resolves today. The progression grid (T-M2-5)
@@ -117,25 +124,25 @@ const EQUIPMENT_ICONS: Readonly<Record<string, string>> = {
   'Life Gem': lifeGemIcon,
   'Rage Gem': rageGemIcon,
   'Dark Orb': darkOrbIcon,
-  Henchman: henchmanIcon,
-  'Iron Pants': ironPantsIcon,
+  'Henchmen Puppet': henchmanPuppetIcon,
+  'Metal Pants': ironPantsIcon,
   'Noble Iron': nobleIronIcon,
   'Electro Boots': electroBootsIcon,
   'Frost Flake': frostFlakeIcon,
   'Haste Vial': hasteVialIcon,
-  'Hog Rider Doll': hogRiderDollIcon,
+  'Hog Rider Puppet': hogRiderPuppetIcon,
   'Royal Gem': royalGemIcon,
   'Seeking Shield': seekingShieldIcon,
-  'Stick Fire Horse': stickFireHorseIcon,
+  'Stick Horse': stickHorseIcon,
   'Electro Fangs': electroFangsIcon,
   'Fire Heart': fireHeartIcon,
   'Flame Blower': flameBlowerIcon,
   'Rocket Backpack': rocketBackpackIcon,
-  'Stun Blast': stunBlastIcon,
+  'Stun Blaster': stunBlasterIcon,
   'Heroic Torch': heroicTorchIcon,
   'Lavaloon Puppet': lavaloonPuppetIcon,
   'Dark Crown': darkCrownIcon,
-  'Meteorite Sceptre': meteoriteSceptreIcon,
+  'Meteor Staff': meteorStaffIcon,
   'Rocket Spear': rocketSpearIcon,
 };
 

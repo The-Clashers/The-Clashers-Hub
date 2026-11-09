@@ -15,6 +15,7 @@ import ErrorState from '../components/ErrorState';
 import LevelRail from '../components/LevelRail';
 import PillButton from '../components/PillButton';
 import ProgressRail from '../components/ProgressRail';
+import ProgressionGrid from '../components/ProgressionGrid';
 import SkeletonBlock, { useSkeletonPulse } from '../components/SkeletonBlock';
 import UnitIcon from '../components/UnitIcon';
 import { fetchPlayer, PlayerFetchError, type PlayerResponse } from '../api/player';
@@ -28,6 +29,7 @@ import { heroProgress, formatLevelPair } from '../lib/hero-progress';
 import { clanRoleLabel } from '../lib/clan-role';
 import { canonicalTagFromRoute } from '../lib/tag';
 import { groupByVillage } from '../lib/village';
+import { playerToProgressionTiles } from '../lib/progression-grid';
 
 // The player detail shell (T-M2-1, FR-06, FR-14). The roster's tap-through
 // and the tag boxes both land here (golden paths A and B), on the shareable
@@ -75,10 +77,13 @@ const SKELETON_META_WIDTH = 170;
 // The header stat cells the skeleton draws, matching the grid's count.
 const SKELETON_STAT_CELLS = 4;
 
-// The analysis sections the skeleton draws, matching the three sections
+// The analysis sections the skeleton draws, matching the four sections
 // the success state renders (the rushed notice, the hero card, the
-// achievements card).
-const SKELETON_SECTIONS = 3;
+// achievements card, the progression grid). Each skeleton block mirrors
+// the section it stands in for: a title line and a body line inside the
+// shared state panel, so the layout-matched skeleton (06 section 3)
+// keeps its shape through the loading state.
+const SKELETON_SECTIONS = 4;
 
 // Micro-label tracking: the one-off 0.6 px tracking the design language
 // pairs with uppercase micro labels (StatChip keeps the same local value).
@@ -286,6 +291,7 @@ function PlayerSuccess({ player }: PlayerSuccessProps) {
       />
       <HeroCard heroes={player.heroes} />
       <AchievementsCard achievements={player.achievements} />
+      <ProgressionCard player={player} />
     </>
   );
 
@@ -577,6 +583,58 @@ function AchievementRow({ achievement }: AchievementRowProps) {
         </Text>
         <ProgressRail progress={progress} />
       </View>
+    </View>
+  );
+}
+
+// ---------- progression card (T-M2-5, FR-16, SR-16) ----------
+
+interface ProgressionCardProps {
+  player: PlayerResponse;
+}
+
+// The progression grid card. Every unit of both villages with its icon,
+// current level, and a maxed chip, grouped by village and category. The
+// grid renders entirely from the same single player response the shell
+// already fetched (SR-16): no second call, no second loading state, and
+// no network request beyond the player fetch (AC-07). The grid is
+// virtualized because a real account carries ~100 unit tiles across both
+// villages (07 section 3).
+//
+// The card wraps the ProgressionGrid in the same panelRaised chrome the
+// hero and achievements cards use, so the three analysis surfaces read as
+// one family. A payload with no units renders the quiet empty notice, the
+// same within-success degradation the other cards keep.
+function ProgressionCard({ player }: ProgressionCardProps) {
+  const { theme } = useTheme();
+  const base = useMemo(() => createBaseStyles(theme), [theme]);
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
+  const groups = useMemo(() => playerToProgressionTiles(player), [player]);
+  const tileCount = useMemo(
+    () => groups.reduce((sum, g) => sum + g.categories.reduce((s, b) => s + b.tiles.length, 0), 0),
+    [groups],
+  );
+
+  if (tileCount === 0) {
+    return (
+      <EmptyState
+        title="No units in this payload"
+        body="The game API returned no troops, spells, heroes, or equipment for this player. Refresh in a moment; even a brand-new account carries its opening units."
+      />
+    );
+  }
+
+  return (
+    <View
+      style={[base.panelRaised, styles.progressionCard]}
+      accessibilityLabel={`Progression grid, ${tileCount} units`}
+    >
+      <View style={styles.progressionHeader}>
+        <Text style={base.title}>Progression</Text>
+        <Text style={styles.progressionCount}>{tileCount} units</Text>
+      </View>
+      <ProgressionGrid groups={groups} />
     </View>
   );
 }
@@ -1134,6 +1192,25 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     achievementPairDone: {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.xs,
+      fontWeight: t.fontWeight.regular,
+      color: c.textMuted,
+      fontVariant: ['tabular-nums'],
+    },
+
+    // progression card (T-M2-5)
+    progressionCard: {
+      gap: t.spacing[4],
+    },
+    progressionHeader: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      justifyContent: 'space-between',
+      flexWrap: 'wrap',
+      columnGap: t.spacing[3],
+    },
+    progressionCount: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.sm,
       fontWeight: t.fontWeight.regular,
       color: c.textMuted,
       fontVariant: ['tabular-nums'],

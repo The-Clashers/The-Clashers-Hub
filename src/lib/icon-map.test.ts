@@ -76,6 +76,40 @@ describe('unitIcon', () => {
     }
   });
 
+  it('resolves every name the live payload carries (the T-M2-6 true-up)', () => {
+    // The evidence set the reference-data pass verified against: every
+    // hero and every equipment piece a live TH18 payload actually carried
+    // (including the seven whose derived-from-filenames spellings used to
+    // miss, and the two whose first-map names were plain wrong).
+    const liveCarried: Array<{ kind: 'hero' | 'equipment'; name: string }> = [
+      { kind: 'hero', name: 'Barbarian King' },
+      { kind: 'hero', name: 'Dragon Duke' },
+      { kind: 'hero', name: 'Minion Prince' },
+      { kind: 'equipment', name: 'Vampstache' },
+      { kind: 'equipment', name: 'Fireball' },
+      { kind: 'equipment', name: 'Henchmen Puppet' },
+      { kind: 'equipment', name: 'Hog Rider Puppet' },
+      { kind: 'equipment', name: 'Metal Pants' },
+      { kind: 'equipment', name: 'Meteor Staff' },
+      { kind: 'equipment', name: 'Stun Blaster' },
+      { kind: 'equipment', name: 'Stick Horse' },
+      { kind: 'equipment', name: 'Snake Bracelet' },
+      { kind: 'equipment', name: 'Dark Crown' },
+      { kind: 'equipment', name: 'Lavaloon Puppet' },
+    ];
+    for (const { kind, name } of liveCarried) {
+      expect(unitIcon(kind, name), `${kind} ${name}`).toBeTruthy();
+    }
+  });
+
+  it('keeps the two Fankit-less pieces unmapped (the honest placeholder)', () => {
+    // Revenge Deck and Portal Pendant are real equipment the game runs;
+    // the Fankit ships no icon for either. They render the placeholder
+    // rather than a wrong icon standing in for a missing one.
+    expect(unitIcon('equipment', 'Revenge Deck')).toBeNull();
+    expect(unitIcon('equipment', 'Portal Pendant')).toBeNull();
+  });
+
   it('answers null for an unmapped name, the placeholder fallback signal', () => {
     expect(unitIcon('hero', 'Not A Hero')).toBeNull();
     expect(unitIcon('equipment', 'Unreleased Trinket')).toBeNull();
