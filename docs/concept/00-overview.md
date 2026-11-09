@@ -77,6 +77,15 @@ proxy, nothing third-party is requested at runtime.
 - **No write access to the game.** The official API is read-only anyway; we
   never pretend otherwise.
 
+**Post-course amendment, proposed.** The two non-goals above (accounts, the
+tracker line) are the v1 semester contract and stand until further notice.
+[10 - Accounts & Persistence](./10-accounts-and-persistence.md) (session 36,
+in review) proposes climbing the storage ladder's Supabase rung after M4:
+opt-in accounts, verified game-account binding, snapshot-backed analytics.
+The lines it keeps are [10 §1](./10-accounts-and-persistence.md)'s: no login
+wall, read-only toward the game, the searcher stays the product. Nothing on
+this page changes until that proposal is activated.
+
 ## 6. Constraints we treat as design principles
 
 - **Free tiers only.** Hosting, CI, and the game API cost nothing. Anything

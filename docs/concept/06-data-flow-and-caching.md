@@ -108,6 +108,12 @@ each rung is independently cuttable:
    never read it; it only remembers tags. If this rung activates, it gets its
    own concept doc before any code.
 
+   That doc now exists: [10 - Accounts & Persistence](./10-accounts-and-persistence.md)
+   (session 36, in review) proposes activating this rung, widened beyond the
+   watchlist sketch to accounts, verified game-account binding, and daily
+   snapshots. Section 4 above stays the v1 decision record; the ladder's rule
+   held: the concept doc came before any code.
+
 The rule: the ladder is a response to a requirement, never a default. A rung
 that demands scheduled jobs (cron, pollers) is out of bounds for this
 project: that is the tracker's problem class, and we are not building a

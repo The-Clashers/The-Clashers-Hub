@@ -44,7 +44,7 @@ merge (that's the smoke test, manual, on the preview deploy).
 | Engine edge cases (new content, null maxLevel) | medium | medium | fixture-driven tests from M2 ([05 §5](./05-scoring-engines.md)); reference-data fallback first, "new content skipped" footnote as the last resort |
 | Reference data drifts when the game ships new content | medium | low | versioned bundle in the repo; completeness tests fail loudly on drift; the footnote absorbs whatever is still un-mapped |
 | API key leak | low | high | env-only, gitignored `.env`, key-check step in CI (grep the built bundle for the token) |
-| Scope creep (tracker features, accounts) | high | high | the non-goals in [00 §5](./00-overview.md) are the contract; any such PR gets closed with a link to this doc |
+| Scope creep (tracker features, accounts) | high | high | the non-goals in [00 §5](./00-overview.md) are the contract; any such PR gets closed with a link to this doc. One carve-out, on the record: the storage ladder ([06 §5](./06-data-flow-and-caching.md)) is climbable by owner decision with a concept doc first, which is what [10](./10-accounts-and-persistence.md) is (in review) |
 | Member availability drops mid-semester | medium | medium | rotation + ≥ 2 owners per area (§2) |
 
 ## 4. Definition of done (every PR, no exceptions)

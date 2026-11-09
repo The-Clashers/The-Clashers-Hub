@@ -72,6 +72,12 @@ Two boundaries matter:
 If any component approaches a cap, the answer is more caching or less
 scope, never a credit card.
 
+> Proposed amendment (not yet active): [10 - Accounts & Persistence](./10-accounts-and-persistence.md)
+> adds the hosted Supabase free tier for the post-M4 phase, with its limits
+> and key rules recorded there ([10 §2, §3](./10-accounts-and-persistence.md)).
+> The "Database: none" row above stays the v1 record until that proposal is
+> activated and amends this table in the same PR.
+
 ## 5. Planned repository layout
 
 ```
