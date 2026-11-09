@@ -15,6 +15,7 @@ for the planned layout.
 | `locations.ts` | nothing (bundled filter constants, ids verified live) | `screens/SearchScreen.tsx` |
 | `labels.ts` | nothing (bundled clan-label filter constants, ids verified from live captures) | `screens/SearchScreen.tsx` |
 | `chat-languages.ts` | nothing (bundled chat-language filter constants, codes matched client-side) | `screens/SearchScreen.tsx` |
+| `league-tiers.ts` | nothing (bundled ranked-ladder table, ids 105000000-105000036, names cross-checked against live captures) | `screens/SearchScreen.tsx` (the league-requirement filter), `api/search.ts` (the tier lookup) |
 
 Each client:
 
