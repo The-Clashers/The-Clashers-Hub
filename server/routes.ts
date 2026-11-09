@@ -41,7 +41,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function upstreamReason(body: string): string {
+/** The machine-readable reason an upstream error body carries ("accessDenied",
+ * "badName", …), or null. The warlog classifier keys off this field. */
+function upstreamReason(body: string): string | null {
   try {
     const parsed: unknown = JSON.parse(body);
     if (isRecord(parsed) && typeof parsed.reason === 'string') {
@@ -50,14 +52,33 @@ function upstreamReason(body: string): string {
   } catch {
     // fall through to the generic detail
   }
-  return 'upstream rejected the request';
+  return null;
+}
+
+/** The human-readable sentence an upstream error body carries when it has
+ * one ("clanName must have at least three characters"). The live API sends
+ * both a reason and a message on validation failures; the message is what a
+ * visitor can read, so it wins the bad_request detail when present. */
+function upstreamMessage(body: string): string | null {
+  try {
+    const parsed: unknown = JSON.parse(body);
+    if (isRecord(parsed) && typeof parsed.message === 'string') {
+      return parsed.message;
+    }
+  } catch {
+    // fall through to the generic detail
+  }
+  return null;
 }
 
 /** Default upstream mapping per the error contract. */
 export function classifyUpstream(status: number, body: string): Outcome {
   if (status === 200) return { kind: 'data', body };
   if (status === 404) return { kind: 'notFound' };
-  if (status === 400) return { kind: 'badRequest', detail: upstreamReason(body) };
+  if (status === 400) {
+    const detail = upstreamMessage(body) ?? upstreamReason(body) ?? 'upstream rejected the request';
+    return { kind: 'badRequest', detail };
+  }
   return { kind: 'unreachable' };
 }
 
@@ -68,7 +89,7 @@ export function classifyUpstream(status: number, body: string): Outcome {
  * upstream failure. */
 export function classifyWarlog(status: number, body: string): Outcome {
   if (status === 403) {
-    const reason = upstreamReason(body);
+    const reason = upstreamReason(body) ?? '';
     return reason === 'accessDenied' || reason === 'privateWarLog' ? { kind: 'private' } : { kind: 'unreachable' };
   }
   return classifyUpstream(status, body);
@@ -124,6 +145,11 @@ export function parseSearchQuery(url: URL): { ok: true; query: SearchQuery } | {
 
   const name = (url.searchParams.get('name') ?? '').trim();
   if (name.length < 1) return { ok: false, detail: 'name is required' };
+  // The game API rejects clan-name searches shorter than three characters
+  // (a two-character name travels all the way upstream just to come back as
+  // a 400 badName). The tier mirrors the floor so the rejection costs ~1 ms
+  // and carries our own sentence instead of upstream's reason code.
+  if (name.length < 3) return { ok: false, detail: 'name must be at least three characters' };
   if (name.length > 64) return { ok: false, detail: 'name is too long' };
   upstream.set('name', name);
   cacheParts.push(`name=${name}`);
@@ -135,11 +161,28 @@ export function parseSearchQuery(url: URL): { ok: true; query: SearchQuery } | {
     cacheParts.push(`minMembers=${minMembers}`);
   }
 
+  // The upper half of the clan-size pair (the screen merges the two into one
+  // "Clan size" control: up to 10 / 10-30 / 30-49 / full 50).
+  const maxMembers = optionalInt(url, 'maxMembers', 1, 50);
+  if (typeof maxMembers === 'string') return { ok: false, detail: maxMembers };
+  if (maxMembers !== undefined) {
+    upstream.set('maxMembers', String(maxMembers));
+    cacheParts.push(`maxMembers=${maxMembers}`);
+  }
+
   const minClanLevel = optionalInt(url, 'minClanLevel', 1, 30);
   if (typeof minClanLevel === 'string') return { ok: false, detail: minClanLevel };
   if (minClanLevel !== undefined) {
     upstream.set('minClanLevel', String(minClanLevel));
     cacheParts.push(`minClanLevel=${minClanLevel}`);
+  }
+
+  // Minimum clan points: the "competitive clans" ladder (10k / 20k / …).
+  const minClanPoints = optionalInt(url, 'minClanPoints', 1, 100_000);
+  if (typeof minClanPoints === 'string') return { ok: false, detail: minClanPoints };
+  if (minClanPoints !== undefined) {
+    upstream.set('minClanPoints', String(minClanPoints));
+    cacheParts.push(`minClanPoints=${minClanPoints}`);
   }
 
   const warFrequency = url.searchParams.get('warFrequency');
@@ -156,6 +199,16 @@ export function parseSearchQuery(url: URL): { ok: true; query: SearchQuery } | {
   if (locationId !== undefined) {
     upstream.set('locationId', String(locationId));
     cacheParts.push(`locationId=${locationId}`);
+  }
+
+  // Clan label (Clan Wars, International, Relaxed, …): the ids the game API
+  // assigns live in the 56xxxxxx range; the bound stays loose like
+  // locationId's because the exact set is upstream's to grow.
+  const labelId = optionalInt(url, 'labelId', 1, 99_999_999);
+  if (typeof labelId === 'string') return { ok: false, detail: labelId };
+  if (labelId !== undefined) {
+    upstream.set('labelId', String(labelId));
+    cacheParts.push(`labelId=${labelId}`);
   }
 
   const limit = optionalInt(url, 'limit', 1, 100);

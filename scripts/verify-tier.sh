@@ -30,8 +30,14 @@ check "search x-cache HIT second"     HIT  "$(hdr "$BASE/api/search?name=mock&li
 check "search age grows on hit"       2    "$(curl -s "$BASE/api/search?name=mock&limit=5" | python3 -c 'import json,sys;print(json.load(sys.stdin)["age"])')"
 check "search two names never alias"  MISS "$(hdr "$BASE/api/search?name=other" x-cache)"
 check "search missing name -> 400"    400  "$(status "$BASE/api/search")"
-check "search bad minMembers -> 400"  400  "$(status "$BASE/api/search?name=x&minMembers=999")"
-check "search bad frequency -> 400"   400  "$(status "$BASE/api/search?name=x&warFrequency=sometimes")"
+check "search short name -> 400"     400  "$(status "$BASE/api/search?name=PH")"
+check "search short name detail"     'name must be at least three characters' "$(curl -s "$BASE/api/search?name=PH" | python3 -c 'import json,sys;print(json.load(sys.stdin)["detail"])')"
+check "search bad minMembers -> 400"  400  "$(status "$BASE/api/search?name=xyz&minMembers=999")"
+check "search bad maxMembers -> 400"  400  "$(status "$BASE/api/search?name=xyz&maxMembers=0")"
+check "search bad minClanPoints -> 400" 400 "$(status "$BASE/api/search?name=xyz&minClanPoints=999999")"
+check "search bad labelId -> 400"     400  "$(status "$BASE/api/search?name=xyz&labelId=0")"
+check "search bad frequency -> 400"   400  "$(status "$BASE/api/search?name=xyz&warFrequency=sometimes")"
+check "search new filters pass through" 200 "$(status "$BASE/api/search?name=mock&maxMembers=10&minClanPoints=5000&labelId=56000007")"
 
 # --- clan ---
 check "clan 200 with roster"          200  "$(status "$BASE/api/clan/%23MOCKCLAN")"
@@ -41,7 +47,7 @@ check "clan cache HIT"                HIT  "$(hdr "$BASE/api/clan/%23MOCKCLAN" x
 
 # --- player ---
 check "player 200"                    200  "$(status "$BASE/api/player/%23MOCKPLAY")"
-check "player carries troops"         2    "$(curl -s "$BASE/api/player/%23MOCKPLAY" | python3 -c 'import json,sys;print(len(json.load(sys.stdin)["troops"]))')"
+check "player carries troops"         22   "$(curl -s "$BASE/api/player/%23MOCKPLAY" | python3 -c 'import json,sys;print(len(json.load(sys.stdin)["troops"]))')"
 
 # --- war ---
 check "war 200"                       200  "$(status "$BASE/api/clan/%23MOCKCLAN/war")"
@@ -66,14 +72,14 @@ check "not_found tag echoed"          '#NOTFOUND' "$(curl -s "$BASE/api/clan/%23
 check "not_found negatively cached"   HIT  "$(hdr "$BASE/api/clan/%23NOTFOUND" x-cache)"
 
 check "upstream 400 -> bad_request"   400  "$(status "$BASE/api/clan/%23BADREQ")"
-check "upstream 400 reason in detail" badName "$(curl -s "$BASE/api/clan/%23BADREQ" | python3 -c 'import json,sys;print(json.load(sys.stdin)["detail"])')"
+check "upstream 400 message wins detail" 'mock bad request' "$(curl -s "$BASE/api/clan/%23BADREQ" | python3 -c 'import json,sys;print(json.load(sys.stdin)["detail"])')"
 
 check "upstream fail -> 502"          502  "$(status "$BASE/api/search?name=fail")"
 check "502 error code"                upstream_unreachable "$(curl -s "$BASE/api/search?name=fail" | python3 -c 'import json,sys;print(json.load(sys.stdin)["error"])')"
 
 check "invalid tag -> 400"            400  "$(status "$BASE/api/clan/%ZZ%%")"
 
-check "non-GET -> 405"                405  "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/api/search?name=x")"
+check "non-GET -> 405"                405  "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/api/search?name=xyz")"
 
 check "unknown route -> 404"          404  "$(status "$BASE/api/nothing")"
 
