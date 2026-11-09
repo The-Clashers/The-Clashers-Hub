@@ -122,8 +122,30 @@ describe('UNIT_ICON_MAP completeness', () => {
     'Life Gem',
     'Seeking Shield',
     'Royal Gem',
+    // hero equipment the reference-data pass trued against the live
+    // payload: the API's own spellings, which the flat map now carries
+    // so it agrees with the typed map in lib/icon-map.ts
+    'Hog Rider Puppet',
+    'Stick Horse',
+    'Henchmen Puppet',
+    'Metal Pants',
+    'Meteor Staff',
+    'Stun Blaster',
   ])('has a bundled icon for %s', (name) => {
     expect(hasUnitIcon(name)).toBe(true);
+  });
+
+  it('the derived spellings the reference-data pass corrected no longer resolve', () => {
+    // Hog Rider Doll and Stick Fire Horse were misnamings (the API spells
+    // them Hog Rider Puppet and Stick Horse); Henchman, Iron Pants, and
+    // Meteorite Sceptre were derived spellings the API does not use. A
+    // payload carrying any of them renders the placeholder, the same
+    // honest fallback the typed map keeps.
+    expect(hasUnitIcon('Hog Rider Doll')).toBe(false);
+    expect(hasUnitIcon('Stick Fire Horse')).toBe(false);
+    expect(hasUnitIcon('Henchman')).toBe(false);
+    expect(hasUnitIcon('Iron Pants')).toBe(false);
+    expect(hasUnitIcon('Meteorite Sceptre')).toBe(false);
   });
 
   it('every value is a non-empty string', () => {

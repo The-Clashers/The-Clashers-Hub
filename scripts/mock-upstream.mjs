@@ -129,7 +129,13 @@ const player = {
       level: 21,
       maxLevel: 80,
       village: 'home',
-      equipment: [{ name: 'Giant Gauntlet', level: 20, maxLevel: 27, village: 'home' }],
+      equipment: [
+        { name: 'Giant Gauntlet', level: 20, maxLevel: 27, village: 'home' },
+        // A trued equipment name: the API's own spelling the
+        // reference-data pass verified, resolving through the typed map
+        // on the panel row and the flat map on the grid tile alike.
+        { name: 'Hog Rider Puppet', level: 15, maxLevel: 18, village: 'home' },
+      ],
     },
     { name: 'Minion Prince', level: 9, maxLevel: null, village: 'home' },
     { name: 'Battle Machine', level: 30, maxLevel: 35, village: 'builderBase' },
@@ -137,6 +143,7 @@ const player = {
   heroEquipment: [
     { name: 'Giant Gauntlet', level: 20, maxLevel: 27, village: 'home' },
     { name: 'Snake Bracelet', level: 12, maxLevel: 27, village: 'home' },
+    { name: 'Hog Rider Puppet', level: 15, maxLevel: 18, village: 'home' },
   ],
   achievements: [{ name: 'Keep Your Account Safe', stars: 3, value: 1, target: 1 }],
 };

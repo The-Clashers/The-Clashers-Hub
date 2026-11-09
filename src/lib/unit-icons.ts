@@ -14,9 +14,13 @@
 //
 // The map is the runtime half of the reference-data bundle the concept doc
 // names (05 section 1, SR-17). The Town Hall cap tables and hero equipment
-// caps land with T-M2-6; the icon map lands here because the progression
-// grid (T-M2-5) needs it first. When T-M2-6 ships, this module is the
-// icon-map portion of that bundle, unchanged.
+// caps landed with T-M2-6; the icon map landed here first because the
+// progression grid (T-M2-5) needed it. The hero and equipment keys are the
+// API's own spellings, trued to the corrected names the reference-data
+// pass verified against the live payload (lib/icon-map.ts carries the same
+// names behind its typed lookup), so the flat map and the typed map never
+// disagree about a shared name. Folding the two maps into one module lands
+// as its own pass.
 
 // The bundled placeholder SVG, imported as a URL so Vite emits it as an
 // asset and the Image source resolves on the deploy. The placeholder is
@@ -180,25 +184,25 @@ import eqHealingTome from '../assets/game-icons/Icon_HE_GW_Healing_Tome.png';
 import eqLifeGem from '../assets/game-icons/Icon_HE_GW_Life_Gem.png';
 import eqRageGem from '../assets/game-icons/Icon_HE_GW_Rage_Gem.png';
 import eqDarkOrb from '../assets/game-icons/Icon_HE_MP_DarkOrb.png';
-import eqHenchman from '../assets/game-icons/Icon_HE_MP_Henchman.png';
-import eqIronPants from '../assets/game-icons/Icon_HE_MP_Iron_Pants.png';
+import eqHenchmanPuppet from '../assets/game-icons/Icon_HE_MP_Henchman.png';
+import eqMetalPants from '../assets/game-icons/Icon_HE_MP_Iron_Pants.png';
 import eqNobleIron from '../assets/game-icons/Icon_HE_MP_Noble_Iron.png';
 import eqElectroBoots from '../assets/game-icons/Icon_HE_RC_ElectroBoots.png';
 import eqFrostFlake from '../assets/game-icons/Icon_HE_RC_Frost_Flake.png';
 import eqHasteVial from '../assets/game-icons/Icon_HE_RC_Haste_Vial.png';
-import eqHogRiderDoll from '../assets/game-icons/Icon_HE_RC_Hog_Rider_Doll.png';
+import eqHogRiderPuppet from '../assets/game-icons/Icon_HE_RC_Hog_Rider_Doll.png';
 import eqRoyalGem from '../assets/game-icons/Icon_HE_RC_Royal_Gem.png';
 import eqSeekingShield from '../assets/game-icons/Icon_HE_RC_Seeking_Shield.png';
-import eqStickFireHorse from '../assets/game-icons/Icon_HG_BK_StickFireHorse.png';
+import eqStickHorse from '../assets/game-icons/Icon_HG_BK_StickFireHorse.png';
 import eqElectroFangs from '../assets/game-icons/Icon_HG_DD_Electro_Fangs.png';
 import eqFireHeart from '../assets/game-icons/Icon_HG_DD_FireHeart.png';
 import eqFlameBlower from '../assets/game-icons/Icon_HG_DD_FlameBlower.png';
 import eqRocketBackPack from '../assets/game-icons/Icon_HG_DD_Rocket_BackPack.png';
-import eqStunBlast from '../assets/game-icons/Icon_HG_DD_StunBlast.png';
+import eqStunBlaster from '../assets/game-icons/Icon_HG_DD_StunBlast.png';
 import eqHeroicTorch from '../assets/game-icons/Icon_HG_GW_Heroic_Torch.png';
 import eqLavaloonPuppet from '../assets/game-icons/Icon_HG_GW_LavaloonPuppet.png';
 import eqDarkCrown from '../assets/game-icons/Icon_HG_MP_DarkCrown.png';
-import eqMeteoriteSceptre from '../assets/game-icons/Icon_HG_MP_MeteoriteSceptre.png';
+import eqMeteorStaff from '../assets/game-icons/Icon_HG_MP_MeteoriteSceptre.png';
 import eqRocketSpear from '../assets/game-icons/Icon_HG_RoyalChampion_RocketSpear_Equipment_03.png';
 
 /**
@@ -361,22 +365,22 @@ export const UNIT_ICON_MAP: Readonly<Record<string, string>> = {
   'Royal Gem': eqRoyalGem,
   'Frost Flake': eqFrostFlake,
   'Haste Vial': eqHasteVial,
-  'Hog Rider Doll': eqHogRiderDoll,
+  'Hog Rider Puppet': eqHogRiderPuppet,
   'Electro Boots': eqElectroBoots,
   'Dark Orb': eqDarkOrb,
-  'Henchman': eqHenchman,
-  'Iron Pants': eqIronPants,
+  'Henchmen Puppet': eqHenchmanPuppet,
+  'Metal Pants': eqMetalPants,
   'Noble Iron': eqNobleIron,
-  'Stick Fire Horse': eqStickFireHorse,
+  'Stick Horse': eqStickHorse,
   'Electro Fangs': eqElectroFangs,
   'Fire Heart': eqFireHeart,
   'Flame Blower': eqFlameBlower,
   'Rocket Backpack': eqRocketBackPack,
-  'Stun Blaster': eqStunBlast,
+  'Stun Blaster': eqStunBlaster,
   'Heroic Torch': eqHeroicTorch,
   'Lavaloon Puppet': eqLavaloonPuppet,
   'Dark Crown': eqDarkCrown,
-  'Meteorite Sceptre': eqMeteoriteSceptre,
+  'Meteor Staff': eqMeteorStaff,
   'Rocket Spear': eqRocketSpear,
 };
 
