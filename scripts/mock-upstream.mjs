@@ -3,6 +3,13 @@
 // Run it next to the tier: COC_API_BASE_URL=http://localhost:8787/v1
 // COC_API_TOKEN=mock npm run dev:api
 //
+// The /v1/clans listing honors the upstream filter params the tier
+// forwards (minMembers, maxMembers, minClanLevel, minClanPoints,
+// frequency, locationId, labelId) and its items carry the fields the
+// client-side filters read (type, isFamilyFriendly, requiredTrophies,
+// requiredTownhallLevel, chatLanguage), so the whole filter row is
+// exercisable locally end to end.
+//
 // Special tags and names exercise the whole error contract:
 //   name contains "fail"        -> 500 (upstream_unreachable path)
 //   name contains "busy"        -> 429 with Retry-After (the busy path on search)
@@ -192,14 +199,146 @@ const warlog = {
   ],
 };
 
-// The clans the search endpoint pages through: one per page, distinct tags,
-// then a real end (the last page carries no cursor). A listing that
-// repeated one clan on every page would hand the client duplicate keys,
-// which the real API never does.
+// The clans the search endpoint pages through: eight fixture clans whose
+// fields vary across every filter dimension (type, family-friendliness,
+// join gates, chat language, labels, location, points, size, frequency),
+// then a real end (the last page carries no cursor). Two clans per page, so
+// pagination is exercisable without tedium. A listing that repeated one
+// clan on every page would hand the client duplicate keys, which the real
+// API never does.
+const SEARCH_LABEL_INTERNATIONAL = { id: 56000007, name: 'International' };
+
 const MOCK_SEARCH_CLANS = [
-  { ...clan, memberList: undefined },
-  { ...clan, tag: '#MOCKTWO', name: 'Mock Second Clan', memberList: undefined },
-  { ...clan, tag: '#MOCKTHREE', name: 'Mock Third Clan', memberList: undefined },
+  {
+    tag: '#MOCKCLAN',
+    name: 'Mock Clan',
+    type: 'open',
+    description: 'A fixture clan for local development.',
+    clanLevel: 12,
+    clanPoints: 41230,
+    members: 45,
+    warFrequency: 'always',
+    isWarLogPublic: true,
+    isFamilyFriendly: true,
+    location: { id: 32000006, name: 'International', isCountry: false },
+    chatLanguage: { id: 75000000, name: 'English', languageCode: 'EN' },
+    labels: [
+      { id: 56000000, name: 'Clan Wars' },
+      SEARCH_LABEL_INTERNATIONAL,
+    ],
+  },
+  {
+    tag: '#MOCKTWO',
+    name: 'Mock Second Clan',
+    type: 'inviteOnly',
+    clanLevel: 8,
+    clanPoints: 22000,
+    members: 30,
+    warFrequency: 'oncePerWeek',
+    isWarLogPublic: true,
+    isFamilyFriendly: false,
+    requiredTrophies: 1000,
+    requiredTownhallLevel: 12,
+    location: { id: 32000185, name: 'Philippines', isCountry: true },
+    chatLanguage: { id: 75000000, name: 'English', languageCode: 'EN' },
+    labels: [{ id: 56000013, name: 'Relaxed' }],
+  },
+  {
+    tag: '#MOCKTHREE',
+    name: 'Mock Third Clan',
+    type: 'closed',
+    clanLevel: 15,
+    clanPoints: 38000,
+    members: 49,
+    warFrequency: 'always',
+    isWarLogPublic: false,
+    isFamilyFriendly: false,
+    requiredTrophies: 2000,
+    requiredTownhallLevel: 14,
+    location: { id: 32000249, name: 'United States', isCountry: true },
+    chatLanguage: { id: 75000017, name: 'Spanish', languageCode: 'ES' },
+    labels: [{ id: 56000014, name: 'Competitive' }],
+  },
+  {
+    tag: '#MOCKFOUR',
+    name: 'Mock Fourth Clan',
+    type: 'open',
+    clanLevel: 3,
+    clanPoints: 8000,
+    members: 10,
+    warFrequency: 'lessThanOncePerWeek',
+    isWarLogPublic: true,
+    isFamilyFriendly: true,
+    requiredTrophies: 0,
+    location: { id: 32000038, name: 'Brazil', isCountry: true },
+    chatLanguage: { id: 75000035, name: 'Portuguese', languageCode: 'PT' },
+    labels: [SEARCH_LABEL_INTERNATIONAL],
+  },
+  {
+    tag: '#MOCKFIVE',
+    name: 'Mock Fifth Clan',
+    type: 'inviteOnly',
+    clanLevel: 18,
+    clanPoints: 55000,
+    members: 50,
+    warFrequency: 'always',
+    isWarLogPublic: true,
+    isFamilyFriendly: false,
+    requiredTrophies: 4000,
+    requiredTownhallLevel: 16,
+    location: { id: 32000006, name: 'International', isCountry: false },
+    chatLanguage: { id: 75000000, name: 'English', languageCode: 'EN' },
+    labels: [{ id: 56000001, name: 'Clan War League' }],
+  },
+  {
+    tag: '#MOCKSIX',
+    name: 'Mock Sixth Clan',
+    type: 'open',
+    clanLevel: 5,
+    clanPoints: 12000,
+    members: 20,
+    warFrequency: 'never',
+    isWarLogPublic: true,
+    isFamilyFriendly: false,
+    requiredTrophies: 0,
+    location: { id: 32000185, name: 'Philippines', isCountry: true },
+    chatLanguage: { id: 75000000, name: 'English', languageCode: 'EN' },
+    labels: [{ id: 56000000, name: 'Clan Wars' }],
+  },
+  {
+    tag: '#MOCKSEVEN',
+    name: 'Mock Seventh Clan',
+    type: 'closed',
+    clanLevel: 6,
+    clanPoints: 9000,
+    members: 15,
+    warFrequency: 'moreThanOncePerWeek',
+    isWarLogPublic: true,
+    isFamilyFriendly: false,
+    requiredTrophies: 3000,
+    requiredTownhallLevel: 10,
+    location: { id: 32000114, name: 'Indonesia', isCountry: true },
+    chatLanguage: { id: 75000017, name: 'Spanish', languageCode: 'ES' },
+    labels: [
+      { id: 56000013, name: 'Relaxed' },
+      SEARCH_LABEL_INTERNATIONAL,
+    ],
+  },
+  {
+    tag: '#MOCKEIGHT',
+    name: 'Mock Eighth Clan',
+    type: 'open',
+    clanLevel: 2,
+    clanPoints: 3000,
+    members: 5,
+    warFrequency: 'oncePerWeek',
+    isWarLogPublic: true,
+    isFamilyFriendly: true,
+    requiredTrophies: 0,
+    location: { id: 32000006, name: 'International', isCountry: false },
+    chatLanguage: { id: 75000000, name: 'English', languageCode: 'EN' },
+    labels: [SEARCH_LABEL_INTERNATIONAL],
+  },
 ];
 
 function sendJson(res, status, body, headers = {}) {
@@ -238,11 +377,42 @@ const server = createServer((req, res) => {
       sendJson(res, 200, { items: [], paging: { cursors: {} } });
       return;
     }
-    // One clan per page, cursor-walked, then a page with no cursor so the
+
+    // The upstream filter params the tier forwards, applied honestly so
+    // the filter row is exercisable against the mock. The tier sends
+    // "frequency" for war frequency (the param name it owns upstream), so
+    // the mock reads that name too.
+    const numberParam = (key) => {
+      const raw = url.searchParams.get(key);
+      if (raw === null) return null;
+      const value = Number(raw);
+      return Number.isFinite(value) ? value : null;
+    };
+    const minMembers = numberParam('minMembers');
+    const maxMembers = numberParam('maxMembers');
+    const minClanLevel = numberParam('minClanLevel');
+    const minClanPoints = numberParam('minClanPoints');
+    const labelId = numberParam('labelId');
+    const locationId = numberParam('locationId');
+    const frequency = url.searchParams.get('frequency');
+
+    const filtered = MOCK_SEARCH_CLANS.filter((entry) => {
+      if (minMembers !== null && entry.members < minMembers) return false;
+      if (maxMembers !== null && entry.members > maxMembers) return false;
+      if (minClanLevel !== null && entry.clanLevel < minClanLevel) return false;
+      if (minClanPoints !== null && entry.clanPoints < minClanPoints) return false;
+      if (labelId !== null && !entry.labels.some((label) => label.id === labelId)) return false;
+      if (locationId !== null && entry.location.id !== locationId) return false;
+      if (frequency !== null && entry.warFrequency !== frequency) return false;
+      return true;
+    });
+
+    // Two clans per page, cursor-walked, then a page with no cursor so the
     // listing ends the way a real one does.
+    const PAGE_SIZE = 2;
     const pageIndex = after === null ? 0 : Math.max(0, Number.parseInt(after, 10) || 0);
-    const pageItems = MOCK_SEARCH_CLANS.slice(pageIndex, pageIndex + 1);
-    const nextCursor = pageIndex + 1 < MOCK_SEARCH_CLANS.length ? String(pageIndex + 1) : null;
+    const pageItems = filtered.slice(pageIndex * PAGE_SIZE, pageIndex * PAGE_SIZE + PAGE_SIZE);
+    const nextCursor = (pageIndex + 1) * PAGE_SIZE < filtered.length ? String(pageIndex + 1) : null;
     sendJson(res, 200, {
       items: pageItems,
       paging: nextCursor === null ? { cursors: {} } : { cursors: { after: nextCursor } },
