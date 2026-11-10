@@ -20,9 +20,18 @@ export default defineConfig({
       '/api': 'http://localhost:8788',
     },
   },
+  preview: {
+    proxy: {
+      '/api': 'http://localhost:8788',
+    },
+  },
+  optimizeDeps: {
+    exclude: ['react-native-svg'],
+  },
   resolve: {
     alias: [
       { find: /^react-native$/, replacement: 'react-native-web' },
+      { find: /^react-native-svg$/, replacement: 'react-native-svg/lib/module/ReactNativeSVG.web.js' },
       {
         find: '@react-native/assets-registry/registry',
         replacement: fileURLToPath(new URL('./src/shims/assets-registry.ts', import.meta.url)),

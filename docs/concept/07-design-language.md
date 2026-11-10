@@ -262,7 +262,8 @@ draw, which is why the ambience layer uses react-native-svg, the chart
   describes; the clan screen keeps its footer row until its own pass).
   Breadcrumbs `Home › Players › <name>` sit above with the clan card's
   clearance.
-  The analysis column stacks the five sections. The rushed analysis card
+  The left column holds the identity card and the two verdict cards: the
+  rushed analysis card and the upgrade-next list. The rushed analysis card
   (T-M2-2's card half) centers the `Gauge` dial (the overall deficit
   percentage as a gold arc on a semicircle, the number in its throat,
   "DEFICIT VS TH CEILING" under it), the band chip under the dial, the
@@ -274,7 +275,8 @@ draw, which is why the ambience layer uses react-native-svg, the chart
   level/maximum pair, and the gap as a warning chip; a maxed account gets
   the designed "nothing to catch up" reading (AC-04), never a fabricated
   todo list.
-  The hero card (T-M2-4) renders the prototype's hero cards: one compact
+  The right column stacks the three ledger cards: heroes, the progression
+  grid, and achievements last. The hero card (T-M2-4) renders the prototype's hero cards: one compact
   card per hero in measured rows of at least 240 px — the bundled unit
   icon (`UnitIcon`, 32 px slot, the typed map in `lib/icon-map.ts`
   resolving every hero the API names, placeholder.svg for content the map
@@ -289,28 +291,34 @@ draw, which is why the ambience layer uses react-native-svg, the chart
   strength: the chip is the verdict, the picture is identity); a hero
   with a null maxLevel renders its level alone with no rail, and the card
   footnotes the count instead of inventing a maximum.
-  The achievements card (T-M2-3) renders the prototype's rows: a headline
-  with the name, the star trio (`Glyph` stars, gold for earned tiers,
-  quiet for the open ones), and the value/target pair closing the line;
-  the `ProgressRail` full width under it (the stars live in the headline,
-  so the rail draws its track alone); the requirement text with the
-  stars-earned count under that. Stars are the API's count, never derived
-  from the fill: the payload proves they are independent (2 stars at 25%
-  of the target, 1 star past it). A completed row (all three stars in)
-  mutes to the ledger treatment: secondary name, no requirement line,
-  so the in-progress rows draw the eye; on a maxed account the card reads
-  as a quiet ledger, which is the honest reading of a finished list. The
-  rows group by village under quiet uppercase headers (the payload
-  interleaves home, builder base, and clan capital rows) and key on
-  village-name-index because the live payload carries duplicate names
-  (one locked "Keep Your Account Safe!" beside the completed one).
-  The progression grid (T-M2-5) renders the prototype's tile wall:
+  The progression grid (T-M2-5) renders the prototype's tile wall for all
+  non-hero units (heroes live on their own card above and are excluded here):
   compact tiles in measured rows of at least 76 px — the bundled icon
   centered on top, the name in two quiet lines under it, the level/max
   pair at the bottom, and a gold MAX badge breaking the tile's top-right
   corner when the unit is maxed (the maxed tile's border goes gold too).
-  Village and category headers dock above their blocks, the category
-  header carrying its "N units · M maxed" count line.
+  Village and category headers dock above their blocks, with Home Village
+  ordered `Troops`, `Spells`, `Equipments`, `Pets`, `Siege` and Builder
+  Base carrying `Troops`; each category header carries its "N units · M
+  maxed" count line.
+  The achievements card (T-M2-3) sits last in the column and pairs a
+  filter pill bar (`All`, `In Progress`, `Completed` with counts) with a
+  measured multi-column grid of compact achievement tiles (at least 220 px
+  wide, the same `onLayout` measurement pattern `HeroGrid` uses) so ~54
+  achievements scan as a compact ledger grid instead of a towering
+  single-column list. Each tile places the achievement name and star trio
+  (`Glyph` stars, gold for earned tiers, quiet for the open ones) on the
+  top line, the `ProgressRail` (`showStars={false}`) beside the tabular
+  value/target counter on the meter line, and a single-line requirement
+  note on in-progress tiles. Stars are the API's count, never derived
+  from the fill: the payload proves they are independent (2 stars at 25%
+  of the target, 1 star past it). A completed tile (all three stars in)
+  mutes to the ledger treatment — secondary name, no requirement line —
+  so completed items stay two lines tall while in-progress items draw the
+  eye. Tiles group by village under quiet uppercase headers (the payload
+  interleaves home, builder base, and clan capital rows) and key on
+  village-name-index because the live payload carries duplicate names
+  (one locked "Keep Your Account Safe!" beside the completed one).
 - Breakpoints come from `useWindowDimensions` into a shared `breakpoints`
   helper, no CSS media queries scattered through components; RN paradigm is
   JS-driven layout.

@@ -93,6 +93,31 @@ function formatInteger(value: number): string {
   return Math.round(Math.max(0, value)).toLocaleString('en-US');
 }
 
+/** The filter modes the achievements card offers to compact the list:
+ * - 'all': every achievement across all villages
+ * - 'inProgress': only achievements with fewer than 3 stars earned
+ * - 'complete': only completed achievements (all 3 stars earned) */
+export type AchievementFilter = 'all' | 'inProgress' | 'complete';
+
+export const ACHIEVEMENT_FILTER_LABELS: Record<AchievementFilter, string> = {
+  all: 'All',
+  inProgress: 'In Progress',
+  complete: 'Completed',
+};
+
+/** Filters a list of achievements by completion status. Pure: does not
+ * mutate the input array. */
+export function filterAchievements<T extends { stars: number }>(
+  achievements: readonly T[],
+  filter: AchievementFilter,
+): T[] {
+  if (filter === 'all') return [...achievements];
+  return achievements.filter((item) => {
+    const isDone = starSlots(item.stars).earned >= ACHIEVEMENT_MAX_STARS;
+    return filter === 'complete' ? isDone : !isDone;
+  });
+}
+
 // ---------- village grouping ----------
 
 // The grouping rule lives in lib/village.ts now: the hero card (T-M2-4)
