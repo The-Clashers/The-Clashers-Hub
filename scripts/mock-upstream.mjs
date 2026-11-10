@@ -82,6 +82,15 @@ const player = {
   name: 'Mock Player',
   townHallLevel: 14,
   expLevel: 189,
+  // The season counters the player card's identity chips read (the
+  // prototype rework): trophies, war stars, attack wins, and the donation
+  // pair, all optional on the wire and all present here so local dev shows
+  // every chip.
+  trophies: 4871,
+  warStars: 1240,
+  attackWins: 88,
+  donations: 340,
+  donationsReceived: 260,
   league: { name: 'Titan League I' },
   clan: { tag: '#MOCKCLAN', name: 'Mock Clan', clanLevel: 12 },
   troops: [
