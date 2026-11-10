@@ -47,6 +47,7 @@ theme toggle, fixed in a thin row at the top like a tracker site.
 | `/contributors` | Contributors | the repo's contributor list, read live from GitHub |
 | `/clan/:tag` | Clan detail | stacked details card (identity, description, uniform stat grid); breadcrumbs `Home › Clans › <name>`; tabs: Roster (default) / War / Log / Needs Attention; tab via `?tab=` |
 | `/player/:tag` | Player detail | identity header, rushed analysis, heroes, achievements |
+| `/compare` | Compare landing | mode selector (players or clans) with dual search boxes (Entity A vs Entity B) for head-to-head comparison |
 | `/compare/players?a=:tag&b=:tag` | Player compare | P1 |
 | `/compare/clans?a=:tag&b=:tag` | Clan compare | P1 |
 

@@ -196,14 +196,16 @@ draw, which is why the ambience layer uses react-native-svg, the chart
 
 - Centered content column, max width 1280, side padding from the spacing scale.
 - **Global nav bar:** a thin fixed row at the top like a tracker site (the
-  owner's layout): the brand, the lookup box (its small icon dropdown picks
-  player or clan), the page links (Home, Players, Clans, Contributors), and
+  owner's layout): the brand, the lookup box (its icon-and-label dropdown picks
+  player or clan, accompanied by a search glyph), the page links with dedicated
+  SVG glyphs (Home, Players, Clans, Compare, Contributors), and
   the theme toggle. The brand is the prototype's shield logo — the
   gold-rimmed shield with its filled field and star, drawn on
   react-native-svg from theme tokens so it follows the accent — beside the
   two-line lockup (name over the "clan and player analytics, live and
-  login-free" tagline; the tagline drops off the stacked tiers). The Home
-  link carries the prototype's home glyph beside its label. One row at
+  login-free" tagline; the tagline drops off the stacked tiers). The page
+  links carry matching icons beside their labels (`home`, `user`, `shield`,
+  `compare`, `code`). One row at
   48 px from 1024 px up; below that a two-row
   90 px stack (brand + links + toggle, then the lookup full width) so the
   lookup never squeezes. Fixed, not sticky: a sticky bar is constrained to
@@ -213,6 +215,11 @@ draw, which is why the ambience layer uses react-native-svg, the chart
   the 44 px floor, keyboard focus, and the gold ring. The glass pass made
   it frosted: the canvas veil plus the shared backdrop blur over the
   scrolling page, on the resting shadow.
+- **Compare landing screen:** `/compare` provides a head-to-head comparison
+  hub with an active mode toggle (`Compare Players` or `Compare Clans`). Each
+  mode offers two dedicated input boxes (Entity A and Entity B) divided by
+  a central VS badge, complete with tag normalization, helper hints, and
+  a launch button navigating to `/compare/players` or `/compare/clans`.
 - **Clan detail card:** three stacked bands (the owner's better-layout call
   over the two-column wireframe). The identity row (badge 48, name,
   tag/level/location line), the description at full width clamped to two
@@ -357,7 +364,7 @@ draw, which is why the ambience layer uses react-native-svg, the chart
 | `LeagueRank` | the rank cell the roster and attention tables share: tier icon plus the rank number parsed from the tier name, dash when unranked |
 | `RosterTable` / `RosterCard` | the clan roster, table & card presentations |
 | `AttentionTable` / `AttentionCard` | the Needs Attention tab's worst-first view, table & card presentations |
-| `Glyph` | the UI glyph set (the prototype's own paths on react-native-svg): compare, refresh, home, and the filled star — the marks the buttons, the Home link, and the achievement ratings draw |
+| `Glyph` | the UI glyph set (the prototype's own paths on react-native-svg): compare, refresh, home, star, user, shield, search, and code — the marks buttons, nav links, mode pickers, and ratings draw |
 | `ProgressRail` | achievement value/target bar; the star row beside the track by default, or track-only (`showStars={false}`) when the row renders its star trio in the headline the prototype's layout draws |
 | `LevelRail` | the hero panel's level-versus-maximum bar: the fill without star markers, the same 6 px track and gold fill `ProgressRail` draws |
 | `CategoryBars` | rushed per-category horizontal bars: label, quiet track, band-colored fill, tabular percentage |
