@@ -111,9 +111,10 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     textWarn: {
       color: c.warning,
     },
-    // dash: no data, a muted chip that does not read as a verdict
+    // dash: no data, a muted chip that does not read as a verdict. The
+    // quiet fill keeps the chip visible on the glass panel it sits on.
     chipDash: {
-      backgroundColor: c.panel,
+      backgroundColor: c.fillQuiet,
       borderColor: c.panelBorder,
     },
     textDash: {

@@ -51,12 +51,14 @@ export default function LevelRail({ fill }: LevelRailProps) {
 function createStyles(t: ReturnType<typeof useTheme>['theme']) {
   const c = t.colors;
   return StyleSheet.create({
-    // The quiet track the fill climbs: panel tone with a hairline border,
-    // so an empty rail still reads as a rail on the raised panel behind it.
+    // The quiet track the fill climbs: the glass system's quiet fill with a
+    // hairline border, so an empty rail still reads as a rail on the
+    // translucent panel behind it (panel tone itself is now glass and
+    // would vanish into its host).
     track: {
       height: RAIL_HEIGHT,
       borderRadius: RAIL_RADIUS,
-      backgroundColor: c.panel,
+      backgroundColor: c.fillQuiet,
       borderWidth: 1,
       borderColor: c.hairline,
       // Clip the fill to the track's rounded ends.

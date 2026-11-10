@@ -15,16 +15,19 @@ export {
   layout,
   motion,
   zIndex,
+  glass,
+  shadows,
   breakpointFor,
   type ThemeTokens,
   type ColorTokenName,
   type ColorTokens,
   type SpacingStep,
   type RadiusStep,
+  type ShadowStep,
   type FontSizeStep,
   type FontWeightName,
   type LineHeightName,
   type Breakpoint,
 } from './tokens';
 export { ThemeProvider, useTheme, type ThemeName } from './ThemeProvider';
-export { baseStyles, createBaseStyles, type BaseStyles } from './baseStyles';
+export { baseStyles, createBaseStyles, glassSurfaceFilter, type BaseStyles } from './baseStyles';

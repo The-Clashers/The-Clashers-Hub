@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigate } from 'react-router';
-import { useTheme } from '../theme';
+import { useTheme, glassSurfaceFilter } from '../theme';
 import LookupModePicker, { type LookupMode } from './LookupModePicker';
 import { SEARCH_NAME_MIN_CHARS, SEARCH_NAME_MIN_COPY } from '../api/search';
 import {
@@ -225,7 +225,11 @@ function createStyles(t: ReturnType<typeof useTheme>['theme'], variant: LookupVa
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.xs,
       color: c.warning,
-      backgroundColor: c.canvas,
+      // Glass: the hint floats over whatever sits behind the nav row, so
+      // it takes the canvas veil plus the shared blur instead of an opaque
+      // block that would punch a hole in the frosted bar.
+      ...glassSurfaceFilter(t),
+      backgroundColor: c.canvasVeil,
       paddingHorizontal: t.spacing[2],
       paddingVertical: 2,
       borderRadius: t.radius[1],

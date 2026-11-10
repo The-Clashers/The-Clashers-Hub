@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { createPortal } from 'react-dom';
-import { useTheme } from '../theme';
+import { useTheme, glassSurfaceFilter } from '../theme';
 
 // A select-style dropdown built on RN primitives only (CON-04: no DOM-only
 // UI libraries, no native <select>, no extra dependency). The search screen
@@ -400,6 +400,9 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     // absolute/relative and visible/hidden/scroll, hence the casts. zIndex
     // at the overlay level beats anything in the app tree. maxHeight stays
     // here as the ceiling; the component tightens it to the option count.
+    // Glass: the list floats over arbitrary page content, so it takes the
+    // shared backdrop blur and the lifted shadow, not just the translucent
+    // surface color, to keep its options readable over whatever it covers.
     listbox: {
       position: 'fixed' as unknown as 'relative',
       zIndex: t.zIndex.overlay,
@@ -410,6 +413,9 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       backgroundColor: c.panelRaised,
       overflow: 'auto' as unknown as 'scroll',
       paddingBottom: t.spacing[1],
+      ...glassSurfaceFilter(t),
+      shadowColor: c.shadowColor,
+      ...t.shadows.lifted,
     },
     option: {
       flexDirection: 'row',

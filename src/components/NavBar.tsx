@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useLocation, useNavigate } from 'react-router';
-import { useTheme, breakpointFor } from '../theme';
+import { useTheme, breakpointFor, glassSurfaceFilter } from '../theme';
 import { ThemeToggle } from './ThemeToggle';
 import LookupSearch from './LookupSearch';
 
@@ -167,21 +167,26 @@ function NavLink({ spec, active, onPress, styles }: NavLinkProps) {
 function createStyles(t: ReturnType<typeof useTheme>['theme'], stacked: boolean) {
   const c = t.colors;
   return StyleSheet.create({
-    // The fixed bar: pinned to the viewport's top, opaque canvas so page
-    // content scrolls under it cleanly, hairline bottom edge.
-    // position:fixed is a react-native-web runtime value the RN types do
-    // not carry (the Dropdown makes the same cast for its portaled
-    // listbox). Fixed, not sticky, because a sticky bar is constrained to
-    // its containing block, which is exactly viewport-height here.
+    // The fixed bar: pinned to the viewport's top, glass over the scrolling
+    // page (the canvas veil plus the shared backdrop blur, 07 section 2
+    // "Glass"), lifted on the shadow scale so content visibly passes under
+    // it, hairline bottom edge. position:fixed is a react-native-web runtime
+    // value the RN types do not carry (the Dropdown makes the same cast for
+    // its portaled listbox). Fixed, not sticky, because a sticky bar is
+    // constrained to its containing block, which is exactly viewport-height
+    // here.
     bar: {
       position: 'fixed' as unknown as 'relative',
       top: 0,
       left: 0,
       right: 0,
       zIndex: t.zIndex.sticky,
-      backgroundColor: c.canvas,
+      ...glassSurfaceFilter(t),
+      backgroundColor: c.canvasVeil,
       borderBottomWidth: 1,
       borderBottomColor: c.hairline,
+      shadowColor: c.shadowColor,
+      ...t.shadows.resting,
     },
     // The centered content column the screens use, kept in sync with
     // baseStyles.contentColumn: same max width, same side padding.
