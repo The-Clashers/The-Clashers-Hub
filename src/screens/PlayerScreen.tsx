@@ -66,12 +66,11 @@ import {
 // last-refresh text riding in the cached pill) — freshness belongs to the
 // card whose data it describes, beside the compare action.
 //
-// The analysis column holds the five M2 sections in a stack: the rushed
-// analysis card and the upgrade-next list (T-M2-2's card half, the verdict
-// pair), then the hero, achievements, and progression cards — the hero
-// cards and the achievement rows follow the prototype's icon layouts (the
-// icon-anchored hero card with its rail, the star-rated achievement
-// headline), and the progression grid renders the prototype's tile wall.
+// The two-column desktop layout places the identity card and the two
+// verdict cards (rushed analysis and upgrade next) in the left column,
+// while the right column holds the three ledger cards: heroes,
+// achievements, and the progression grid. On mobile they stack in the
+// same logical order.
 //
 // Breadcrumbs locate the page the way the clan detail's do (07 section 3):
 // Home > Players > <player name>, the tag from the URL until the name is in
@@ -95,14 +94,6 @@ const SKELETON_META_WIDTH = 170;
 
 // The header stat cells the skeleton draws, matching the grid's count.
 const SKELETON_STAT_CELLS = 4;
-
-// The analysis sections the skeleton draws, matching the five sections
-// the success state renders (the rushed card, the upgrade-next list, the
-// hero card, the achievements card, the progression grid). Each skeleton
-// block mirrors the section it stands in for: a title line and a body line
-// inside the shared state panel, so the layout-matched skeleton (06
-// section 3) keeps its shape through the loading state.
-const SKELETON_SECTIONS = 5;
 
 // Micro-label tracking: the one-off 0.6 px tracking the design language
 // pairs with uppercase micro labels (StatChip keeps the same local value).
@@ -342,25 +333,37 @@ function PlayerSuccess({ player, onRefresh, isRefreshing }: PlayerSuccessProps) 
     </View>
   );
 
-  const sections = (
-    <>
-      <RushedAnalysisCard verdict={verdict} townHallLevel={player.townHallLevel} />
-      <UpgradeNextCard verdict={verdict} />
-      <HeroCard heroes={player.heroes} />
-      <AchievementsCard achievements={player.achievements} />
-      <ProgressionCard player={player} />
-    </>
+  const rushedCard = (
+    <RushedAnalysisCard verdict={verdict} townHallLevel={player.townHallLevel} />
   );
+  const upgradeNextCard = <UpgradeNextCard verdict={verdict} />;
+  const heroCard = <HeroCard heroes={player.heroes} />;
+  const achievementsCard = <AchievementsCard achievements={player.achievements} />;
+  const progressionCard = <ProgressionCard player={player} />;
 
   return twoColumns ? (
     <View style={styles.columns}>
-      <View style={styles.identityColumn}>{identityCard}</View>
-      <View style={styles.analysisColumn}>{sections}</View>
+      <View style={styles.identityColumn}>
+        {identityCard}
+        {rushedCard}
+        {upgradeNextCard}
+      </View>
+      <View style={styles.analysisColumn}>
+        {heroCard}
+        {achievementsCard}
+        {progressionCard}
+      </View>
     </View>
   ) : (
     <View style={styles.stackedColumn}>
       {identityCard}
-      <View style={styles.sectionStack}>{sections}</View>
+      <View style={styles.sectionStack}>
+        {rushedCard}
+        {upgradeNextCard}
+        {heroCard}
+        {achievementsCard}
+        {progressionCard}
+      </View>
     </View>
   );
 }
@@ -1058,20 +1061,37 @@ function PlayerLoading({ busyRetrying }: PlayerLoadingProps) {
     </View>
   );
 
+  const rushedBlock = sectionBlock('sk-rushed');
+  const upgradeBlock = sectionBlock('sk-upgrade');
+  const heroBlock = sectionBlock('sk-heroes');
+  const achievementsBlock = sectionBlock('sk-achievements');
+  const progressionBlock = sectionBlock('sk-progression');
+
   return twoColumns ? (
     <View style={styles.columns} aria-hidden>
-      {/* The identity column holds the card skeleton; the analysis column
-          holds one block per section, the five the success state draws. */}
-      <View style={styles.identityColumn}>{identityCard}</View>
+      {/* The identity column holds the card skeleton plus the rushed and
+          upgrade-next skeletons; the analysis column holds the hero,
+          achievements, and progression skeletons. */}
+      <View style={styles.identityColumn}>
+        {identityCard}
+        {rushedBlock}
+        {upgradeBlock}
+      </View>
       <View style={styles.analysisColumn}>
-        {Array.from({ length: SKELETON_SECTIONS }, (_, index) => sectionBlock(`sk-${index}`))}
+        {heroBlock}
+        {achievementsBlock}
+        {progressionBlock}
       </View>
     </View>
   ) : (
     <View style={styles.stackedColumn} aria-hidden>
       {identityCard}
       <View style={styles.sectionStack}>
-        {Array.from({ length: SKELETON_SECTIONS }, (_, index) => sectionBlock(`sk-${index}`))}
+        {rushedBlock}
+        {upgradeBlock}
+        {heroBlock}
+        {achievementsBlock}
+        {progressionBlock}
       </View>
     </View>
   );
@@ -1195,10 +1215,11 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     // the analysis column's room; it may shrink a little on the narrower
     // desktop viewports, where its stat grid already wraps two per row.
     identityColumn: {
-      flexBasis: '36%',
+      flexBasis: '38%',
       flexGrow: 0,
       flexShrink: 1,
       minWidth: 0,
+      gap: t.spacing[4],
     },
     analysisColumn: {
       flexBasis: '58%',
