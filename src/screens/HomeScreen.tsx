@@ -29,6 +29,11 @@ const QUICK_LINKS: ReadonlyArray<{ title: string; body: string; route: string }>
     route: '/players',
   },
   {
+    title: 'Compare',
+    body: 'Head-to-head analysis. Compare two players or two clans side by side.',
+    route: '/compare',
+  },
+  {
     title: 'Contributors',
     body: 'The people building The Clashers Hub, straight from the repo.',
     route: '/contributors',

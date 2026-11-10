@@ -4,7 +4,7 @@ import Svg, { Path } from 'react-native-svg';
 import { useLocation, useNavigate } from 'react-router';
 import { useTheme, breakpointFor, glassSurfaceFilter } from '../theme';
 import { ThemeToggle } from './ThemeToggle';
-import Glyph from './Glyph';
+import Glyph, { type GlyphName } from './Glyph';
 import LookupSearch from './LookupSearch';
 
 // The nav bar (07 section 3, the owner's layout): a thin fixed row like a
@@ -45,16 +45,16 @@ interface NavLinkSpec {
   route: string;
   /** Active when the pathname is the route itself or a detail under it. */
   matchPrefixes: ReadonlyArray<string>;
-  /** The leading glyph the link carries (the home mark); most links stay
-   * text-only. */
-  icon?: 'home';
+  /** The leading glyph the link carries. */
+  icon?: GlyphName;
 }
 
 const NAV_LINKS: ReadonlyArray<NavLinkSpec> = [
   { label: 'Home', route: '/', matchPrefixes: ['/'], icon: 'home' },
-  { label: 'Players', route: '/players', matchPrefixes: ['/players', '/player/'] },
-  { label: 'Clans', route: '/clans', matchPrefixes: ['/clans', '/clan/'] },
-  { label: 'Contributors', route: '/contributors', matchPrefixes: ['/contributors'] },
+  { label: 'Players', route: '/players', matchPrefixes: ['/players', '/player/'], icon: 'user' },
+  { label: 'Clans', route: '/clans', matchPrefixes: ['/clans', '/clan/'], icon: 'shield' },
+  { label: 'Compare', route: '/compare', matchPrefixes: ['/compare'], icon: 'compare' },
+  { label: 'Contributors', route: '/contributors', matchPrefixes: ['/contributors'], icon: 'code' },
 ];
 
 function linkActive(spec: NavLinkSpec, pathname: string): boolean {
