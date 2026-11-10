@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Image,
   Pressable,
@@ -28,6 +28,7 @@ import { attacksLeftFor, fetchCurrentWar } from '../api/war';
 import { busyRetryDelayMs, shouldRetryBusy } from '../lib/busy-retry';
 import { warFrequencyLabel } from '../lib/war-frequency';
 import { canonicalTagFromRoute, playerRouteFor } from '../lib/tag';
+import { recordRecentSearch } from '../lib/recent-searches';
 import {
   CLAN_ORDER,
   flipRosterSortDirection,
@@ -173,6 +174,12 @@ export default function ClanScreen() {
     query.isPending &&
     query.failureReason instanceof ClanFetchError &&
     query.failureReason.result.kind === 'busy';
+
+  useEffect(() => {
+    if (query.data?.tag && query.data?.name) {
+      recordRecentSearch({ kind: 'clan', query: query.data.tag, label: query.data.name });
+    }
+  }, [query.data?.tag, query.data?.name]);
 
   const selectTab = (next: ClanTab) => {
     // Replace, not push: tab switches are state on the same route, not pages

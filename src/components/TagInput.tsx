@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigate } from 'react-router';
 import { useTheme } from '../theme';
 import { normalizeTagInput, playerRouteFor, TAG_REJECT_COPY, type NormalizeTagResult } from '../lib/tag';
+import { recordRecentSearch } from '../lib/recent-searches';
 
 // The player tag lookup box (T-M1-2, FR-02, SR-13). The ONE component that
 // owns tag normalization: it accepts a tag with or without the # prefix, runs
@@ -62,6 +63,7 @@ export default function TagInput({ label = 'Player tag', onNavigate, children }:
     const next = normalizeTagInput(draft);
     setResult(next);
     if (next.ok) {
+      recordRecentSearch({ kind: 'player', query: next.tag });
       go(playerRouteFor(next.tag));
     }
   };
