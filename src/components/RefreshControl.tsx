@@ -30,13 +30,20 @@ export interface RefreshControlProps {
   /** True while that re-issued request is in flight, so a second press
    * cannot stack on the first. */
   isRefreshing: boolean;
+  /** 'row' for horizontal (default), 'stacked' for vertical top-right placement. */
+  layout?: 'row' | 'stacked';
 }
 
 // The cooldown countdown ticks once a second: the only clock the component
 // keeps, and it exists purely to repaint the number.
 const COOLDOWN_TICK_MS = 1000;
 
-export default function RefreshControl({ onRefresh, ageSeconds, isRefreshing }: RefreshControlProps) {
+export default function RefreshControl({
+  onRefresh,
+  ageSeconds,
+  isRefreshing,
+  layout = 'row',
+}: RefreshControlProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -70,6 +77,25 @@ export default function RefreshControl({ onRefresh, ageSeconds, isRefreshing }: 
       ? `Refresh (${remainingSeconds}s)`
       : 'Refresh';
 
+  if (layout === 'stacked') {
+    return (
+      <View style={styles.stackedWrap}>
+        <PillButton
+          label={label}
+          variant="ghost"
+          icon="refresh"
+          onPress={handleRefresh}
+          disabled={coolingDown || isRefreshing}
+          hint="Sends the same request again. The server cache decides what comes back, and the button waits 60 seconds after each use."
+        />
+        <View style={styles.agePill}>
+          <View style={styles.ageDot} aria-hidden />
+          <Text style={styles.ageText}>{dataAgeHint(ageSeconds)}</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.row}>
       <View style={styles.agePill}>
@@ -91,6 +117,10 @@ export default function RefreshControl({ onRefresh, ageSeconds, isRefreshing }: 
 function createStyles(t: ReturnType<typeof useTheme>['theme']) {
   const c = t.colors;
   return StyleSheet.create({
+    stackedWrap: {
+      alignItems: 'flex-end',
+      gap: t.spacing[1],
+    },
     // The freshness row: the age pill first, the action last, right where
     // each screen's age line used to sit. Wraps rather than squeezes when
     // a narrow phone runs out of room.

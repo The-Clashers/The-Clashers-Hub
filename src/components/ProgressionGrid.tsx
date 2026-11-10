@@ -315,7 +315,6 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       backgroundColor: c.fillQuiet,
       borderWidth: 1,
       borderColor: c.panelBorder,
-      borderTopColor: c.panelHighlight,
       borderRadius: t.radius[2],
       paddingHorizontal: t.spacing[1],
       paddingTop: 10,

@@ -87,10 +87,6 @@ import {
 // the two cache layers decay together, the same pairing every route keeps.
 const PLAYER_STALE_TIME_MS = 300_000;
 
-// The league icon slot (07 section 7): API icon in a fixed box, so a slow
-// CDN load never reflows the stat grid.
-const LEAGUE_ICON_SLOT = 24;
-
 // Line widths chosen to read as a name and a tag line; the stat cells mirror
 // the uniform grid they stand in for.
 const SKELETON_NAME_WIDTH = 200;
@@ -214,8 +210,7 @@ function PlayerSuccess({ player, onRefresh, isRefreshing }: PlayerSuccessProps) 
   // stacked below it. Read through useWindowDimensions into the breakpoints
   // helper, never CSS media queries.
   const { width } = useWindowDimensions();
-  const breakpoint = breakpointFor(width);
-  const twoColumns = breakpoint === 'desktop';
+  const twoColumns = breakpointFor(width) === 'desktop';
 
   // The rushed verdict (the flagship engine, T-M2-2): computed here once
   // from the same single response the shell fetched, then handed to the
@@ -235,104 +230,87 @@ function PlayerSuccess({ player, onRefresh, isRefreshing }: PlayerSuccessProps) 
   // the payload carries no tier, so the player header and the roster never
   // disagree about which ladder they show.
   const league = player.leagueTier ?? player.league;
+  const leagueIconUri = league?.iconUrls?.small;
 
   // The FR-06 header cells. The values speak (tabular figures), the labels
   // whisper, the same rhythm the clan detail card's stat grid keeps. The
-  // league cell pairs the tier icon with the tier name; a clanless player
-  // renders the quiet dash in the clan role cell, and a player with no
-  // league at all renders Unranked as text.
+  // large crest lives next to the player name in the identity header;
+  // a clanless player renders the quiet dash in the clan role cell, and
+  // a player with no league at all renders Unranked as text.
   const stats: ReadonlyArray<HeaderStat> = [
     { label: 'Town Hall', value: String(player.townHallLevel) },
-    { label: 'League', value: league?.name ?? 'Unranked', iconUri: league?.iconUrls?.small },
+    { label: 'League', value: league?.name ?? 'Unranked' },
     { label: 'XP level', value: String(player.expLevel) },
     { label: 'Clan role', value: player.role ? clanRoleLabel(player.role) : '\u2014' },
   ];
 
-  // The stat grid wraps two cells per row inside the identity column (the
-  // column the two-column layout gives the card is too narrow for four),
-  // and follows the clan card's own rule when the card runs full width:
-  // four per row from tablet up, two below.
-  const cellBasis = twoColumns || breakpoint === 'mobile' || breakpoint === 'small'
-    ? styles.statCellHalf
-    : styles.statCellQuarter;
-
-  // The identity card: the FR-06 header (name, tag | clan, stat grid) the
-  // design language has always fixed, with the prototype's two actions
-  // riding at the card's foot — the compare pill and the refresh control
-  // share the actions block under a second hairline.
+  // The identity card: crest and name left, refresh top-right, 2x2 stat grid,
+  // and full-width compare CTA at the bottom.
   const identityCard = (
     <View
       style={[base.panelRaised, styles.identityCard]}
       accessibilityLabel={`${player.name} player detail`}
     >
-      <View style={styles.identityText}>
-        <Text style={base.title} numberOfLines={1}>
-          {player.name}
-        </Text>
-        <View style={styles.identityMeta}>
-          <Text style={styles.tagLine}>{player.tag}</Text>
-          {player.clan ? (
-            <>
-              <Text style={styles.metaDot} aria-hidden>
-                |
-              </Text>
-              <Text style={styles.clanLine} numberOfLines={1}>
-                {player.clan.name}
-              </Text>
-            </>
-          ) : null}
-        </View>
-      </View>
-
-      <View style={styles.statDivider} aria-hidden />
-
-      <View style={styles.statGrid}>
-        {stats.map((stat) => (
-          <View key={stat.label} style={[styles.statCell, cellBasis]}>
-            <Text style={styles.statLabel}>{stat.label}</Text>
-            {stat.iconUri ? (
-              <View style={styles.statValueRow}>
-                <Image
-                  source={{ uri: stat.iconUri }}
-                  style={styles.leagueIcon}
-                  accessibilityLabel={`${stat.value} league icon`}
-                />
-                <Text style={styles.statValue} numberOfLines={1}>
-                  {stat.value}
-                </Text>
-              </View>
-            ) : (
-              <Text style={styles.statValue} numberOfLines={1}>
-                {stat.value}
-              </Text>
-            )}
+      <View style={styles.identityTopRow}>
+        <View style={styles.identityIdentity}>
+          {leagueIconUri ? (
+            <Image
+              source={{ uri: leagueIconUri }}
+              style={styles.headerLeagueCrest}
+              accessibilityLabel={`${league?.name ?? 'League'} crest`}
+            />
+          ) : (
+            <View style={[styles.headerLeagueCrest, styles.headerLeagueCrestEmpty]} />
+          )}
+          <View style={styles.identityText}>
+            <Text style={styles.playerName} numberOfLines={1}>
+              {player.name}
+            </Text>
+            <View style={styles.identityMeta}>
+              <Text style={styles.tagLine}>{player.tag}</Text>
+              {player.clan ? (
+                <>
+                  <Text style={styles.metaDot} aria-hidden>
+                    |
+                  </Text>
+                  <Text style={styles.clanLine} numberOfLines={1}>
+                    {player.clan.name}
+                  </Text>
+                </>
+              ) : null}
+            </View>
           </View>
-        ))}
-      </View>
-
-      <View style={styles.statDivider} aria-hidden />
-
-      {/* The actions block (the owner's prototype placement): the compare
-          action above the refresh control, both on the card whose data
-          they act on. */}
-      <View style={styles.cardActions}>
-        <PillButton
-          label="Compare this player"
-          icon="compare"
-          onPress={() =>
-            navigate(
-              `/compare?mode=players&a=${encodeURIComponent(player.tag.replace(/^#/, ''))}`,
-            )
-          }
-          hint="Opens the compare screen with this player pre-selected."
-          stretch
-        />
+        </View>
         <RefreshControl
           onRefresh={onRefresh}
           ageSeconds={player.age}
           isRefreshing={isRefreshing}
+          layout="stacked"
         />
       </View>
+
+      <View style={styles.statGrid}>
+        {stats.map((stat) => (
+          <View key={stat.label} style={[styles.statCell, styles.statCellHalf]}>
+            <Text style={styles.statLabel}>{stat.label}</Text>
+            <Text style={styles.statValue} numberOfLines={1}>
+              {stat.value}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      <PillButton
+        label="Compare this player"
+        icon="compare"
+        onPress={() =>
+          navigate(
+            `/compare?mode=players&a=${encodeURIComponent(player.tag.replace(/^#/, ''))}`,
+          )
+        }
+        hint="Opens the compare screen with this player pre-selected."
+        stretch
+      />
     </View>
   );
 
@@ -688,9 +666,9 @@ function HeroGrid({
 }) {
   const [width, setWidth] = useState(0);
 
-  // 2 columns whenever container is at least 380 px; 1 column on narrow mobile.
+  // 2 columns whenever container is at least 260 px; 1 column on narrow mobile.
   // Defaults to 2 columns before layout measurement to avoid layout jump.
-  const columns = width > 0 ? (width >= 380 ? 2 : 1) : 2;
+  const columns = width > 0 ? (width >= 260 ? 2 : 1) : 2;
   const basis = width > 0
     ? Math.floor((width - (columns - 1) * HERO_CARD_GAP) / columns)
     : null;
@@ -1016,9 +994,9 @@ function AchievementGrid({
 }) {
   const [width, setWidth] = useState(0);
 
-  // 2 columns whenever container is at least 380 px; 1 column on narrow mobile.
+  // 2 columns whenever container is at least 260 px; 1 column on narrow mobile.
   // Defaults to 2 columns before layout measurement to avoid layout jump.
-  const columns = width > 0 ? (width >= 380 ? 2 : 1) : 2;
+  const columns = width > 0 ? (width >= 260 ? 2 : 1) : 2;
   const basis = width > 0
     ? Math.floor((width - (columns - 1) * ACHIEVEMENT_CARD_GAP) / columns)
     : null;
@@ -1145,27 +1123,27 @@ function PlayerLoading({ busyRetrying }: PlayerLoadingProps) {
       accessibilityRole="progressbar"
       accessibilityLabel="Loading player"
     >
-      {/* The header the data lands into: the name line, the tag + clan
-          line, then the four stat cells the grid draws. */}
-      <View style={styles.identityText}>
-        <SkeletonBlock width={SKELETON_NAME_WIDTH} height={theme.fontSize.xl} pulse={pulse} />
-        <SkeletonBlock width={SKELETON_META_WIDTH} height={theme.fontSize.sm} pulse={pulse} />
+      {/* The header mirrors the crest, name, meta line, and refresh on the right. */}
+      <View style={styles.identityTopRow}>
+        <View style={styles.identityIdentity}>
+          <SkeletonBlock width={48} height={48} radiusStep={2} pulse={pulse} />
+          <View style={styles.identityText}>
+            <SkeletonBlock width={SKELETON_NAME_WIDTH} height={theme.fontSize.xl} pulse={pulse} />
+            <SkeletonBlock width={SKELETON_META_WIDTH} height={theme.fontSize.sm} pulse={pulse} />
+          </View>
+        </View>
+        <SkeletonBlock width={96} height={46} radiusStep={2} pulse={pulse} />
       </View>
-      <View style={styles.statDivider} aria-hidden />
       <View style={styles.statGrid}>
         {Array.from({ length: SKELETON_STAT_CELLS }, (_, index) => (
-          <View key={index} style={[styles.statCell, styles.statCellQuarter]}>
+          <View key={index} style={[styles.statCell, styles.statCellHalf]}>
             <SkeletonBlock width={64} height={theme.fontSize.xs} pulse={pulse} />
             <SkeletonBlock width="80%" height={theme.fontSize.sm} pulse={pulse} />
           </View>
         ))}
       </View>
-      <View style={styles.statDivider} aria-hidden />
-      {/* The actions block: the compare pill above the refresh row. */}
-      <View style={styles.cardActions}>
-        <SkeletonBlock width={170} height={36} radiusStep="pill" pulse={pulse} />
-        <SkeletonBlock width={130} height={28} radiusStep="pill" pulse={pulse} />
-      </View>
+      {/* Full-width compare pill CTA */}
+      <SkeletonBlock width="100%" height={40} radiusStep="pill" pulse={pulse} />
       <Text style={[base.caption, styles.loadingCaption]}>
         {busyRetrying
           ? 'The game API is busy. One moment, retrying automatically…'
@@ -1337,16 +1315,12 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     // the analysis column's room; it may shrink a little on the narrower
     // desktop viewports, where its stat grid already wraps two per row.
     identityColumn: {
-      flexBasis: '38%',
-      flexGrow: 0,
-      flexShrink: 1,
-      minWidth: 0,
+      width: 320,
+      flexShrink: 0,
       gap: t.spacing[4],
     },
     analysisColumn: {
-      flexBasis: '58%',
-      flexGrow: 1,
-      flexShrink: 1,
+      flex: 1,
       minWidth: 0,
       gap: t.spacing[4],
     },
@@ -1357,15 +1331,45 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       gap: t.spacing[4],
     },
 
-    // The identity card: name, the tag + clan line, a hairline, the stat
-    // grid, a second hairline, then the actions block. The card carries the
-    // panelRaised chrome the clan detail card uses, so the site's two
-    // detail headers read as one family.
+    // The identity card: crest, name, tag + clan line, stacked refresh control,
+    // followed by the 2x2 stat grid and the full-width compare pill button.
     identityCard: {
       gap: t.spacing[5],
     },
+    identityTopRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      gap: t.spacing[3],
+    },
+    identityIdentity: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: t.spacing[3],
+      flex: 1,
+      minWidth: 0,
+    },
+    headerLeagueCrest: {
+      width: 48,
+      height: 48,
+      resizeMode: 'contain',
+      flexShrink: 0,
+    },
+    headerLeagueCrestEmpty: {
+      backgroundColor: c.fillQuiet,
+      borderRadius: t.radius[2],
+    },
     identityText: {
+      flex: 1,
+      minWidth: 0,
       gap: t.spacing[1],
+    },
+    playerName: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.xl,
+      fontWeight: t.fontWeight.bold,
+      color: c.textPrimary,
+      letterSpacing: t.letterSpacing.tight,
     },
     identityMeta: {
       flexDirection: 'row',
@@ -1388,12 +1392,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontSize: t.fontSize.sm,
       color: c.textMuted,
     },
-    statDivider: {
-      height: 1,
-      backgroundColor: c.hairline,
-    },
-    // The stat grid, the same wrap the clan detail card renders: cells flex
-    // within their row so the grid stays even at any width.
+    // The stat grid: 2x2 cells flexing to half row basis.
     statGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
@@ -1405,14 +1404,8 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       flexShrink: 1,
       gap: t.spacing[1],
     },
-    // The basis sits under a half row so the wrap lands on even columns
-    // while flexGrow fills each line to the edges; the quarter basis is the
-    // clan card's four-up form, used only when the card runs full width.
     statCellHalf: {
       flexBasis: '46%',
-    },
-    statCellQuarter: {
-      flexBasis: '22%',
     },
     statLabel: {
       fontFamily: t.fontFamily.sans,
@@ -1422,29 +1415,12 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       textTransform: 'uppercase',
       letterSpacing: t.letterSpacing.micro,
     },
-    statValueRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      columnGap: t.spacing[2],
-      minWidth: 0,
-    },
     statValue: {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.sm,
       fontWeight: t.fontWeight.semibold,
       color: c.textPrimary,
       fontVariant: ['tabular-nums'],
-    },
-    // The league icon slot (07 section 7): fixed 24 px box.
-    leagueIcon: {
-      width: LEAGUE_ICON_SLOT,
-      height: LEAGUE_ICON_SLOT,
-    },
-    // The actions block at the card's foot (the owner's prototype
-    // placement): the compare pill above the refresh control, both on the
-    // card whose data they act on.
-    cardActions: {
-      gap: t.spacing[2],
     },
     loadingCaption: {
       marginTop: t.spacing[1],
@@ -1675,7 +1651,6 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       backgroundColor: c.fillQuiet,
       borderWidth: 1,
       borderColor: c.panelBorder,
-      borderTopColor: c.panelHighlight,
       borderRadius: t.radius[2],
       paddingHorizontal: t.spacing[3],
       paddingVertical: t.spacing[2],
@@ -1693,6 +1668,8 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       minWidth: 0,
     },
     heroName: {
+      flexShrink: 1,
+      minWidth: 0,
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.sm,
       fontWeight: t.fontWeight.semibold,
@@ -1749,10 +1726,10 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       color: c.textMuted,
       fontVariant: ['tabular-nums'],
     },
-    // The rail column (compact 84 px): the level rail with the pair under
+    // The rail column (compact 72 px): the level rail with the pair under
     // it, fitting cleanly within 2-column hero cards without crowding equipment.
     heroRailColumn: {
-      width: 84,
+      width: 72,
       gap: t.spacing[1],
       flexShrink: 0,
     },
@@ -1899,7 +1876,6 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       backgroundColor: c.fillQuiet,
       borderWidth: 1,
       borderColor: c.panelBorder,
-      borderTopColor: c.panelHighlight,
       borderRadius: t.radius[2],
       paddingHorizontal: t.spacing[3],
       paddingVertical: t.spacing[2],
