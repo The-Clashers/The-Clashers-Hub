@@ -58,7 +58,7 @@ export default function HomeScreen() {
           </View>
 
           <View style={[base.panelRaised, styles.heroPanel]}>
-            <LookupSearch variant="hero" />
+            <LookupSearch variant="hero" actionLabel="Search" />
           </View>
 
           <View style={styles.linkRow}>

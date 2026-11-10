@@ -33,13 +33,20 @@ export type LookupVariant = 'bar' | 'hero';
 export interface LookupSearchProps {
   /** 'bar' for the thin nav row, 'hero' for the home page's big box. */
   variant?: LookupVariant;
+  /** Button label for the submit action. Defaults to 'Search' on hero, 'Go' on bar. */
+  actionLabel?: string;
   /** Override navigation in tests; defaults to react-router's useNavigate. */
   onNavigate?: (route: string) => void;
 }
 
-export default function LookupSearch({ variant = 'bar', onNavigate }: LookupSearchProps) {
+export default function LookupSearch({
+  variant = 'bar',
+  actionLabel,
+  onNavigate,
+}: LookupSearchProps) {
   const { theme } = useTheme();
   const hero = variant === 'hero';
+  const buttonLabel = actionLabel ?? (hero ? 'Search' : 'Go');
   const styles = useMemo(() => createStyles(theme, variant), [theme, variant]);
   const navigate = useNavigate();
   const location = useLocation();
@@ -143,8 +150,8 @@ export default function LookupSearch({ variant = 'bar', onNavigate }: LookupSear
           accessibilityLabel={mode === 'player' ? 'Player tag' : 'Clan name or tag'}
           accessibilityHint={
             mode === 'player'
-              ? 'Type a player tag and press Go. The # prefix is optional.'
-              : 'Type a clan name, or a clan tag starting with #, and press Go.'
+              ? `Type a player tag and press ${buttonLabel}. The # prefix is optional.`
+              : `Type a clan name, or a clan tag starting with #, and press ${buttonLabel}.`
           }
           autoCapitalize={mode === 'player' ? 'characters' : 'none'}
           autoCorrect={false}
@@ -162,7 +169,7 @@ export default function LookupSearch({ variant = 'bar', onNavigate }: LookupSear
           onPress={submit}
           style={({ pressed }) => [styles.go, pressed && styles.goPressed]}
         >
-          <Text style={styles.goText}>Go</Text>
+          <Text style={styles.goText}>{buttonLabel}</Text>
         </Pressable>
       </View>
       {hint !== null ? (
