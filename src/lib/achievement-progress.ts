@@ -107,10 +107,10 @@ export const ACHIEVEMENT_FILTER_LABELS: Record<AchievementFilter, string> = {
 
 /** Filters a list of achievements by completion status. Pure: does not
  * mutate the input array. */
-export function filterAchievements(
-  achievements: readonly PlayerAchievement[],
+export function filterAchievements<T extends { stars: number }>(
+  achievements: readonly T[],
   filter: AchievementFilter,
-): PlayerAchievement[] {
+): T[] {
   if (filter === 'all') return [...achievements];
   return achievements.filter((item) => {
     const isDone = starSlots(item.stars).earned >= ACHIEVEMENT_MAX_STARS;

@@ -11,6 +11,8 @@ import {
 } from './achievement-progress';
 import { groupByVillage } from './village';
 
+import type { PlayerAchievement } from '../api/player';
+
 // Table-driven tests (NFR-07) for the achievement progress math. The tables
 // mirror the real payload shapes the live proxy served while the card was
 // designed: the counter distributions come from a 54-achievement player.
@@ -138,12 +140,12 @@ describe('village grouping delegation', () => {
 });
 
 describe('filterAchievements', () => {
-  const sample = [
-    { name: 'Empire Builder', stars: 3, value: 4, target: 4 },
-    { name: 'Wall Buster', stars: 2, value: 1800, target: 2000 },
-    { name: 'Keep Your Account Safe!', stars: 0, value: 0, target: 1 },
-    { name: 'Sweet Victory!', stars: 3, value: 3622, target: 1250 },
-  ] as const;
+  const sample: ReadonlyArray<PlayerAchievement> = [
+    { name: 'Empire Builder', stars: 3, value: 4, target: 4, info: 'Upgrade TH', village: 'home' },
+    { name: 'Wall Buster', stars: 2, value: 1800, target: 2000, info: 'Destroy walls', village: 'home' },
+    { name: 'Keep Your Account Safe!', stars: 0, value: 0, target: 1, info: 'Connect ID', village: 'home' },
+    { name: 'Sweet Victory!', stars: 3, value: 3622, target: 1250, info: 'Trophies', village: 'home' },
+  ];
 
   it('returns every row in order under the all filter without mutating the input', () => {
     const frozen = Object.freeze([...sample]);
