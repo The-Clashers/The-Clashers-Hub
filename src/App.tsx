@@ -1,6 +1,7 @@
 import { Route, Routes } from 'react-router';
 import GlassAmbience from './components/GlassAmbience';
 import NavBar from './components/NavBar';
+import Footer from './components/Footer';
 import HomeScreen from './screens/HomeScreen';
 import SearchScreen from './screens/SearchScreen';
 import ClanScreen from './screens/ClanScreen';
@@ -46,6 +47,7 @@ export default function App() {
         <Route path="/compare" element={<CompareScreen />} />
         <Route path="/tokens" element={<TokenScreen />} />
       </Routes>
+      <Footer />
     </>
   );
 }
