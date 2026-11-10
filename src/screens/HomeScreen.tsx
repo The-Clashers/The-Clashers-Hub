@@ -8,7 +8,6 @@ import Gauge from '../components/Gauge';
 import CategoryBars, { type CategoryBarRow } from '../components/CategoryBars';
 import RatioFlag from '../components/RatioFlag';
 import type { DonationVerdict } from '../lib/donation-balance';
-import { getGlobalReferenceSummary } from '../lib/reference-stats';
 import { clanRouteFor, playerRouteFor } from '../lib/tag';
 import type { RecentSearchItem } from '../lib/recent-searches';
 
@@ -63,8 +62,6 @@ export default function HomeScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const navigate = useNavigate();
 
-  const reference = useMemo(() => getGlobalReferenceSummary(), []);
-
   const sampleBars: ReadonlyArray<CategoryBarRow> = useMemo(
     () => [
       { key: 'heroes', label: 'Heroes', percent: 4.8, color: theme.colors.success },
@@ -100,43 +97,6 @@ export default function HomeScreen() {
           <View style={[base.panelRaised, styles.heroPanel]}>
             <LookupSearch variant="hero" actionLabel="Search" />
             <RecentSearchesStrip onSelect={handleRecentSelect} />
-          </View>
-
-          {/* Reference stats strip */}
-          <View style={styles.sectionWrap}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionMicro}>Reference Data</Text>
-              <Text style={styles.sectionTitle}>Tracked by the Numbers</Text>
-            </View>
-
-            <View style={styles.statsGrid}>
-              <View style={[base.panelRaised, styles.statCard]}>
-                <Text style={styles.statNumber}>TH 18 · BH 10</Text>
-                <Text style={styles.statLabel}>Max Hall Coverage</Text>
-                <Text style={styles.statSub}>Full upgrade cap tables bundled locally</Text>
-              </View>
-
-              <View style={[base.panelRaised, styles.statCard]}>
-                <Text style={styles.statNumber}>{reference.totalUnitsAndGearCount} Entities</Text>
-                <Text style={styles.statLabel}>Units & Equipment</Text>
-                <Text style={styles.statSub}>
-                  {reference.homeTroopsCount} troops, {reference.spellsCount} spells,{' '}
-                  {reference.petsCount} pets, {reference.equipmentCount} gear
-                </Text>
-              </View>
-
-              <View style={[base.panelRaised, styles.statCard]}>
-                <Text style={styles.statNumber}>{reference.superTroopsCount} Super Troops</Text>
-                <Text style={styles.statLabel}>Lab Normalizations</Text>
-                <Text style={styles.statSub}>Mapped to base troops to prevent false deficits</Text>
-              </View>
-
-              <View style={[base.panelRaised, styles.statCard]}>
-                <Text style={styles.statNumber}>{reference.rankedLeagueTiersCount} League Tiers</Text>
-                <Text style={styles.statLabel}>Ranked Ladder</Text>
-                <Text style={styles.statSub}>Skeleton League 1 through Legend League I</Text>
-              </View>
-            </View>
           </View>
 
           {/* Quick link cards */}
@@ -319,41 +279,6 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.sm,
       color: c.textSecondary,
-    },
-    statsGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: t.spacing[3],
-    },
-    statCard: {
-      flexGrow: 1,
-      flexShrink: 1,
-      flexBasis: 220,
-      gap: 4,
-      padding: t.spacing[4],
-      borderRadius: t.radius[2],
-      borderWidth: 1,
-      borderColor: c.panelBorder,
-      borderTopColor: c.panelHighlight,
-      backgroundColor: c.panel,
-    },
-    statNumber: {
-      fontFamily: t.fontFamily.sans,
-      fontSize: t.fontSize.lg,
-      fontWeight: t.fontWeight.bold,
-      color: c.accentInk,
-    },
-    statLabel: {
-      fontFamily: t.fontFamily.sans,
-      fontSize: t.fontSize.sm,
-      fontWeight: t.fontWeight.semibold,
-      color: c.textPrimary,
-    },
-    statSub: {
-      fontFamily: t.fontFamily.sans,
-      fontSize: t.fontSize.xs,
-      color: c.textMuted,
-      lineHeight: 16,
     },
     linkRow: {
       flexDirection: 'row',
