@@ -54,7 +54,7 @@ export default function CompareScreen() {
     if (isPlayer) {
       const normalized = normalizeTagInput(trimmed);
       if (!normalized.ok) {
-        setHint(TAG_REJECT_COPY[normalized.reason]);
+        setHint(normalized.reason === 'empty' ? 'Enter a player tag.' : TAG_REJECT_COPY[normalized.reason]);
         return { ok: false };
       }
       setHint(null);
@@ -65,7 +65,7 @@ export default function CompareScreen() {
     if (trimmed.startsWith('#')) {
       const normalized = normalizeTagInput(trimmed);
       if (!normalized.ok) {
-        setHint(TAG_REJECT_COPY[normalized.reason]);
+        setHint(normalized.reason === 'empty' ? 'Enter a clan tag.' : TAG_REJECT_COPY[normalized.reason]);
         return { ok: false };
       }
       setHint(null);

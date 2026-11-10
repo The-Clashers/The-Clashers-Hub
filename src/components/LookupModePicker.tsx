@@ -232,6 +232,16 @@ export default function LookupModePicker({ value, onSelect }: LookupModePickerPr
   );
 }
 
+function ModeIcon({
+  mode,
+  color,
+}: {
+  mode: LookupMode;
+  color: string;
+}) {
+  return <Glyph name={mode === 'player' ? 'user' : 'shield'} size={15} color={color} />;
+}
+
 // ---------- styles ----------
 
 function createStyles(t: ReturnType<typeof useTheme>['theme']) {
