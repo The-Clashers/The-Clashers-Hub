@@ -264,8 +264,8 @@ const SEARCH_STALE_TIME_MS = 60_000;
 // TOWN HALL REQUIRED never wrap. Cells grow to share whatever row they
 // land in. Micro labels that cannot fit a half-width cell wrap to a second
 // line rather than truncating: a wrapped label reads, a cut one guesses.
-const FILTER_CELL_BASIS_SMALL = 116;
-const FILTER_CELL_BASIS_WIDE = 150;
+const FILTER_CELL_BASIS_SMALL = 108;
+const FILTER_CELL_BASIS_WIDE = 140;
 
 // Six skeleton cards fill the fold without implying anything about how many
 // results are coming.
@@ -982,17 +982,18 @@ function createNumberCellStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontWeight: t.fontWeight.medium,
       color: c.textMuted,
       textTransform: 'uppercase',
-      letterSpacing: 0.6,
+      letterSpacing: t.letterSpacing.micro,
     },
     // The same input chrome the name input and the Dropdown trigger carry,
     // so the mixed grid reads as one control family.
     input: {
-      minHeight: t.layout.touchTargetMin,
+      minHeight: t.layout.controlHeight,
       paddingHorizontal: t.spacing[4],
       paddingVertical: t.spacing[2],
       borderRadius: t.radius[2],
       borderWidth: 1,
       borderColor: c.panelBorderStrong,
+      borderTopColor: c.panelHighlight,
       backgroundColor: c.panelRaised,
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.md,
@@ -1036,11 +1037,12 @@ function createChipStyles(t: ReturnType<typeof useTheme>['theme']) {
       flexDirection: 'row',
       alignItems: 'center',
       columnGap: t.spacing[2],
-      minHeight: t.layout.touchTargetMin,
-      paddingHorizontal: t.spacing[4],
+      minHeight: t.layout.controlHeight,
+      paddingHorizontal: t.spacing[3],
       borderRadius: t.radius[1],
       borderWidth: 1,
       borderColor: c.panelBorderStrong,
+      borderTopColor: c.panelHighlight,
       backgroundColor: c.panelRaised,
       outlineColor: c.focusRing,
       outlineOffset: t.layout.focusRingOffset,
@@ -1259,7 +1261,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme'], filterCellBasis: 
       fontWeight: t.fontWeight.medium,
       color: c.textMuted,
       textTransform: 'uppercase',
-      letterSpacing: 0.6,
+      letterSpacing: t.letterSpacing.micro,
     },
     nameFootnote: {
       fontFamily: t.fontFamily.sans,
@@ -1278,12 +1280,13 @@ function createStyles(t: ReturnType<typeof useTheme>['theme'], filterCellBasis: 
       // go below it, which pushed the Search button off the 360 px
       // compatibility floor (NFR-05) with a horizontal scrollbar.
       minWidth: 0,
-      minHeight: t.layout.touchTargetMin,
+      minHeight: t.layout.controlHeight,
       paddingHorizontal: t.spacing[4],
       paddingVertical: t.spacing[2],
       borderRadius: t.radius[2],
       borderWidth: 1,
       borderColor: c.panelBorderStrong,
+      borderTopColor: c.panelHighlight,
       backgroundColor: c.panelRaised,
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.md,

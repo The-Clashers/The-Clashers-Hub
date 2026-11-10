@@ -99,11 +99,6 @@ const SKELETON_META_WIDTH = 170;
 // The header stat cells the skeleton draws, matching the grid's count.
 const SKELETON_STAT_CELLS = 4;
 
-// Micro-label tracking: the one-off 0.6 px tracking the design language
-// pairs with uppercase micro labels (StatChip keeps the same local value).
-// It becomes a token the moment a second value needs one.
-const LABEL_TRACKING = 0.6;
-
 export default function PlayerScreen() {
   const { theme } = useTheme();
   const base = useMemo(() => createBaseStyles(theme), [theme]);
@@ -626,7 +621,7 @@ interface HeroCardProps {
 // names, and the name alone is not a stable identity.
 
 // The hero grid's gap between cards.
-const HERO_CARD_GAP = 10;
+const HERO_CARD_GAP = 8;
 
 function HeroCard({ heroes }: HeroCardProps) {
   const { theme } = useTheme();
@@ -900,7 +895,7 @@ interface AchievementsCardProps {
 // duplicate names (STD-18).
 
 // The achievement tile grid's gap.
-const ACHIEVEMENT_CARD_GAP = 8;
+const ACHIEVEMENT_CARD_GAP = 6;
 
 const ACHIEVEMENT_FILTERS: ReadonlyArray<AchievementFilter> = [
   'all',
@@ -1096,7 +1091,7 @@ function AchievementRow({ achievement, basis }: AchievementRowProps) {
             <Glyph
               key={index}
               name="star"
-              color={index < progress.stars.earned ? c.accent : c.panelBorderStrong}
+              color={index < progress.stars.earned ? c.accentInk : c.panelBorderStrong}
             />
           ))}
         </View>
@@ -1425,7 +1420,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontWeight: t.fontWeight.medium,
       color: c.textMuted,
       textTransform: 'uppercase',
-      letterSpacing: LABEL_TRACKING,
+      letterSpacing: t.letterSpacing.micro,
     },
     statValueRow: {
       flexDirection: 'row',
@@ -1468,7 +1463,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.xs,
       fontWeight: t.fontWeight.semibold,
-      color: c.accent,
+      color: c.accentInk,
       fontVariant: ['tabular-nums'],
     },
     chipInfo: {
@@ -1550,7 +1545,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontWeight: t.fontWeight.medium,
       color: c.textMuted,
       textTransform: 'uppercase',
-      letterSpacing: LABEL_TRACKING,
+      letterSpacing: t.letterSpacing.micro,
     },
     gaugeWrap: {
       alignItems: 'center',
@@ -1591,7 +1586,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       paddingVertical: t.spacing[2],
       borderBottomWidth: 1,
       borderBottomColor: c.hairline,
-      minHeight: t.layout.touchTargetMin,
+      minHeight: t.layout.controlHeight,
     },
     deficitRank: {
       width: 20,
@@ -1606,7 +1601,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontFamily: t.fontFamily.sans,
       fontSize: 10,
       fontWeight: t.fontWeight.bold,
-      color: c.accent,
+      color: c.accentInk,
       fontVariant: ['tabular-nums'],
     },
     deficitName: {
@@ -1668,7 +1663,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontWeight: t.fontWeight.medium,
       color: c.textMuted,
       textTransform: 'uppercase',
-      letterSpacing: LABEL_TRACKING,
+      letterSpacing: t.letterSpacing.micro,
     },
     // One hero card (the prototype's layout): the icon anchoring the left
     // edge, the name + sub-line + equipment block filling the middle, and
@@ -1680,6 +1675,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       backgroundColor: c.fillQuiet,
       borderWidth: 1,
       borderColor: c.panelBorder,
+      borderTopColor: c.panelHighlight,
       borderRadius: t.radius[2],
       paddingHorizontal: t.spacing[3],
       paddingVertical: t.spacing[2],
@@ -1829,13 +1825,14 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       flexDirection: 'row',
       alignItems: 'center',
       columnGap: t.spacing[2],
-      minHeight: t.layout.touchTargetMin,
+      minHeight: t.layout.controlHeight,
       paddingHorizontal: t.spacing[3],
       paddingVertical: t.spacing[1],
       borderRadius: t.radius.pill,
       backgroundColor: c.fillQuiet,
       borderWidth: 1,
       borderColor: c.panelBorder,
+      borderTopColor: c.panelHighlight,
       outlineColor: c.focusRing,
       outlineOffset: t.layout.focusRingOffset,
     },
@@ -1856,7 +1853,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.xs,
       fontWeight: t.fontWeight.semibold,
-      color: c.accent,
+      color: c.accentInk,
     },
     achievementFilterCount: {
       fontFamily: t.fontFamily.sans,
@@ -1869,7 +1866,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.xs,
       fontWeight: t.fontWeight.semibold,
-      color: c.accent,
+      color: c.accentInk,
       fontVariant: ['tabular-nums'],
     },
     achievementsEmptyFilter: {
@@ -1893,7 +1890,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontWeight: t.fontWeight.medium,
       color: c.textMuted,
       textTransform: 'uppercase',
-      letterSpacing: LABEL_TRACKING,
+      letterSpacing: t.letterSpacing.micro,
     },
     // One compact achievement tile inside the measured multi-column grid:
     // quiet fill, hairline border, tight internal rhythm so 54 rows read as
@@ -1902,6 +1899,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       backgroundColor: c.fillQuiet,
       borderWidth: 1,
       borderColor: c.panelBorder,
+      borderTopColor: c.panelHighlight,
       borderRadius: t.radius[2],
       paddingHorizontal: t.spacing[3],
       paddingVertical: t.spacing[2],

@@ -9,6 +9,7 @@ import {
   fontFamily,
   fontSize,
   fontWeight,
+  letterSpacing,
   glass,
   lineHeight,
   layout,
@@ -39,6 +40,7 @@ const COLOR_GROUPS: { title: string; names: ColorTokenName[] }[] = [
       'panelRaised',
       'panelBorder',
       'panelBorderStrong',
+      'panelHighlight',
       'hairline',
       'fillQuiet',
     ],
@@ -49,7 +51,7 @@ const COLOR_GROUPS: { title: string; names: ColorTokenName[] }[] = [
   },
   {
     title: 'Accent (gold)',
-    names: ['accent', 'accentHover', 'accentPressed', 'accentSoft', 'focusRing'],
+    names: ['accent', 'accentHover', 'accentPressed', 'accentSoft', 'accentInk', 'focusRing'],
   },
   {
     title: 'Semantic',
@@ -245,10 +247,21 @@ export default function TokenScreen() {
                 <Text style={styles.typographyMeta}>tabular-nums</Text>
               </View>
             </View>
+
+            <View style={styles.group}>
+              <Text style={styles.groupTitle}>Letter spacing</Text>
+              <KeyValue label="tight" value={`${letterSpacing.tight}px`} styles={styles} />
+              <KeyValue label="normal" value={`${letterSpacing.normal}px`} styles={styles} />
+              <KeyValue label="micro" value={`${letterSpacing.micro}px`} styles={styles} />
+            </View>
           </Section>
 
           <Section title="Layout" base={base} styles={styles}>
             <View style={styles.group}>
+              <KeyValue label="density" value={theme.density} styles={styles} />
+              <KeyValue label="controlHeight" value={`${theme.layout.controlHeight}px`} styles={styles} />
+              <KeyValue label="navHeightDesktop" value={`${theme.layout.navHeightDesktop}px`} styles={styles} />
+              <KeyValue label="navHeightStacked" value={`${theme.layout.navHeightStacked}px`} styles={styles} />
               <KeyValue label="contentMaxWidth" value={`${layout.contentMaxWidth}px`} styles={styles} />
               <KeyValue label="sidePaddingDesktop" value={`${layout.sidePaddingDesktop}px`} styles={styles} />
               <KeyValue label="sidePaddingTablet" value={`${layout.sidePaddingTablet}px`} styles={styles} />
