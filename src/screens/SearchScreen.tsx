@@ -9,6 +9,7 @@ import SkeletonCard from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';
 import PillButton from '../components/PillButton';
+import RefreshControl from '../components/RefreshControl';
 import { clanRouteFor, normalizeTagInput, TAG_REJECT_COPY } from '../lib/tag';
 import { WAR_FREQUENCY_LABELS } from '../lib/war-frequency';
 import { busyRetryDelayMs, shouldRetryBusy } from '../lib/busy-retry';
@@ -872,7 +873,16 @@ export default function SearchScreen() {
                         ? '1 clan'
                         : `${shownItems.length} clans`}
                   </Text>
-                  <Text style={base.caption}>fetched {firstPageAge}s ago</Text>
+                  {/* The manual refresh control (F-19): the hint and the
+                      button ride where the quiet age line rode, above the
+                      results. The first page's age speaks for the search:
+                      a refresh re-issues every loaded page's GET, and the
+                      listing's head is the reading a visitor cares about. */}
+                  <RefreshControl
+                    onRefresh={() => void query.refetch()}
+                    ageSeconds={firstPageAge}
+                    isRefreshing={query.isFetching && !isFetchingNextPage}
+                  />
                 </View>
                 {/* The results render in page flow: each card is a plain
                     child of the column, the browser scrollbar owns the
@@ -1330,7 +1340,12 @@ function createStyles(t: ReturnType<typeof useTheme>['theme'], filterCellBasis: 
     },
     resultsMeta: {
       flexDirection: 'row',
+      alignItems: 'center',
       justifyContent: 'space-between',
+      // Wraps rather than squeezes: on a narrow phone the refresh control
+      // drops under the count line instead of colliding with it.
+      flexWrap: 'wrap',
+      gap: t.spacing[2],
       marginBottom: t.spacing[2],
     },
     // The emptied-by-client-filters view: the EmptyState, the live

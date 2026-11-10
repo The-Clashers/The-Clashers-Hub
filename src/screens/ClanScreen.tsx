@@ -15,6 +15,7 @@ import Breadcrumbs from '../components/Breadcrumbs';
 import ErrorState from '../components/ErrorState';
 import EmptyState from '../components/EmptyState';
 import PillButton from '../components/PillButton';
+import RefreshControl from '../components/RefreshControl';
 import RosterTable from '../components/RosterTable';
 import RosterCard from '../components/RosterCard';
 import AttentionTable from '../components/AttentionTable';
@@ -267,11 +268,19 @@ export default function ClanScreen() {
             </>
           )}
 
-          <View style={styles.footer}>
-            {query.isSuccess ? (
-              <Text style={base.caption}>fetched {query.data.age}s ago</Text>
-            ) : null}
-          </View>
+          {query.isSuccess ? (
+            <View style={styles.footer}>
+              {/* The manual refresh control (F-19): the hint and the button
+                  where the quiet age line rode. The control re-issues the
+                  same GET; the tier's TTL decides cache-hit versus the one
+                  upstream call, and the hint reports which one answered. */}
+              <RefreshControl
+                onRefresh={() => void query.refetch()}
+                ageSeconds={query.data.age}
+                isRefreshing={query.isFetching}
+              />
+            </View>
+          ) : null}
         </View>
       </View>
     </View>
@@ -1369,14 +1378,11 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       marginTop: t.spacing[4],
     },
 
-    // footer: the fetch age only. The back-to-search button retired with
+    // footer: the freshness row's screen rhythm only; the row itself
+    // (the cached-data hint plus the refresh button) is the
+    // RefreshControl's (STD-13). The back-to-search button retired with
     // the breadcrumbs, which carry the way back (the owner's call).
     footer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'flex-end',
-      flexWrap: 'wrap',
-      gap: t.spacing[3],
       marginTop: t.spacing[6],
       marginBottom: t.spacing[8],
     },

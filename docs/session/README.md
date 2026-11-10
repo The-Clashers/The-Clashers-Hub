@@ -42,3 +42,4 @@ One file per session, copied from [_template.md](_template.md), named
 | 11-09-2026 | 35 | [11-09-2026-session-35](./11-09-2026-session-35.md) |
 | 11-09-2026 | 36 | [11-09-2026-session-36](./11-09-2026-session-36.md) |
 | 11-09-2026 | 37 | [11-09-2026-session-37](./11-09-2026-session-37.md) |
+| 11-09-2026 | 38 | [11-09-2026-session-38](./11-09-2026-session-38.md) |

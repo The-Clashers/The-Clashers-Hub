@@ -16,6 +16,7 @@ import LevelRail from '../components/LevelRail';
 import PillButton from '../components/PillButton';
 import ProgressRail from '../components/ProgressRail';
 import ProgressionGrid from '../components/ProgressionGrid';
+import RefreshControl from '../components/RefreshControl';
 import SkeletonBlock, { useSkeletonPulse } from '../components/SkeletonBlock';
 import UnitIcon from '../components/UnitIcon';
 import { fetchPlayer, PlayerFetchError, type PlayerResponse } from '../api/player';
@@ -176,11 +177,18 @@ export default function PlayerScreen() {
             <PlayerSuccess player={query.data} />
           )}
 
-          <View style={styles.footer}>
-            {query.isSuccess ? (
-              <Text style={base.caption}>fetched {query.data.age}s ago</Text>
-            ) : null}
-          </View>
+          {query.isSuccess ? (
+            <View style={styles.footer}>
+              {/* The manual refresh control (F-19): the hint and the button
+                  where the quiet age line rode, the same row the clan
+                  screen keeps. */}
+              <RefreshControl
+                onRefresh={() => void query.refetch()}
+                ageSeconds={query.data.age}
+                isRefreshing={query.isFetching}
+              />
+            </View>
+          ) : null}
         </View>
       </View>
     </View>
@@ -947,13 +955,10 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       marginTop: t.spacing[1],
     },
 
-    // footer: the fetch age only, the same quiet line the clan screen keeps.
+    // footer: the freshness row's screen rhythm only; the row itself
+    // (the cached-data hint plus the refresh button) is the
+    // RefreshControl's (STD-13), the same row the clan screen keeps.
     footer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'flex-end',
-      flexWrap: 'wrap',
-      gap: t.spacing[3],
       marginTop: t.spacing[6],
       marginBottom: t.spacing[8],
     },
