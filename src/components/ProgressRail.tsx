@@ -52,9 +52,15 @@ export interface ProgressRailProps {
   /** The pre-computed display data for the row, from
    * lib/achievement-progress.ts. */
   progress: AchievementProgress;
+  /** Whether the rail draws its own star row beside the track. The player
+   * screen's rows render the star trio in their headline (the prototype's
+   * layout), so they pass false and the rail draws the track alone; the
+   * default keeps the stars for any caller that wants the rail's own
+   * rating row. */
+  showStars?: boolean;
 }
 
-export default function ProgressRail({ progress }: ProgressRailProps) {
+export default function ProgressRail({ progress, showStars = true }: ProgressRailProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -68,19 +74,21 @@ export default function ProgressRail({ progress }: ProgressRailProps) {
           style={[styles.fill, { flexBasis: `${Math.round(progress.fill * 100)}%` }]}
         />
       </View>
-      <View style={styles.stars} aria-hidden>
-        {Array.from({ length: progress.stars.total }, (_, index) => {
-          const isEarned = index < progress.stars.earned;
-          return (
-            <Text
-              key={index}
-              style={isEarned ? styles.starEarned : styles.starOpen}
-            >
-              {isEarned ? STAR_GLYPH : OPEN_STAR_GLYPH}
-            </Text>
-          );
-        })}
-      </View>
+      {showStars ? (
+        <View style={styles.stars} aria-hidden>
+          {Array.from({ length: progress.stars.total }, (_, index) => {
+            const isEarned = index < progress.stars.earned;
+            return (
+              <Text
+                key={index}
+                style={isEarned ? styles.starEarned : styles.starOpen}
+              >
+                {isEarned ? STAR_GLYPH : OPEN_STAR_GLYPH}
+              </Text>
+            );
+          })}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -102,13 +110,15 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       alignItems: 'center',
       columnGap: t.spacing[3],
     },
-    // The quiet track the fill climbs: panel tone with a hairline border,
-    // so an empty rail still reads as a rail on the raised panel behind it.
+    // The quiet track the fill climbs: the glass system's quiet fill with a
+    // hairline border, so an empty rail still reads as a rail on the
+    // translucent panel behind it (panel tone itself is now glass and
+    // would vanish into its host).
     track: {
       flex: 1,
       height: RAIL_HEIGHT,
       borderRadius: RAIL_RADIUS,
-      backgroundColor: c.panel,
+      backgroundColor: c.fillQuiet,
       borderWidth: 1,
       borderColor: c.hairline,
       // Clip the fill to the track's rounded ends.

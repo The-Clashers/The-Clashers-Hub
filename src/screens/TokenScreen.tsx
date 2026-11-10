@@ -1,6 +1,6 @@
 import { useMemo, type ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { useTheme, createBaseStyles, type BaseStyles } from '../theme';
+import { useTheme, createBaseStyles, glassSurfaceFilter, type BaseStyles } from '../theme';
 import {
   lightColors,
   darkColors,
@@ -9,9 +9,11 @@ import {
   fontFamily,
   fontSize,
   fontWeight,
+  glass,
   lineHeight,
   layout,
   motion,
+  shadows,
   zIndex,
   type ColorTokenName,
   type ColorTokens,
@@ -32,11 +34,13 @@ const COLOR_GROUPS: { title: string; names: ColorTokenName[] }[] = [
     title: 'Surface',
     names: [
       'canvas',
+      'canvasVeil',
       'panel',
       'panelRaised',
       'panelBorder',
       'panelBorderStrong',
       'hairline',
+      'fillQuiet',
     ],
   },
   {
@@ -63,6 +67,10 @@ const COLOR_GROUPS: { title: string; names: ColorTokenName[] }[] = [
   {
     title: 'Chart series',
     names: ['seriesGold', 'seriesBlue', 'seriesGreen', 'seriesRed', 'seriesMuted'],
+  },
+  {
+    title: 'Glass and elevation',
+    names: ['glowA', 'glowB', 'shadowColor'],
   },
 ];
 
@@ -251,6 +259,38 @@ export default function TokenScreen() {
               <KeyValue label="playerTwoColumnBreakpoint" value={`${layout.playerTwoColumnBreakpoint}px`} styles={styles} />
               <KeyValue label="focusRingWidth" value={`${layout.focusRingWidth}px`} styles={styles} />
               <KeyValue label="focusRingOffset" value={`${layout.focusRingOffset}px`} styles={styles} />
+            </View>
+          </Section>
+
+          <Section title="Glass and elevation" base={base} styles={styles}>
+            <Text style={[base.caption, styles.sectionNote]}>
+              The glass system (07 section 2 "Glass"): every surface blurs with
+              the one shared filter, and the two shadow steps are what make the
+              translucency read as height. The swatches below are live: the
+              left card rides the resting shadow, the right one the lifted
+              step, both over the canvas's glow fields.
+            </Text>
+            <View style={styles.group}>
+              <KeyValue label="glass.blur" value={`${glass.blur}px`} styles={styles} />
+              <KeyValue label="glass.saturate" value={String(glass.saturate)} styles={styles} />
+              <KeyValue
+                label="shadows.resting"
+                value={`opacity ${shadows.resting.shadowOpacity} / radius ${shadows.resting.shadowRadius}px / offset ${shadows.resting.shadowOffset.height}px`}
+                styles={styles}
+              />
+              <KeyValue
+                label="shadows.lifted"
+                value={`opacity ${shadows.lifted.shadowOpacity} / radius ${shadows.lifted.shadowRadius}px / offset ${shadows.lifted.shadowOffset.height}px`}
+                styles={styles}
+              />
+            </View>
+            <View style={styles.glassDemoRow}>
+              <View style={styles.glassDemoResting}>
+                <Text style={base.body}>resting</Text>
+              </View>
+              <View style={styles.glassDemoLifted}>
+                <Text style={base.body}>lifted</Text>
+              </View>
             </View>
           </Section>
 
@@ -579,6 +619,38 @@ function createScreenStyles(t: ThemeTokens) {
       fontSize: t.fontSize.xs,
       color: c.textMuted,
       textAlign: 'right',
+    },
+    // The glass demo pair: two live glass surfaces side by side, the left on
+    // the resting shadow, the right on the lifted step, so the elevation
+    // difference is reviewable on the same canvas the tokens list on.
+    glassDemoRow: {
+      flexDirection: 'row',
+      gap: t.spacing[4],
+      marginTop: t.spacing[2],
+    },
+    glassDemoResting: {
+      ...glassSurfaceFilter(t),
+      flex: 1,
+      padding: t.spacing[4],
+      borderRadius: t.radius[2],
+      borderWidth: 1,
+      borderColor: c.panelBorder,
+      backgroundColor: c.panel,
+      shadowColor: c.shadowColor,
+      ...t.shadows.resting,
+      alignItems: 'center',
+    },
+    glassDemoLifted: {
+      ...glassSurfaceFilter(t),
+      flex: 1,
+      padding: t.spacing[4],
+      borderRadius: t.radius[3],
+      borderWidth: 1,
+      borderColor: c.panelBorder,
+      backgroundColor: c.panelRaised,
+      shadowColor: c.shadowColor,
+      ...t.shadows.lifted,
+      alignItems: 'center',
     },
     footer: {
       marginTop: t.spacing[6],

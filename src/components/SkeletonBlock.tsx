@@ -125,7 +125,10 @@ function createStyles(t: ReturnType<typeof useTheme>['theme'], radiusStep: Radiu
   const c = t.colors;
   return StyleSheet.create({
     block: {
-      backgroundColor: c.hairline,
+      // The glass system's quiet fill: strong enough to read through the
+      // translucent panel a skeleton always sits on, where the old hairline
+      // tone would wash out under the glass pass.
+      backgroundColor: c.fillQuiet,
       borderRadius: t.radius[radiusStep],
     },
   });

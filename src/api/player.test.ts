@@ -87,12 +87,56 @@ describe('fetchPlayer', () => {
       name: 'Yeon',
       townHallLevel: 18,
       expLevel: 220,
+      trophies: 617,
+      warStars: 1959,
+      attackWins: 13,
+      donations: 3496,
+      donationsReceived: 3455,
       role: 'leader',
       clan: { tag: '#2JPCYP98L', name: 'Umbra Lunaria' },
       leagueTier: { name: 'Electro League 31', iconUrls: { small: 't-s.png' } },
       league: { name: 'Legend League', iconUrls: { small: 'l-s.png' } },
       age: 12,
     } satisfies PlayerResponse);
+  });
+
+  it('parses the season counters the identity card reads, and degrades each to undefined when absent', async () => {
+    // The identity chips (the player card rework) read trophies, war stars,
+    // attack wins, and the donation pair off the same single response. Each
+    // is optional on the wire: a missing or malformed counter drops its chip
+    // rather than reading as a real zero.
+    const fetchImpl = (async () =>
+      stubResponse(200, {
+        ...fullPayload,
+        trophies: 'many',
+        warStars: null,
+        attackWins: undefined,
+        // donations and donationsReceived stay numbers here.
+      })) as typeof fetch;
+
+    const player = await fetchPlayer('#YPCC8QYU2', { fetchImpl });
+
+    expect(player.trophies).toBeUndefined();
+    expect(player.warStars).toBeUndefined();
+    expect(player.attackWins).toBeUndefined();
+    expect(player.donations).toBe(3496);
+    expect(player.donationsReceived).toBe(3455);
+
+    const bare = await fetchPlayer('#ABC', {
+      fetchImpl: (async () =>
+        stubResponse(200, {
+          tag: '#ABC',
+          name: 'No Frills',
+          townHallLevel: 3,
+          expLevel: 12,
+          age: 0,
+        })) as typeof fetch,
+    });
+    expect(bare.trophies).toBeUndefined();
+    expect(bare.warStars).toBeUndefined();
+    expect(bare.attackWins).toBeUndefined();
+    expect(bare.donations).toBeUndefined();
+    expect(bare.donationsReceived).toBeUndefined();
   });
 
   it('defaults optional fields when the payload omits them', async () => {

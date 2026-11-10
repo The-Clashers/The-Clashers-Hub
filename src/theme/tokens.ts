@@ -6,27 +6,38 @@
 // the typed exports below. A screen that needs a value not listed here files a
 // PR that changes *this* file and the matching row in 07-design-language.md.
 //
-// Two contracts govern every value here:
+// Three contracts govern every value here:
 // - NFR-06: contrast ratio at least 4.5:1 for text on its canvas/panel.
-//   Every text-on-canvas and text-on-panel pair was checked at the time the
-//   token was added; the comment next to each color records the lowest pair.
+//   Panels are translucent under the glass system, so the checked pair is
+//   text over the worst-case panel blend: the panel composited over the
+//   canvas carrying a full-strength glow blob (the strongest thing that can
+//   sit behind any panel). The comment next to each color records the
+//   lowest pair under that method.
 // - The "one gold accent" rule (07 §1): gold is reserved for the things that
 //   matter (numbers, verdicts, focus). It is not a generic brand color and it
 //   does not appear on chrome.
+// - The glass rule (07 §1): surfaces float. Panels are translucent and blur
+//   what passes behind them (the `glass` scale), the canvas carries two soft
+//   glow fields (glowA/glowB) that the blur has to play with, and chrome
+//   (the nav bar, floating hints) uses the canvas veil. Small controls keep
+//   solid enough ink: the translucency lives on the surfaces, not the text.
 //
-// Themes: the canvas is white in light mode and near-black in dark mode, with
-// floating panels and a single gold accent. Both themes share the spacing,
-// radius, typography, layout, and motion scales; only the color surface
-// changes between them, which keeps the rest of the system stable.
+// Themes: the canvas is warm bone in light mode and near-black in dark mode,
+// both carrying the same glow fields; panels are translucent white or
+// translucent charcoal over them. Both themes share the spacing, radius,
+// typography, layout, glass, shadow, and motion scales; only the color
+// surface changes between them, which keeps the rest of the system stable.
 
 export type ColorTokenName =
   // Surface
   | 'canvas'
+  | 'canvasVeil'
   | 'panel'
   | 'panelRaised'
   | 'panelBorder'
   | 'panelBorderStrong'
   | 'hairline'
+  | 'fillQuiet'
   // Text
   | 'textPrimary'
   | 'textSecondary'
@@ -53,20 +64,36 @@ export type ColorTokenName =
   | 'seriesBlue'
   | 'seriesGreen'
   | 'seriesRed'
-  | 'seriesMuted';
+  | 'seriesMuted'
+  // The canvas glow fields (07 §1): the soft color washes that sit behind
+  // every translucent panel and give the blur something to catch.
+  | 'glowA'
+  | 'glowB'
+  // Elevation: the shadow ink each theme's shadows draw with.
+  | 'shadowColor';
 
 export type ColorTokens = Record<ColorTokenName, string>;
 
-// Light canvas: white background, near-black ink, one gold accent.
-// Lowest-contrast text pair: textMuted (#5F5F57) on canvas at 7.0:1, well
-// clear of the 4.5:1 floor. textOnAccent over accent is 5.9:1.
+// Light canvas: warm bone background, translucent white glass panels, one
+// gold accent. Lowest-contrast text pair under the glass method: textMuted
+// (#5F5F57) on the worst-case panel blend at 5.8:1 (5.6:1 on the bare
+// canvas), clear of the 4.5:1 floor with margin. textOnAccent over accent
+// is 5.9:1, unchanged by the glass pass.
 export const lightColors: ColorTokens = {
-  canvas: '#FFFFFF',
-  panel: '#F7F7F5',
-  panelRaised: '#FFFFFF',
-  panelBorder: '#E4E4E1',
-  panelBorderStrong: '#C9C9C4',
-  hairline: '#EDEDEA',
+  canvas: '#F1EFE8',
+  // The translucent canvas chrome paints with: the nav bar and the floating
+  // hints. Opaque enough to keep their text honest, translucent enough to
+  // read as glass over the scrolling page.
+  canvasVeil: 'rgba(255, 255, 255, 0.58)',
+  panel: 'rgba(255, 255, 255, 0.60)',
+  panelRaised: 'rgba(255, 255, 255, 0.76)',
+  panelBorder: 'rgba(28, 26, 18, 0.10)',
+  panelBorderStrong: 'rgba(28, 26, 18, 0.22)',
+  hairline: 'rgba(28, 26, 18, 0.07)',
+  // Quiet fills that sit ON a panel (rail tracks, skeleton blocks, neutral
+  // chips): strong enough to read through their host panel's translucency,
+  // quieter than a border.
+  fillQuiet: 'rgba(28, 26, 18, 0.10)',
 
   textPrimary: '#14140F',
   textSecondary: '#3F3F38',
@@ -94,18 +121,29 @@ export const lightColors: ColorTokens = {
   seriesGreen: '#1F7A3D',
   seriesRed: '#B02020',
   seriesMuted: '#9A9A92',
+
+  // The gold wash over the canvas's upper field and the cool wash over its
+  // lower one; the ambience layer draws them, the panels blur them.
+  glowA: 'rgba(184, 134, 11, 0.12)',
+  glowB: 'rgba(31, 90, 168, 0.07)',
+
+  shadowColor: '#14140F',
 };
 
-// Dark canvas: near-black background, near-white ink, brighter gold so the
-// accent still reads as gold against the dark surface. Lowest-contrast text
-// pair: textMuted (#A8A89E) on canvas at 8.2:1, still clear of the floor.
+// Dark canvas: near-black background with the same glow fields, translucent
+// charcoal glass panels, brighter gold so the accent still reads as gold
+// against the dark surface. Lowest-contrast text pair under the glass
+// method: textMuted (#A8A89E) on the worst-case panel blend at 7.0:1
+// (8.3:1 on the bare canvas), clear of the floor.
 export const darkColors: ColorTokens = {
-  canvas: '#0B0B0A',
-  panel: '#161614',
-  panelRaised: '#1E1E1B',
-  panelBorder: '#2A2A26',
-  panelBorderStrong: '#3A3A35',
-  hairline: '#222220',
+  canvas: '#0A0A09',
+  canvasVeil: 'rgba(10, 10, 9, 0.60)',
+  panel: 'rgba(23, 23, 21, 0.55)',
+  panelRaised: 'rgba(31, 31, 28, 0.70)',
+  panelBorder: 'rgba(245, 244, 238, 0.10)',
+  panelBorderStrong: 'rgba(245, 244, 238, 0.24)',
+  hairline: 'rgba(245, 244, 238, 0.07)',
+  fillQuiet: 'rgba(245, 244, 238, 0.12)',
 
   textPrimary: '#F5F4EE',
   textSecondary: '#C7C6BE',
@@ -133,6 +171,11 @@ export const darkColors: ColorTokens = {
   seriesGreen: '#5BD07D',
   seriesRed: '#F26F6F',
   seriesMuted: '#7E7E76',
+
+  glowA: 'rgba(224, 184, 76, 0.12)',
+  glowB: 'rgba(122, 168, 224, 0.08)',
+
+  shadowColor: '#000000',
 };
 
 // Spacing scale. A 4px base with the steps the layout actually needs; values
@@ -159,6 +202,9 @@ export type SpacingStep = keyof typeof spacing;
 // Radius scale. Chips and small controls take radius.1, panels take radius.2,
 // hero panels take radius.3, and pills take the round value. Everything else
 // inherits; a screen adding its own radius is a PR that gets sent back.
+// The glass pass leans on the same scale: translucency makes a panel's
+// corners its most visible edge, and radius.3 keeps the raised glass card
+// soft enough to read as floating.
 export const radius = {
   0: 0,
   1: 4,
@@ -169,6 +215,43 @@ export const radius = {
 } as const;
 
 export type RadiusStep = keyof typeof radius;
+
+// The glass scale (07 section 2 "Glass"): how strongly a surface blurs and
+// saturate-shifts whatever passes behind it. Both values ride together in
+// one backdrop-filter string built by the theme base styles, so every glass
+// surface in the product blurs identically; a surface wanting its own value
+// is a PR that changes this scale.
+export const glass = {
+  // Blur radius in px. Strong enough that page content scrolling under the
+  // nav bar or behind a panel reads as soft color, never as legible text
+  // fighting the panel's own text.
+  blur: 18,
+  // Saturation multiplier. The bump is what makes frosted glass feel lit
+  // rather than merely fogged: the glow fields keep their warmth through
+  // the blur.
+  saturate: 1.6,
+} as const;
+
+// The shadow scale (07 section 2 "Glass"): the two elevations a surface can
+// sit at. `resting` is the everyday panel, a tight soft shadow just clear of
+// the panel's edge; `lifted` is the raised panel and floating chrome, wide
+// and diffuse, the shadow that makes translucency read as height. The ink
+// comes from the per-theme shadowColor token; RN Web maps these to a CSS
+// box-shadow.
+export const shadows = {
+  resting: {
+    shadowOpacity: 0.07,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  lifted: {
+    shadowOpacity: 0.14,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: 10 },
+  },
+} as const;
+
+export type ShadowStep = keyof typeof shadows;
 
 // Typography. System font stack so the canvas stays quiet; the design language
 // calls for tabular figures on numbers (no chart junk, no decimal noise), so
@@ -218,9 +301,9 @@ export type LineHeightName = keyof typeof lineHeight;
 
 // Layout. The centered content column is 1280px max (07 §3); side padding
 // comes from the spacing scale and steps down at the small breakpoint. The
-// roster table swaps to cards at 768px, and the player detail goes two-up at
-// 1024px; both breakpoints are read through useWindowDimensions, not CSS
-// media queries, per the RN paradigm.
+// roster table swaps to cards at 768px, and the player detail's analysis
+// grids go two-up at 1024px; both breakpoints are read through
+// useWindowDimensions, not CSS media queries, per the RN paradigm.
 export const layout = {
   contentMaxWidth: 1280,
   sidePaddingDesktop: spacing[6],
@@ -279,6 +362,8 @@ export interface ThemeTokens {
   readonly colors: ColorTokens;
   readonly spacing: typeof spacing;
   readonly radius: typeof radius;
+  readonly glass: typeof glass;
+  readonly shadows: typeof shadows;
   readonly fontFamily: typeof fontFamily;
   readonly fontSize: typeof fontSize;
   readonly fontWeight: typeof fontWeight;
@@ -293,6 +378,8 @@ export const lightTheme: ThemeTokens = {
   colors: lightColors,
   spacing,
   radius,
+  glass,
+  shadows,
   fontFamily,
   fontSize,
   fontWeight,
@@ -307,6 +394,8 @@ export const darkTheme: ThemeTokens = {
   colors: darkColors,
   spacing,
   radius,
+  glass,
+  shadows,
   fontFamily,
   fontSize,
   fontWeight,

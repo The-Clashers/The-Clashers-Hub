@@ -129,6 +129,16 @@ export interface PlayerResponse {
   townHallLevel: number;
   /** XP level, the header's XP cell. */
   expLevel: number;
+  /** Current home-village trophies, the identity card's trophy chip. */
+  trophies?: number;
+  /** Lifetime war stars earned, the identity card's war chip. */
+  warStars?: number;
+  /** Season attack wins, the identity card's attacks chip. */
+  attackWins?: number;
+  /** Season donations given, the identity card's donation chip. */
+  donations?: number;
+  /** Season donations received, the identity card's donation chip. */
+  donationsReceived?: number;
   /** Raw API role string ("leader" | "coLeader" | "admin" | "member").
    * Undefined when the player is clanless; lib/clan-role.ts owns the label
    * and the seniority order, the same table the roster reads. */
@@ -303,11 +313,22 @@ function toPlayerResponse(parsed: unknown): PlayerResponse {
   const townHallLevel = typeof parsed.townHallLevel === 'number' ? parsed.townHallLevel : 0;
   const expLevel = typeof parsed.expLevel === 'number' ? parsed.expLevel : 0;
   const role = typeof parsed.role === 'string' && parsed.role !== '' ? parsed.role : undefined;
-  return {
+  // The season counters are optional numbers on the raw payload; each gets
+  // the same tolerance (a missing or malformed field degrades to undefined,
+  // and the identity card simply drops that chip) instead of a default that
+  // would read as a real zero.
+  const toOptionalCount = (value: unknown): number | undefined =>
+    typeof value === 'number' ? value : undefined;
+  const response: PlayerResponse = {
     tag,
     name,
     townHallLevel,
     expLevel,
+    trophies: toOptionalCount(parsed.trophies),
+    warStars: toOptionalCount(parsed.warStars),
+    attackWins: toOptionalCount(parsed.attackWins),
+    donations: toOptionalCount(parsed.donations),
+    donationsReceived: toOptionalCount(parsed.donationsReceived),
     role,
     clan: toPlayerClan(parsed.clan),
     leagueTier: toPlayerLeagueTier(parsed.leagueTier),
@@ -319,6 +340,7 @@ function toPlayerResponse(parsed: unknown): PlayerResponse {
     achievements: toPlayerAchievementArray(parsed.achievements),
     age: typeof parsed.age === 'number' ? parsed.age : 0,
   };
+  return response;
 }
 
 function classifyError(status: number, body: unknown): PlayerFetchError {

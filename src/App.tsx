@@ -1,4 +1,5 @@
 import { Route, Routes } from 'react-router';
+import GlassAmbience from './components/GlassAmbience';
 import NavBar from './components/NavBar';
 import HomeScreen from './screens/HomeScreen';
 import SearchScreen from './screens/SearchScreen';
@@ -26,9 +27,14 @@ import TokenScreen from './screens/TokenScreen';
 // page (the owner's call); the /hello M0 smoke screen is gone, the real
 // /clan/:tag screen renders everything it used to render (the owner's
 // duplicate-surface note).
+//
+// The ambience layer renders before everything else so the glow fields sit
+// behind every surface in stacking order; it is fixed and pointer-transparent,
+// so it costs nothing to any route that ignores it.
 export default function App() {
   return (
     <>
+      <GlassAmbience />
       <NavBar />
       <Routes>
         <Route path="/" element={<HomeScreen />} />
