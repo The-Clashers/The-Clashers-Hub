@@ -262,7 +262,8 @@ draw, which is why the ambience layer uses react-native-svg, the chart
   describes; the clan screen keeps its footer row until its own pass).
   Breadcrumbs `Home › Players › <name>` sit above with the clan card's
   clearance.
-  The analysis column stacks the five sections. The rushed analysis card
+  The left column holds the identity card and the two verdict cards: the
+  rushed analysis card and the upgrade-next list. The rushed analysis card
   (T-M2-2's card half) centers the `Gauge` dial (the overall deficit
   percentage as a gold arc on a semicircle, the number in its throat,
   "DEFICIT VS TH CEILING" under it), the band chip under the dial, the
@@ -274,7 +275,8 @@ draw, which is why the ambience layer uses react-native-svg, the chart
   level/maximum pair, and the gap as a warning chip; a maxed account gets
   the designed "nothing to catch up" reading (AC-04), never a fabricated
   todo list.
-  The hero card (T-M2-4) renders the prototype's hero cards: one compact
+  The right column stacks the three ledger cards: heroes, achievements,
+  and the progression grid. The hero card (T-M2-4) renders the prototype's hero cards: one compact
   card per hero in measured rows of at least 240 px — the bundled unit
   icon (`UnitIcon`, 32 px slot, the typed map in `lib/icon-map.ts`
   resolving every hero the API names, placeholder.svg for content the map
