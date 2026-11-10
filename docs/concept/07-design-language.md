@@ -8,10 +8,19 @@ too.
 ## 1. Feel
 
 Clash of Clans is a game of gold and trophies, but a data tool should be
-quiet, simple, Clash of Clans inspired: a white/black mode canvas (light and
-dark themes), panels that float on it, one gold accent used sparingly for the
-things that matter (numbers, verdicts, focus). Dense but never noisy:
-micro-labels whisper, values speak.
+quiet, simple, Clash of Clans inspired: a warm-bone / near-black canvas
+(light and dark themes) carrying two soft glow fields, panels of frosted
+glass that float over them and blur what passes behind, one gold accent
+used sparingly for the things that matter (numbers, verdicts, focus).
+Dense but never noisy: micro-labels whisper, values speak.
+
+The glass rework (the owner's prototype pass) turned the flat surfaces into
+lit ones: the canvas is no longer a flat color but a field (a gold wash
+upper-left, a cool wash lower-right, drawn once by the ambience layer),
+and every panel is translucent with the one shared backdrop blur, lifted on
+a two-step shadow scale. Translucency lives on the surfaces, never the
+text: ink stays full strength, so the quiet comes from the materials, not
+from washed-out type.
 
 ## 2. Tokens (the only allowed values)
 
@@ -22,26 +31,34 @@ the pairs and the rhythm are checkable at a glance.
 
 ### 2.1 Color (per theme)
 
-Light canvas is white with near-black ink; dark canvas is near-black with
-near-white ink. One gold accent, used sparingly. Every text-on-canvas and
-text-on-panel pair was checked at 4.5:1 or better (NFR-06); the lowest pair in
-each theme is noted next to the table.
+Light canvas is warm bone with near-black ink; dark canvas is near-black
+with near-white ink. One gold accent, used sparingly. Panels are
+translucent glass over the canvas's glow fields, so the honest contrast
+check is text over the worst-case panel blend: the panel composited over
+the canvas carrying a full-strength glow blob, the strongest thing that can
+sit behind any panel. Every text pair was re-checked under that method
+(NFR-06); the lowest pair in each theme is noted next to the table.
 
 | Group | Tokens |
 |---|---|
-| Surface | `canvas`, `panel`, `panelRaised`, `panelBorder`, `panelBorderStrong`, `hairline` |
+| Surface | `canvas`, `canvasVeil` (the translucent chrome the nav bar and floating hints paint with), `panel`, `panelRaised`, `panelBorder`, `panelBorderStrong`, `hairline`, `fillQuiet` (the quiet fill for things that sit ON a panel: rail tracks, skeleton blocks, neutral chips) |
 | Text | `textPrimary`, `textSecondary`, `textMuted`, `textOnAccent`, `textInverse` |
 | Accent (gold) | `accent`, `accentHover`, `accentPressed`, `accentSoft`, `focusRing` |
 | Semantic | `success` / `successSoft`, `warning` / `warningSoft`, `danger` / `dangerSoft`, `info` / `infoSoft` |
 | Chart series | `seriesGold`, `seriesBlue`, `seriesGreen`, `seriesRed`, `seriesMuted` (the four chart types plus a muted series, 07 §5) |
+| Glass glow | `glowA` (the gold wash), `glowB` (the cool wash): the canvas fields the ambience layer draws and the panels blur |
+| Elevation | `shadowColor`: the ink each theme's two shadow steps draw with |
 
-Lowest-contrast text pair per theme:
+Lowest-contrast text pair per theme (worst-case panel blend method):
 
-- Light: `textMuted` on `canvas` at 7.0:1.
-- Dark: `textMuted` on `canvas` at 8.2:1.
+- Light: `textMuted` on the panel blend at 5.8:1 (5.6:1 on the bare
+  canvas).
+- Dark: `textMuted` on the panel blend at 7.0:1 (8.3:1 on the bare
+  canvas).
 
-Both clear the 4.5:1 floor with margin; `textMuted` on `panel` is the next
-pair to watch if a future change shifts either value.
+Both clear the 4.5:1 floor with margin. Gold (`accent`) is not a text
+pair: it fills verdict surfaces and carries `textOnAccent` ink (5.9:1 over
+`accent` in light, unchanged by the glass pass).
 
 ### 2.2 Spacing
 
@@ -141,6 +158,40 @@ the choice to `Appearance.setColorScheme` for RN components that read it, and
 paints the document root so the body underneath matches the canvas on
 overscroll.
 
+### 2.9 Glass and elevation
+
+The glass system the rework shipped: how strongly a surface blurs, and the
+two steps it can sit at. Both live in `src/theme/tokens.ts` beside the
+colors they tint.
+
+| Token | Value | Used for |
+|---|---|---|
+| `glass.blur` | 18 | the one backdrop blur radius every glass surface shares |
+| `glass.saturate` | 1.6 | the saturation bump that keeps the glow fields lit through the blur |
+| `shadows.resting` | opacity 0.07 / radius 14 / offset 4 | the everyday panel and the state surfaces |
+| `shadows.lifted` | opacity 0.14 / radius 28 / offset 10 | raised panels, the nav bar, floating chrome |
+
+Where the treatment applies:
+
+- **The big surfaces blur:** the base styles' `panel`, `panelRaised`, and
+  `statePanel` carry the translucent color, the shared blur (one cast
+  helper, `glassSurfaceFilter`, the theme's single web-only-style cast), and
+  their shadow step. The nav bar and the Dropdown's portaled listbox take
+  the same filter over `canvasVeil` / `panelRaised`, because content passes
+  under them.
+- **Small controls do not blur:** pills, chips, inputs, and tiles paint
+  with the translucent token colors but skip the filter. Backdrop blur is
+  the expensive property in the system; spending it per-panel (roughly ten
+  per screen) reads as glass, spending it per-control reads as lag.
+- **Nested fills use `fillQuiet`:** anything that paints ON a panel (rail
+  tracks, skeleton blocks, neutral chips) uses the quiet fill, because the
+  old panel-tone fills would vanish into their now-translucent host.
+- **The glow fields are drawn once:** `GlassAmbience` (the kit component)
+  renders the two radial gradients in one fixed, pointer-transparent SVG
+  behind every screen. Radial gradients are the one thing Views cannot
+draw, which is why the ambience layer uses react-native-svg, the chart
+  library the stack already blesses.
+
 ## 3. Layout
 
 - Centered content column, max width 1280, side padding from the spacing scale.
@@ -153,7 +204,9 @@ overscroll.
   its containing block, which is exactly viewport-height here. The bar is
   the compact exception the tab strip already records (07 section 6): the
   row heights are compact by the owner's call, while every pressable keeps
-  the 44 px floor, keyboard focus, and the gold ring.
+  the 44 px floor, keyboard focus, and the gold ring. The glass pass made
+  it frosted: the canvas veil plus the shared backdrop blur over the
+  scrolling page, on the resting shadow.
 - **Clan detail card:** three stacked bands (the owner's better-layout call
   over the two-column wireframe). The identity row (badge 48, name,
   tag/level/location line), the description at full width clamped to two
@@ -188,51 +241,74 @@ overscroll.
   read as one family. No sort controls: the row order is the engine's
   judgment. Attacks left reads the current-war endpoint and dashes when
   there is no war to count.
-- **Player detail:** ≥ 1024px two columns (identity + analysis); stacked below.
-  The identity card (the T-M2-1 shell) stacks the name, the tag + clan line,
-  a hairline, then the header stat cells (Town Hall, league, XP, clan role)
-  two per row, the league cell pairing the tier icon with the tier name the
-  same way the roster's rank column reads the ladder (the classic league
-  object is the fallback when the payload carries no tier); breadcrumbs
-  `Home › Players › <name>` sit above with the clan card's clearance. The
-  achievements card (T-M2-3) renders in the analysis column on the
-  panelRaised chrome: the "N / M complete" count line in tabular figures
-  under the title, rows grouped by village under quiet uppercase headers
-  (the payload interleaves home, builder base, and clan capital rows;
-  groups keep first-appearance order), and one row per achievement with the
-  requirement text under the name, the value/target pair in tabular figures
-  above a `ProgressRail` whose earned stars take the gold accent. Stars are
-  the API's count, never derived from the fill: the payload proves they are
-  independent (2 stars at 25% of the target, 1 star past it). A completed
-  row (all three stars in) mutes to the ledger treatment: secondary name,
-  no requirement line, no open star marker, so the in-progress rows draw
-  the eye; on a maxed account the card reads as a quiet ledger, which is
-  the honest reading of a finished list. The rows key on
-  village-name-index because the live payload carries duplicate names
-  (one locked "Keep Your Account Safe!" beside the completed one). The
-  hero card (T-M2-4) renders second in the analysis column on the same
-  panelRaised chrome: a "N / M maxed" count line in tabular figures
-  under the title, rows grouped by village through the shared rule the
-  achievements card established (moved to `lib/village.ts`, groups keep
-  first-appearance order), one row per hero with the bundled unit icon
-  anchoring the name line (`UnitIcon`, 32 px slot, the map in
-  `lib/icon-map.ts` resolving every hero the API names, placeholder.svg
-  when the game ships content the map has not met) beside the name and the
-  level/maximum pair sharing one line (heroes carry no requirement text,
-  so the line has room) above a `LevelRail` — the fill sized by the
-  level/max fraction, no star markers, the same 6 px track and gold fill
-  the `ProgressRail` draws. The equipment the API nests on each hero
-  entry renders as quiet indented rows under that hero (small 20 px icon,
-  name + pair, no rails): equipment belongs to the hero it is equipped
-  on, and the flat `heroEquipment` inventory belongs to the progression
-  grid (FR-16). The icons stay at full strength through the maxed mute:
-  the mute is text hierarchy (the ledger reading), and dimming a unit's
-  picture would read as broken, not quiet. A
-  maxed hero mutes to the ledger treatment the completed achievement row
-  takes; a hero with a null maxLevel (brand-new content) renders its
-  level alone with no rail, and the card footnotes the count instead of
-  inventing a maximum. The rushed analysis section carries its designed
-  land-in-M2 notice until its card ships.
+- **Player detail (the prototype rework):** a full-width identity card
+  above the analysis, then the analysis in two two-column grids from
+  1024 px up (stacked below). The identity card (the T-M2-1 shell, redrawn
+  to the owner's prototype) carries the avatar monogram (56 px circle,
+  accent-soft field, gold ring, the name's initials), the name with its
+  chips beside it (Town Hall on the gold soft chip, the tag on a quiet
+  mono chip, the clan role toned by seniority: leader gold, elders info,
+  members quiet), the season chips (the league tier icon + name with the
+  classic league object as fallback, trophies, war stars, attack wins, XP,
+  and the donation pair "N : N this season", each chip dropping out
+  cleanly when the payload omits its counter), and an actions column on
+  the card's right edge holding the compare button (primary gold) above
+  the manual refresh control (the owner's placement call: freshness lives
+  on the card whose data it describes; the clan screen keeps its footer
+  row until its own pass). Breadcrumbs `Home › Players › <name>` sit above
+  with the clan card's clearance.
+  Grid one is the verdict: the rushed analysis card (T-M2-2's card half)
+  beside the upgrade-next list. The rushed card centers the `Gauge` dial
+  (the overall deficit percentage as a gold arc on a semicircle, the
+  number in its throat, "DEFICIT VS TH CEILING" under it), the band chip
+  under the dial, the reading's own scale note (units measured, already
+  maxed, the band scale), the per-category `CategoryBars` (each bar
+  colored by the band that category's own percentage falls into), and the
+  skipped-units footnote when the engine counts any (SR-14). The
+  upgrade-next list renders the engine's top deficits worst-first: rank
+  circle, name, level/maximum pair, and the gap as a warning chip; a
+  maxed account gets the designed "nothing to catch up" reading (AC-04),
+  never a fabricated todo list. Grid two is the ledgers: the hero and
+  achievements cards in one column, the progression grid in the other —
+  long lists left, the tall tile grid right, the same balance the
+  prototype struck.
+  The achievements card (T-M2-3) renders on the panelRaised chrome: the
+  "N / M complete" count line in tabular figures under the title, rows
+  grouped by village under quiet uppercase headers (the payload
+  interleaves home, builder base, and clan capital rows; groups keep
+  first-appearance order), and one row per achievement with the
+  requirement text under the name, the value/target pair in tabular
+  figures above a `ProgressRail` whose earned stars take the gold accent.
+  Stars are the API's count, never derived from the fill: the payload
+  proves they are independent (2 stars at 25% of the target, 1 star past
+  it). A completed row (all three stars in) mutes to the ledger
+  treatment: secondary name, no requirement line, no open star marker,
+  so the in-progress rows draw the eye; on a maxed account the card reads
+  as a quiet ledger, which is the honest reading of a finished list. The
+  rows key on village-name-index because the live payload carries
+  duplicate names (one locked "Keep Your Account Safe!" beside the
+  completed one).
+  The hero card (T-M2-4) renders on the same panelRaised chrome: an
+  "N / M maxed" count line in tabular figures under the title, rows
+  grouped by village through the shared rule the achievements card
+  established (moved to `lib/village.ts`, groups keep first-appearance
+  order), one row per hero with the bundled unit icon anchoring the name
+  line (`UnitIcon`, 32 px slot, the map in `lib/icon-map.ts` resolving
+  every hero the API names, placeholder.svg when the game ships content
+  the map has not met) beside the name and the level/maximum pair sharing
+  one line (heroes carry no requirement text, so the line has room) above
+  a `LevelRail` — the fill sized by the level/max fraction, no star
+  markers, the same 6 px track and gold fill the `ProgressRail` draws.
+  The equipment the API nests on each hero entry renders as quiet
+  indented rows under that hero (small 20 px icon, name + pair, no
+  rails): equipment belongs to the hero it is equipped on, and the flat
+  `heroEquipment` inventory belongs to the progression grid (FR-16). The
+  icons stay at full strength through the maxed mute: the mute is text
+  hierarchy (the ledger reading), and dimming a unit's picture would
+  read as broken, not quiet. A maxed hero mutes to the ledger treatment
+  the completed achievement row takes; a hero with a null maxLevel
+  (brand-new content) renders its level alone with no rail, and the card
+  footnotes the count instead of inventing a maximum.
 - Breakpoints come from `useWindowDimensions` into a shared `breakpoints`
   helper, no CSS media queries scattered through components; RN paradigm is
   JS-driven layout.
@@ -255,7 +331,8 @@ overscroll.
 
 | Component | Purpose |
 |---|---|
-| `NavBar` | the thin fixed row every page renders: brand, `LookupSearch`, the page links, the theme toggle, plus the in-flow spacer that reserves its height |
+| `NavBar` | the thin fixed row every page renders: brand, `LookupSearch`, the page links, the theme toggle, plus the in-flow spacer that reserves its height; frosted glass since the rework (canvas veil + shared blur) |
+| `GlassAmbience` | the canvas's two glow fields: one fixed, pointer-transparent SVG behind every screen, the radial gradients Views cannot draw |
 | `LookupSearch` + `LookupModePicker` | the one search box (nav-thin and hero-sized): the mode picker is the small icon dropdown that says player or clan; player mode is tag-only, clan mode takes a name or `#tag` |
 | `Breadcrumbs` | the location line detail screens render instead of a header: `Home › Clans › <name>`, WAI-ARIA breadcrumb pattern |
 | `SearchBar` + `FilterRow` | clans page query controls; the search bar takes a clan name or a `#tag` (names under three characters taught inline), and the filters sit behind one `Filters` disclosure whose toggle carries the applied count: a wrapping grid of `Dropdown`s (clan size, war frequency, location, clan label, clan type, chat language, league required) plus two number boxes (min clan level; Town Hall required, capped at the reference max), two cells per row on a phone and four from tablet up (the cell basis follows the shared breakpoint helper) |
@@ -270,11 +347,11 @@ overscroll.
 | `AttentionTable` / `AttentionCard` | the Needs Attention tab's worst-first view, table & card presentations |
 | `ProgressRail` | achievement value/target bar with star markers |
 | `LevelRail` | the hero panel's level-versus-maximum bar: the fill without star markers, the same 6 px track and gold fill `ProgressRail` draws |
-| `CategoryBars` | rushed per-category horizontal bars |
-| `Gauge` | overall rushed % dial (the flagship number) |
+| `CategoryBars` | rushed per-category horizontal bars: label, quiet track, band-colored fill, tabular percentage |
+| `Gauge` | overall rushed % dial (the flagship number): a semicircular SVG arc that fills gold with the deficit, built on react-native-svg |
 | `ProgressionGrid` | player progression tiles: `UnitIcon`, level, maxed-for-Town-Hall chip |
 | `UnitIcon` | bundled game-icon lookup behind `lib/icon-map.ts` with the placeholder fallback, fixed 32 px slot (20 px small variant on quiet rows like the hero panel's equipment); shipped on the hero panel, reused by the `ProgressionGrid` tiles |
-| `RefreshControl` | manual refresh with cooldown and the "cached, Ns ago" hint |
+| `RefreshControl` | manual refresh with cooldown and the "cached, Ns ago" hint; renders in the player card's actions column on the player screen and the footer row on the clan screen |
 | `WarResultChip` | win/loss/tie pill |
 | `CompareRow` | metric row with both values + delta arrow |
 | `Legend` | the ONE chart legend pattern, all charts use it, no exceptions |
@@ -287,12 +364,19 @@ overscroll.
 
 - Built on **react-native-svg**: bar (donation balance), line (war trend),
   dual-line (compare trend), radar (P2 compare garnish). Four types, maximum.
-- One `Legend` component for every chart, swatch + label + optional footnote,
-  laid out in a row. A chart adding its own legend is a PR that gets sent back.
+- The `Gauge` dial is not a series chart: it is a single-value instrument
+  (one number, one arc), so the Legend rule and the four-type cap do not
+  apply to it. Its reading is labeled in place (the caption under the
+  number), which is the legend a one-value dial owes.
+- One `Legend` component for every series chart, swatch + label + optional
+  footnote, laid out in a row. A chart adding its own legend is a PR that
+  gets sent back.
 - Numerics: tabular figures, no decimals unless the metric is inherently
   fractional (stars per attack → 1 decimal max).
 - No chart junk: no gradients, no 3D, no animations on data changes: data
-  tools answer questions, they don't perform.
+  tools answer questions, they don't perform. (The glow fields behind the
+  glass are ambient light on the canvas, not chart decoration; they sit
+  under the panels, never inside a plot.)
 
 ## 6. Accessibility
 
