@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Image,
   Pressable,
@@ -37,6 +37,7 @@ import { heroProgress, formatLevelPair } from '../lib/hero-progress';
 import { clanRoleLabel } from '../lib/clan-role';
 import { canonicalTagFromRoute } from '../lib/tag';
 import { groupByVillage } from '../lib/village';
+import { recordRecentSearch } from '../lib/recent-searches';
 import { playerToProgressionTiles } from '../lib/progression-grid';
 import {
   bandFor,
@@ -205,6 +206,12 @@ function PlayerSuccess({ player, onRefresh, isRefreshing }: PlayerSuccessProps) 
   const base = useMemo(() => createBaseStyles(theme), [theme]);
   const styles = useMemo(() => createStyles(theme), [theme]);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (player.tag) {
+      recordRecentSearch({ kind: 'player', query: player.tag, label: player.name });
+    }
+  }, [player.tag, player.name]);
 
   // The two-column rule (07 section 3): identity + analysis from 1024 px up,
   // stacked below it. Read through useWindowDimensions into the breakpoints

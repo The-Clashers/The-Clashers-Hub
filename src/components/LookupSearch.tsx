@@ -11,6 +11,7 @@ import {
   playerRouteFor,
   TAG_REJECT_COPY,
 } from '../lib/tag';
+import { recordRecentSearch } from '../lib/recent-searches';
 
 // The lookup box (07 section 4): one search input with a player/clan mode
 // picker, the same box rendered thin in the nav bar and large on the home
@@ -78,6 +79,7 @@ export default function LookupSearch({
       const tag = normalizeTagInput(raw);
       if (tag.ok) {
         setHint(null);
+        recordRecentSearch({ kind: 'player', query: tag.tag });
         go(playerRouteFor(tag.tag));
       } else {
         setHint(tag.reason === 'empty' ? 'Type a player tag first.' : TAG_REJECT_COPY[tag.reason]);
@@ -95,6 +97,7 @@ export default function LookupSearch({
       const tag = normalizeTagInput(raw);
       if (tag.ok) {
         setHint(null);
+        recordRecentSearch({ kind: 'clan', query: tag.tag });
         go(clanRouteFor(tag.tag));
       } else {
         setHint(
@@ -108,6 +111,7 @@ export default function LookupSearch({
       return;
     }
     setHint(null);
+    recordRecentSearch({ kind: 'clan', query: raw });
     go(`/clans?name=${encodeURIComponent(raw)}`);
   };
 

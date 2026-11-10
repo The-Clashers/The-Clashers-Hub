@@ -98,7 +98,7 @@ FR-18 are the team's original additions beyond the lab's example set.
 | FR-12 | summarize war efficiency: win rate, stars per attack, and average destruction over recent wars | F-09 | P1 | Draft |
 | FR-13 | compare player vs player and clan vs clan side by side, metric by metric | F-10, F-11 | P1 | Draft |
 | FR-14 | give every screen (search, clan, player, compare) a shareable URL | F-12 | P0 | Draft |
-| FR-15 | persist recent searches in the browser's local storage | F-13 | P1 | Draft |
+| FR-15 | persist recent searches in the browser's local storage | F-13 | P1 | Done |
 | FR-16 | display a progression grid on the player screen: every unit of both villages (troops, spells, heroes, pets, siege machines, and hero equipment where exposed) with its icon, current level, and a maxed-for-Town-Hall indicator | F-17 | P1 | Draft |
 | FR-17 | display a preparation-day scouting view when the clan is in preparation: own and opponent rosters side by side with Town Hall levels and pairwise mismatch highlighting | F-18 | P1 | Draft |
 | FR-18 | provide a manual refresh control on live-data screens, guarded by a cooldown that serves cached data with a cached-data hint instead of calling the game API again | F-19 | P1 | Draft |
