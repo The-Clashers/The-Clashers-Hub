@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigate } from 'react-router';
 import { useTheme, glassSurfaceFilter } from '../theme';
+import Glyph from './Glyph';
 import LookupModePicker, { type LookupMode } from './LookupModePicker';
 import { SEARCH_NAME_MIN_CHARS, SEARCH_NAME_MIN_COPY } from '../api/search';
 import {
@@ -38,6 +39,7 @@ export interface LookupSearchProps {
 
 export default function LookupSearch({ variant = 'bar', onNavigate }: LookupSearchProps) {
   const { theme } = useTheme();
+  const hero = variant === 'hero';
   const styles = useMemo(() => createStyles(theme, variant), [theme, variant]);
   const navigate = useNavigate();
   const go = onNavigate ?? ((route: string) => navigate(route));
@@ -115,6 +117,9 @@ export default function LookupSearch({ variant = 'bar', onNavigate }: LookupSear
         <View style={styles.pickerWrap}>
           <LookupModePicker value={mode} onSelect={setMode} />
         </View>
+        <View style={styles.searchIconWrap} aria-hidden>
+          <Glyph name="search" size={hero ? 18 : 14} color={theme.colors.textMuted} />
+        </View>
         <TextInput
           value={draft}
           onChangeText={handleChange}
@@ -180,11 +185,18 @@ function createStyles(t: ReturnType<typeof useTheme>['theme'], variant: LookupVa
       borderRightWidth: 1,
       borderRightColor: c.panelBorder,
     },
+    searchIconWrap: {
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingLeft: t.spacing[2],
+      paddingRight: 0,
+    },
     input: {
       flex: 1,
       minWidth: 0,
       minHeight: hero ? 52 : t.layout.touchTargetMin,
-      paddingHorizontal: t.spacing[3],
+      paddingLeft: t.spacing[2],
+      paddingRight: t.spacing[3],
       paddingVertical: t.spacing[2],
       fontFamily: t.fontFamily.sans,
       fontSize: hero ? t.fontSize.md : t.fontSize.sm,

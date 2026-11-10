@@ -39,7 +39,15 @@ const GLYPH_STROKE_WIDTH = 1.8;
  * glyphs' so the star's points stay crisp at 13 px. */
 const STAR_STROKE_WIDTH = 1.5;
 
-export type GlyphName = 'compare' | 'refresh' | 'home' | 'star';
+export type GlyphName =
+  | 'compare'
+  | 'refresh'
+  | 'home'
+  | 'star'
+  | 'user'
+  | 'shield'
+  | 'search'
+  | 'code';
 
 /** Each glyph's subpaths, straight from the prototype's ICO set. */
 const GLYPH_PATHS: Record<GlyphName, ReadonlyArray<string>> = {
@@ -51,6 +59,14 @@ const GLYPH_PATHS: Record<GlyphName, ReadonlyArray<string>> = {
   home: ['M3 10.5 12 3l9 7.5', 'M5 9.5V21h14V9.5'],
   // The star mark: the rating glyph, filled.
   star: ['M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z'],
+  // The user mark: head and shoulders silhouette.
+  user: ['M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z', 'M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6'],
+  // The shield mark: clan crest contour.
+  shield: ['M12 2l8 3v6c0 5.5-3.8 10.3-8 11.5-4.2-1.2-8-6-8-11.5V5l8-3z'],
+  // The search mark: magnifying glass lens and handle.
+  search: ['M10.5 18a7.5 7.5 0 1 0 0-15 7.5 7.5 0 0 0 0 15z', 'M16 16l5 5'],
+  // The code/contributors mark: angle brackets with slash.
+  code: ['M16 18l6-6-6-6', 'M8 6l-6 6 6 6'],
 };
 
 export interface GlyphProps {

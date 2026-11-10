@@ -324,8 +324,12 @@ function PlayerSuccess({ player, onRefresh, isRefreshing }: PlayerSuccessProps) 
         <PillButton
           label="Compare this player"
           icon="compare"
-          onPress={() => navigate('/compare')}
-          hint="Opens the compare screen. Player versus player pairing lands with the compare cards."
+          onPress={() =>
+            navigate(
+              `/compare?mode=players&a=${encodeURIComponent(player.tag.replace(/^#/, ''))}`,
+            )
+          }
+          hint="Opens the compare screen with this player pre-selected."
           stretch
         />
         <RefreshControl

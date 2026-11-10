@@ -24,6 +24,8 @@ import { useTheme } from '../theme';
 // color, and each option repeats its icon beside the word so the listbox
 // is self-describing.
 
+import Glyph from './Glyph';
+
 export type LookupMode = 'player' | 'clan';
 
 interface LookupModeOption {
@@ -175,7 +177,11 @@ export default function LookupModePicker({ value, onSelect }: LookupModePickerPr
         onKeyDown={handleTriggerKeyDown}
         style={({ pressed }) => [styles.trigger, pressed && styles.triggerPressed]}
       >
-        <ModeIcon mode={value} styles={styles} />
+        <ModeIcon mode={value} color={theme.colors.textPrimary} />
+        <Text style={styles.triggerLabel}>{selected.label}</Text>
+        <Text style={styles.triggerArrow} aria-hidden>
+          {open ? '▴' : '▾'}
+        </Text>
       </Pressable>
       {open && anchor
         ? createPortal(
@@ -208,8 +214,13 @@ export default function LookupModePicker({ value, onSelect }: LookupModePickerPr
                       pressed && styles.optionPressed,
                     ]}
                   >
-                    <ModeIcon mode={option.value} styles={styles} />
-                    <Text style={styles.optionLabel}>{option.label}</Text>
+                    <ModeIcon
+                      mode={option.value}
+                      color={isSelected ? theme.colors.accent : theme.colors.textPrimary}
+                    />
+                    <Text style={[styles.optionLabel, isSelected && styles.optionLabelSelected]}>
+                      {option.label}
+                    </Text>
                   </Pressable>
                 );
               })}
@@ -221,37 +232,6 @@ export default function LookupModePicker({ value, onSelect }: LookupModePickerPr
   );
 }
 
-// ---------- the two mode marks ----------
-
-/** The player mark: a head-and-shoulders silhouette from two Views. */
-function PlayerMark({ styles }: { styles: ReturnType<typeof createStyles> }) {
-  return (
-    <View style={styles.mark}>
-      <View style={styles.markHead} />
-      <View style={styles.markShoulders} />
-    </View>
-  );
-}
-
-/** The clan mark: a shield, rounded at the top and curved at the point. */
-function ClanMark({ styles }: { styles: ReturnType<typeof createStyles> }) {
-  return (
-    <View style={styles.mark}>
-      <View style={styles.markShield} />
-    </View>
-  );
-}
-
-function ModeIcon({
-  mode,
-  styles,
-}: {
-  mode: LookupMode;
-  styles: ReturnType<typeof createStyles>;
-}) {
-  return mode === 'player' ? <PlayerMark styles={styles} /> : <ClanMark styles={styles} />;
-}
-
 // ---------- styles ----------
 
 function createStyles(t: ReturnType<typeof useTheme>['theme']) {
@@ -260,9 +240,11 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     // The trigger sits flush inside the lookup box's left edge: no border
     // of its own, the 44 px touch floor carried by the height.
     trigger: {
+      flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      width: 36,
+      columnGap: t.spacing[1],
+      paddingHorizontal: t.spacing[2],
       minHeight: t.layout.touchTargetMin,
       borderRadius: t.radius[1],
       outlineColor: c.focusRing,
@@ -270,6 +252,17 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     },
     triggerPressed: {
       backgroundColor: c.panel,
+    },
+    triggerLabel: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.xs,
+      fontWeight: t.fontWeight.semibold,
+      color: c.textPrimary,
+    },
+    triggerArrow: {
+      fontSize: 10,
+      color: c.textMuted,
+      marginLeft: 1,
     },
 
     // The portaled listbox: fixed at the trigger's viewport coordinates,
@@ -284,8 +277,6 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       borderRadius: t.radius[2],
       borderWidth: 1,
       borderColor: c.panelBorderStrong,
-      // boxShadow, not the deprecated shadow* props react-native-web warns
-      // about: the same drop the Dropdown's portaled panel casts.
       boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.18)',
     },
     option: {
@@ -310,38 +301,9 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontWeight: t.fontWeight.medium,
       color: c.textPrimary,
     },
-
-    // The marks: 16 px tall, drawn from primitives, taking the primary
-    // text color so both themes read.
-    mark: {
-      alignItems: 'center',
-      justifyContent: 'flex-end',
-      width: 16,
-      height: 16,
-    },
-    markHead: {
-      width: 7,
-      height: 7,
-      borderRadius: 9999,
-      backgroundColor: c.textPrimary,
-      marginBottom: 1,
-    },
-    markShoulders: {
-      width: 14,
-      height: 6,
-      borderTopLeftRadius: 4,
-      borderTopRightRadius: 4,
-      backgroundColor: c.textPrimary,
-    },
-    markShield: {
-      width: 13,
-      height: 15,
-      borderTopLeftRadius: 3,
-      borderTopRightRadius: 3,
-      borderBottomLeftRadius: 5,
-      borderBottomRightRadius: 5,
-      borderWidth: 1.5,
-      borderColor: c.textPrimary,
+    optionLabelSelected: {
+      fontWeight: t.fontWeight.semibold,
+      color: c.accent,
     },
   });
 }
