@@ -59,9 +59,6 @@ export default function HomeScreen() {
 
           <View style={[base.panelRaised, styles.heroPanel]}>
             <LookupSearch variant="hero" />
-            <Text style={styles.heroCaption}>
-              Clans by name or #tag. Players by tag: the game API has no player-name search.
-            </Text>
           </View>
 
           <View style={styles.linkRow}>
@@ -100,13 +97,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       marginBottom: t.spacing[4],
     },
     heroPanel: {
-      gap: t.spacing[4],
       borderTopColor: c.panelHighlight,
-    },
-    heroCaption: {
-      fontFamily: t.fontFamily.sans,
-      fontSize: t.fontSize.sm,
-      color: c.textMuted,
     },
     // The quick-link cards: one row of three from tablet up, stacked
     // below it; the cards flex so the row stays even at any width.

@@ -634,10 +634,15 @@ export default function SearchScreen() {
                   style={styles.nameInput}
                 />
                 <PillButton
+                  label={showFilters ? 'Hide filters' : appliedChips.length > 0 ? `Filters (${appliedChips.length})` : 'Filters'}
+                  variant="secondary"
+                  onPress={() => setShowFilters((open) => !open)}
+                  hint="Reveals the filters that narrow a name search: clan size, clan level, war frequency, location, clan label, clan type, chat language, and the two join requirements."
+                />
+                <PillButton
                   label="Search"
                   onPress={submit}
                   hint="Runs the search with the current name and filters, or opens the clan directly when the input is a #tag."
-                  stretch
                 />
               </View>
               {searchHint !== null ? (
@@ -645,33 +650,8 @@ export default function SearchScreen() {
                   {searchHint}
                 </Text>
               ) : null}
-              {/* The helper line the player tag box also carries (the
-                  owner's consistency note): same muted style, same slot
-                  under the input row, teaching this input's rule. */}
-              <Text style={styles.nameFootnote}>
-                A leading # opens that clan directly. Everything else searches clan names.
-              </Text>
             </View>
 
-            {/* The filter disclosure: one toggle row replaces the old
-                two-tier layout (primary grid always visible + a More
-                filters expander), so the panel above the fold is the name
-                box and nothing else. The applied count keeps the collapsed
-                row honest, and the chip row over the results carries the
-                removable detail. */}
-            <View style={styles.filterToolbar}>
-              <PillButton
-                label={showFilters ? 'Hide filters' : 'Filters'}
-                variant="secondary"
-                onPress={() => setShowFilters((open) => !open)}
-                hint="Reveals the filters that narrow a name search: clan size, clan level, war frequency, location, clan label, clan type, chat language, and the two join requirements."
-              />
-              {appliedChips.length > 0 ? (
-                <Text style={base.caption}>
-                  {appliedChips.length === 1 ? '1 applied' : `${appliedChips.length} applied`}
-                </Text>
-              ) : null}
-            </View>
             {showFilters ? (
               <View style={styles.filterGrid}>
                 <View style={styles.filterCell}>
@@ -762,12 +742,7 @@ export default function SearchScreen() {
           </View>
 
           <View style={styles.resultsArea}>
-            {submitted === null ? (
-              <EmptyState
-                title="Find a clan"
-                body="Type a clan name, or a clan tag starting with #, and press Search. Filters are optional and narrow name searches."
-              />
-            ) : query.isPending ? (
+            {submitted === null ? null : query.isPending ? (
               <View
                 style={styles.skeletonWrap}
                 accessibilityRole="progressbar"
@@ -1263,11 +1238,6 @@ function createStyles(t: ReturnType<typeof useTheme>['theme'], filterCellBasis: 
       textTransform: 'uppercase',
       letterSpacing: t.letterSpacing.micro,
     },
-    nameFootnote: {
-      fontFamily: t.fontFamily.sans,
-      fontSize: t.fontSize.sm,
-      color: c.textMuted,
-    },
     nameRow: {
       flexDirection: 'row',
       gap: t.spacing[3],
@@ -1298,13 +1268,6 @@ function createStyles(t: ReturnType<typeof useTheme>['theme'], filterCellBasis: 
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.sm,
       color: c.warning,
-    },
-    filterToolbar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      flexWrap: 'wrap',
-      columnGap: t.spacing[3],
-      rowGap: t.spacing[2],
     },
     filterGrid: {
       flexDirection: 'row',

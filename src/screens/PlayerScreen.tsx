@@ -244,49 +244,40 @@ function PlayerSuccess({ player, onRefresh, isRefreshing }: PlayerSuccessProps) 
     { label: 'Clan role', value: player.role ? clanRoleLabel(player.role) : '\u2014' },
   ];
 
-  // The identity card: crest and name left, refresh top-right, 2x2 stat grid,
-  // and full-width compare CTA at the bottom.
+  // The identity card: crest and name, 2x2 stat grid, and full-width compare CTA.
   const identityCard = (
     <View
       style={[base.panelRaised, styles.identityCard]}
       accessibilityLabel={`${player.name} player detail`}
     >
-      <View style={styles.identityTopRow}>
-        <View style={styles.identityIdentity}>
-          {leagueIconUri ? (
-            <Image
-              source={{ uri: leagueIconUri }}
-              style={styles.headerLeagueCrest}
-              accessibilityLabel={`${league?.name ?? 'League'} crest`}
-            />
-          ) : (
-            <View style={[styles.headerLeagueCrest, styles.headerLeagueCrestEmpty]} />
-          )}
-          <View style={styles.identityText}>
-            <Text style={styles.playerName} numberOfLines={1}>
-              {player.name}
-            </Text>
-            <View style={styles.identityMeta}>
-              <Text style={styles.tagLine}>{player.tag}</Text>
-              {player.clan ? (
-                <>
-                  <Text style={styles.metaDot} aria-hidden>
-                    |
-                  </Text>
-                  <Text style={styles.clanLine} numberOfLines={1}>
-                    {player.clan.name}
-                  </Text>
-                </>
-              ) : null}
-            </View>
+      <View style={styles.identityIdentity}>
+        {leagueIconUri ? (
+          <Image
+            source={{ uri: leagueIconUri }}
+            style={styles.headerLeagueCrest}
+            accessibilityLabel={`${league?.name ?? 'League'} crest`}
+          />
+        ) : (
+          <View style={[styles.headerLeagueCrest, styles.headerLeagueCrestEmpty]} />
+        )}
+        <View style={styles.identityText}>
+          <Text style={styles.playerName} numberOfLines={1}>
+            {player.name}
+          </Text>
+          <View style={styles.identityMeta}>
+            <Text style={styles.tagLine}>{player.tag}</Text>
+            {player.clan ? (
+              <>
+                <Text style={styles.metaDot} aria-hidden>
+                  |
+                </Text>
+                <Text style={styles.clanLine} numberOfLines={1}>
+                  {player.clan.name}
+                </Text>
+              </>
+            ) : null}
           </View>
         </View>
-        <RefreshControl
-          onRefresh={onRefresh}
-          ageSeconds={player.age}
-          isRefreshing={isRefreshing}
-          layout="stacked"
-        />
       </View>
 
       <View style={styles.statGrid}>
@@ -318,6 +309,16 @@ function PlayerSuccess({ player, onRefresh, isRefreshing }: PlayerSuccessProps) 
     <RushedAnalysisCard verdict={verdict} townHallLevel={player.townHallLevel} />
   );
   const upgradeNextCard = <UpgradeNextCard verdict={verdict} />;
+  const refreshCard = (
+    <View style={[base.panelRaised, styles.refreshCard]}>
+      <RefreshControl
+        onRefresh={onRefresh}
+        ageSeconds={player.age}
+        isRefreshing={isRefreshing}
+        layout="stacked"
+      />
+    </View>
+  );
   const heroCard = <HeroCard heroes={player.heroes} />;
   const progressionCard = <ProgressionCard player={player} />;
   const achievementsCard = <AchievementsCard achievements={player.achievements} />;
@@ -328,6 +329,7 @@ function PlayerSuccess({ player, onRefresh, isRefreshing }: PlayerSuccessProps) 
         {identityCard}
         {rushedCard}
         {upgradeNextCard}
+        {refreshCard}
       </View>
       <View style={styles.analysisColumn}>
         {heroCard}
@@ -341,6 +343,7 @@ function PlayerSuccess({ player, onRefresh, isRefreshing }: PlayerSuccessProps) 
       <View style={styles.sectionStack}>
         {rushedCard}
         {upgradeNextCard}
+        {refreshCard}
         {heroCard}
         {progressionCard}
         {achievementsCard}
@@ -1123,16 +1126,12 @@ function PlayerLoading({ busyRetrying }: PlayerLoadingProps) {
       accessibilityRole="progressbar"
       accessibilityLabel="Loading player"
     >
-      {/* The header mirrors the crest, name, meta line, and refresh on the right. */}
-      <View style={styles.identityTopRow}>
-        <View style={styles.identityIdentity}>
-          <SkeletonBlock width={48} height={48} radiusStep={2} pulse={pulse} />
-          <View style={styles.identityText}>
-            <SkeletonBlock width={SKELETON_NAME_WIDTH} height={theme.fontSize.xl} pulse={pulse} />
-            <SkeletonBlock width={SKELETON_META_WIDTH} height={theme.fontSize.sm} pulse={pulse} />
-          </View>
+      <View style={styles.identityIdentity}>
+        <SkeletonBlock width={48} height={48} radiusStep={2} pulse={pulse} />
+        <View style={styles.identityText}>
+          <SkeletonBlock width={SKELETON_NAME_WIDTH} height={theme.fontSize.xl} pulse={pulse} />
+          <SkeletonBlock width={SKELETON_META_WIDTH} height={theme.fontSize.sm} pulse={pulse} />
         </View>
-        <SkeletonBlock width={96} height={46} radiusStep={2} pulse={pulse} />
       </View>
       <View style={styles.statGrid}>
         {Array.from({ length: SKELETON_STAT_CELLS }, (_, index) => (
@@ -1163,6 +1162,12 @@ function PlayerLoading({ busyRetrying }: PlayerLoadingProps) {
 
   const rushedBlock = sectionBlock('sk-rushed');
   const upgradeBlock = sectionBlock('sk-upgrade');
+  const refreshBlock = (
+    <View style={[base.panelRaised, styles.refreshCard]}>
+      <SkeletonBlock width={100} height={36} radiusStep="pill" pulse={pulse} />
+      <SkeletonBlock width={120} height={22} radiusStep="pill" pulse={pulse} />
+    </View>
+  );
   const heroBlock = sectionBlock('sk-heroes');
   const progressionBlock = sectionBlock('sk-progression');
   const achievementsBlock = sectionBlock('sk-achievements');
@@ -1176,6 +1181,7 @@ function PlayerLoading({ busyRetrying }: PlayerLoadingProps) {
         {identityCard}
         {rushedBlock}
         {upgradeBlock}
+        {refreshBlock}
       </View>
       <View style={styles.analysisColumn}>
         {heroBlock}
@@ -1189,6 +1195,7 @@ function PlayerLoading({ busyRetrying }: PlayerLoadingProps) {
       <View style={styles.sectionStack}>
         {rushedBlock}
         {upgradeBlock}
+        {refreshBlock}
         {heroBlock}
         {progressionBlock}
         {achievementsBlock}
@@ -1331,16 +1338,17 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       gap: t.spacing[4],
     },
 
-    // The identity card: crest, name, tag + clan line, stacked refresh control,
-    // followed by the 2x2 stat grid and the full-width compare pill button.
+    // The identity card: crest, name, tag + clan line, 2x2 stat grid,
+    // and full-width compare pill button.
     identityCard: {
       gap: t.spacing[5],
     },
-    identityTopRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'flex-start',
-      gap: t.spacing[3],
+    refreshCard: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: t.spacing[2],
+      paddingVertical: t.spacing[4],
+      paddingHorizontal: t.spacing[4],
     },
     identityIdentity: {
       flexDirection: 'row',

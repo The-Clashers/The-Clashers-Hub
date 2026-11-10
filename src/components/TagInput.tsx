@@ -100,7 +100,7 @@ export default function TagInput({ label = 'Player tag', onNavigate, children }:
           placeholder="Paste a player tag, # optional"
           placeholderTextColor={theme.colors.textMuted}
           accessibilityLabel="Player tag"
-          accessibilityHint="Paste a player tag and press Go. The # prefix is optional."
+          accessibilityHint="Paste a player tag and press Search. The # prefix is optional."
           autoCapitalize="characters"
           autoCorrect={false}
           maxLength={21}
@@ -113,7 +113,7 @@ export default function TagInput({ label = 'Player tag', onNavigate, children }:
           onPress={submit}
           style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
         >
-          <Text style={styles.buttonText}>Go</Text>
+          <Text style={styles.buttonText}>Search</Text>
         </Pressable>
       </View>
       {showError ? (

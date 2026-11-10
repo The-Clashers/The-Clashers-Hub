@@ -8,7 +8,6 @@ import {
 } from 'react-native';
 import { useNavigate, useSearchParams } from 'react-router';
 import { useTheme, createBaseStyles } from '../theme';
-import Breadcrumbs from '../components/Breadcrumbs';
 import Glyph from '../components/Glyph';
 import PillButton from '../components/PillButton';
 import {
@@ -115,15 +114,6 @@ export default function CompareScreen() {
     <View style={base.appRoot}>
       <View style={base.screen}>
         <View style={[base.contentColumn, styles.column]}>
-          <View style={styles.breadcrumbWrap}>
-            <Breadcrumbs
-              crumbs={[
-                { label: 'Home', route: '/' },
-                { label: 'Compare' },
-              ]}
-            />
-          </View>
-
           <View style={styles.header}>
             <Text style={base.display}>Compare</Text>
             <Text style={base.subtitle}>
@@ -272,9 +262,6 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
   return StyleSheet.create({
     column: {
       flex: 1,
-    },
-    breadcrumbWrap: {
-      marginBottom: t.spacing[4],
     },
     header: {
       gap: t.spacing[2],

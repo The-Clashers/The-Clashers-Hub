@@ -118,8 +118,8 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
   const c = t.colors;
   return StyleSheet.create({
     stackedWrap: {
-      alignItems: 'flex-end',
-      gap: t.spacing[1],
+      alignItems: 'center',
+      gap: t.spacing[2],
     },
     // The freshness row: the age pill first, the action last, right where
     // each screen's age line used to sit. Wraps rather than squeezes when
