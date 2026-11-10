@@ -84,11 +84,12 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
   const c = t.colors;
   return StyleSheet.create({
     card: {
-      padding: t.spacing[4],
-      marginBottom: t.spacing[3],
+      padding: t.spacing[3],
+      marginBottom: t.spacing[2],
       borderRadius: t.radius[2],
       borderWidth: 1,
       borderColor: c.panelBorder,
+      borderTopColor: c.panelHighlight,
       backgroundColor: c.panelRaised,
       outlineColor: c.focusRing,
       outlineOffset: t.layout.focusRingOffset,
@@ -101,7 +102,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       flexDirection: 'row',
       alignItems: 'flex-start',
       columnGap: t.spacing[3],
-      marginBottom: t.spacing[3],
+      marginBottom: t.spacing[2],
     },
     positionNumber: {
       fontFamily: t.fontFamily.mono,

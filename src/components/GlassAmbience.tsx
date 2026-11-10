@@ -29,11 +29,11 @@ export default function GlassAmbience() {
     <View style={styles.field} aria-hidden>
       <Svg width="100%" height="100%" preserveAspectRatio="none" style={styles.svg}>
         <Defs>
-          <RadialGradient id="tchGlowA" cx="18%" cy="0%" r="75%">
+          <RadialGradient id="tchGlowA" cx="12%" cy="0%" r="55%">
             <Stop offset="0%" stopColor={c.glowA} stopOpacity={1} />
             <Stop offset="100%" stopColor={c.glowA} stopOpacity={0} />
           </RadialGradient>
-          <RadialGradient id="tchGlowB" cx="95%" cy="100%" r="85%">
+          <RadialGradient id="tchGlowB" cx="92%" cy="100%" r="60%">
             <Stop offset="0%" stopColor={c.glowB} stopOpacity={1} />
             <Stop offset="100%" stopColor={c.glowB} stopOpacity={0} />
           </RadialGradient>

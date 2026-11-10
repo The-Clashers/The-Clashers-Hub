@@ -46,11 +46,12 @@ function createStyles(t: ReturnType<typeof useTheme>['theme'], dense: boolean) {
       alignItems: 'center',
       gap: t.spacing[2],
       paddingHorizontal: dense ? t.spacing[2] : t.spacing[4],
-      // 44px touch target floor (07 §6).
-      minHeight: t.layout.touchTargetMin,
+      // Control height adapts to density (36px desktop, 44px mobile).
+      minHeight: t.layout.controlHeight,
       borderRadius: t.radius.pill,
       borderWidth: 1,
       borderColor: c.panelBorderStrong,
+      borderTopColor: c.panelHighlight,
       backgroundColor: c.panelRaised,
       // Gold focus ring (07 §6).
       outlineColor: c.focusRing,

@@ -255,7 +255,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       justifyContent: 'center',
       columnGap: t.spacing[1],
       paddingHorizontal: t.spacing[2],
-      minHeight: t.layout.touchTargetMin,
+      minHeight: t.layout.controlHeight,
       borderRadius: t.radius[1],
       outlineColor: c.focusRing,
       outlineOffset: t.layout.focusRingOffset,
@@ -270,7 +270,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       color: c.textPrimary,
     },
     triggerArrow: {
-      fontSize: 10,
+      fontSize: t.fontSize.xs,
       color: c.textMuted,
       marginLeft: 1,
     },
@@ -287,14 +287,16 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       borderRadius: t.radius[2],
       borderWidth: 1,
       borderColor: c.panelBorderStrong,
-      boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.18)',
+      borderTopColor: c.panelHighlight,
+      shadowColor: c.shadowColor,
+      ...t.shadows.lifted,
     },
     option: {
       flexDirection: 'row',
       alignItems: 'center',
       columnGap: t.spacing[3],
       paddingHorizontal: t.spacing[3],
-      minHeight: t.layout.touchTargetMin,
+      minHeight: t.layout.controlHeight,
       borderRadius: t.radius[1],
       outlineColor: c.focusRing,
       outlineOffset: t.layout.focusRingOffset,
@@ -313,7 +315,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     },
     optionLabelSelected: {
       fontWeight: t.fontWeight.semibold,
-      color: c.accent,
+      color: c.accentInk,
     },
   });
 }

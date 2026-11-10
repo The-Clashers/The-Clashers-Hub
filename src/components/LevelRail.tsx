@@ -20,9 +20,9 @@ import { useTheme } from '../theme';
 // the hero row's own label carries the name and the level/maximum pair,
 // so a screen reader hears both, never twice.
 
-// The rail's height: the same 6 px track ProgressRail draws, so the two
+// The rail's height: the same 5 px track ProgressRail draws, so the two
 // rail families never read as different weights beside each other.
-const RAIL_HEIGHT = 6;
+const RAIL_HEIGHT = 5;
 
 // Fully round ends, the same cap ProgressRail takes.
 const RAIL_RADIUS = RAIL_HEIGHT / 2;

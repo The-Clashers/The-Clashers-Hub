@@ -55,10 +55,6 @@ const COLUMN_WIDTHS = {
   xp: 48,
 } as const;
 
-// Micro-label tracking: the one-off 0.6 px tracking the design language
-// pairs with uppercase micro labels (StatChip keeps the same constant).
-const HEADER_LABEL_TRACKING = 0.6;
-
 const SORT_ARROW: Record<RosterSortDirection, string> = {
   asc: '↑',
   desc: '↓',
@@ -289,6 +285,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       borderRadius: t.radius[2],
       borderWidth: 1,
       borderColor: c.panelBorder,
+      borderTopColor: c.panelHighlight,
       overflow: 'hidden',
     },
 
@@ -305,7 +302,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     },
     headerButton: {
       alignSelf: 'stretch',
-      minHeight: t.layout.touchTargetMin,
+      minHeight: t.layout.controlHeight,
       justifyContent: 'center',
       outlineColor: c.focusRing,
       outlineOffset: t.layout.focusRingOffset,
@@ -319,7 +316,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontWeight: t.fontWeight.medium,
       color: c.textMuted,
       textTransform: 'uppercase',
-      letterSpacing: HEADER_LABEL_TRACKING,
+      letterSpacing: t.letterSpacing.micro,
     },
     headerLabelLeft: {
       textAlign: 'left',
@@ -338,7 +335,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       alignItems: 'center',
       gap: t.spacing[2],
       paddingHorizontal: t.spacing[3],
-      minHeight: t.layout.touchTargetMin,
+      minHeight: t.layout.controlHeight,
       borderBottomWidth: 1,
       borderBottomColor: c.hairline,
       outlineColor: c.focusRing,

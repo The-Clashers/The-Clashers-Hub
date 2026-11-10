@@ -32,9 +32,8 @@ const STAR_GLYPH = '\u2605';
 // that earns its last star does not shift the rail's layout.
 const OPEN_STAR_GLYPH = '\u2606';
 
-// The rail's height: a 6 px track reads as a bar, not a line, at the body
-// font size the row sets beside it.
-const RAIL_HEIGHT = 6;
+// The rail's height: a 5 px track reads as a crisp compact bar.
+const RAIL_HEIGHT = 5;
 
 // The corner a rail takes: fully round, so the fill's end is a cap and the
 // track's ends never read as square corners on a rounded panel.
@@ -138,7 +137,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       alignItems: 'center',
     },
     starEarned: {
-      color: c.accent,
+      color: c.accentInk,
       fontSize: STAR_SIZE,
       lineHeight: STAR_SIZE,
     },

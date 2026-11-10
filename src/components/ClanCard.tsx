@@ -13,7 +13,7 @@ import type { SearchClanItem } from '../api/search';
 
 // The API badge icon renders into a fixed slot (07 section 7) so a slow CDN
 // load never reflows the card; a missing badge gets a quiet block instead.
-const BADGE_SLOT = 48;
+const BADGE_SLOT = 40;
 
 export interface ClanCardProps {
   clan: SearchClanItem;
@@ -77,12 +77,13 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     card: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: t.spacing[4],
-      padding: t.spacing[4],
-      marginBottom: t.spacing[3],
+      gap: t.spacing[3],
+      padding: t.spacing[3],
+      marginBottom: t.spacing[2],
       borderRadius: t.radius[2],
       borderWidth: 1,
       borderColor: c.panelBorder,
+      borderTopColor: c.panelHighlight,
       backgroundColor: c.panelRaised,
       outlineColor: c.focusRing,
       outlineOffset: t.layout.focusRingOffset,

@@ -237,7 +237,7 @@ export default function Dropdown<V>({
   // scrollbar is honest; the one on a list that fit was not.
   const listMaxHeight = Math.min(
     LISTBOX_MAX_HEIGHT,
-    options.length * theme.layout.touchTargetMin + theme.spacing[1] + LISTBOX_CHROME,
+    options.length * theme.layout.controlHeight + theme.spacing[1] + LISTBOX_CHROME,
   );
   const listbox = open && anchor ? (
     <View
@@ -338,16 +338,16 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontWeight: t.fontWeight.medium,
       color: c.textMuted,
       textTransform: 'uppercase',
-      letterSpacing: 0.6,
+      letterSpacing: t.letterSpacing.micro,
     },
     // The trigger reads as the same control family as the name input: input
-    // chrome, 44px tall, no pill, value text left-aligned.
+    // chrome, compact control height, no pill, value text left-aligned.
     trigger: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: t.spacing[3],
-      minHeight: t.layout.touchTargetMin,
+      minHeight: t.layout.controlHeight,
       paddingHorizontal: t.spacing[4],
       paddingVertical: t.spacing[2],
       borderRadius: t.radius[2],
@@ -410,6 +410,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       borderRadius: t.radius[2],
       borderWidth: 1,
       borderColor: c.panelBorderStrong,
+      borderTopColor: c.panelHighlight,
       backgroundColor: c.panelRaised,
       overflow: 'auto' as unknown as 'scroll',
       paddingBottom: t.spacing[1],
@@ -421,7 +422,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: t.spacing[2],
-      minHeight: t.layout.touchTargetMin,
+      minHeight: t.layout.controlHeight,
       paddingHorizontal: t.spacing[4],
       paddingVertical: t.spacing[2],
       outlineColor: c.focusRing,

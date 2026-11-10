@@ -17,9 +17,9 @@ import type { ClanMember } from '../api/clan';
 // the layout, which renders in page flow like the table does (07
 // section 3): the browser scrollbar owns the scrolling.
 
-// The league icon slot (07 section 7): API icon in a fixed 24 px box so a
+// The league icon slot (07 section 7): API icon in a fixed 20 px box so a
 // slow CDN load never reflows the card.
-const LEAGUE_ICON_SLOT = 24;
+const LEAGUE_ICON_SLOT = 20;
 
 export interface RosterCardProps {
   member: ClanMember;
@@ -87,11 +87,12 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
   const c = t.colors;
   return StyleSheet.create({
     card: {
-      padding: t.spacing[4],
-      marginBottom: t.spacing[3],
+      padding: t.spacing[3],
+      marginBottom: t.spacing[2],
       borderRadius: t.radius[2],
       borderWidth: 1,
       borderColor: c.panelBorder,
+      borderTopColor: c.panelHighlight,
       backgroundColor: c.panelRaised,
       outlineColor: c.focusRing,
       outlineOffset: t.layout.focusRingOffset,
@@ -124,7 +125,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       justifyContent: 'space-between',
       gap: t.spacing[3],
       marginTop: t.spacing[1],
-      marginBottom: t.spacing[3],
+      marginBottom: t.spacing[2],
     },
     tag: {
       fontFamily: t.fontFamily.mono,

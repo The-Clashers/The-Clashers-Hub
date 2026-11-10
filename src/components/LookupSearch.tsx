@@ -178,6 +178,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme'], variant: LookupVa
       borderRadius: t.radius[2],
       borderWidth: 1,
       borderColor: c.panelBorderStrong,
+      borderTopColor: c.panelHighlight,
       backgroundColor: c.panelRaised,
     },
     pickerWrap: {
@@ -194,7 +195,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme'], variant: LookupVa
     input: {
       flex: 1,
       minWidth: 0,
-      minHeight: hero ? 52 : t.layout.touchTargetMin,
+      minHeight: hero ? 46 : t.layout.controlHeight,
       paddingLeft: t.spacing[2],
       paddingRight: t.spacing[3],
       paddingVertical: t.spacing[2],

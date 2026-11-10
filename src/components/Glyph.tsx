@@ -23,17 +23,15 @@ import Svg, { Path } from 'react-native-svg';
 // renders one already labels itself with text (the button's label, the
 // link's label), so the picture adds nothing a screen reader needs.
 
-/** The glyph's default size: the 16 px box the prototype's icons render
- * in, matching the body-size text they sit beside. */
-const GLYPH_SIZE = 16;
+/** The glyph's default size: the 15 px box matching compact body text. */
+const GLYPH_SIZE = 15;
 
 /** The star's own default: 13 px, the size the prototype's star ratings
  * render at, sitting between the caption and body text sizes. */
 const STAR_SIZE = 13;
 
-/** The stroke weight every stroke glyph draws with, the prototype's
- * value. */
-const GLYPH_STROKE_WIDTH = 1.8;
+/** The stroke weight every stroke glyph draws with. */
+const GLYPH_STROKE_WIDTH = 1.7;
 
 /** The one filled glyph's stroke: slightly heavier than the stroke
  * glyphs' so the star's points stay crisp at 13 px. */
