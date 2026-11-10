@@ -625,9 +625,7 @@ interface HeroCardProps {
 // achievement rows key on (STD-18): the payload could carry duplicate
 // names, and the name alone is not a stable identity.
 
-// The hero card's minimum width and the grid's gap: the prototype's
-// minmax(240px, 1fr) heroes grid.
-const HERO_CARD_MIN_WIDTH = 240;
+// The hero grid's gap between cards.
 const HERO_CARD_GAP = 10;
 
 function HeroCard({ heroes }: HeroCardProps) {
@@ -684,10 +682,8 @@ function HeroCard({ heroes }: HeroCardProps) {
   );
 }
 
-/** One village group's hero grid: measures its own width and deals the
- * cards even 240 px-plus columns, the prototype's auto-fit grid read
- * through onLayout (the breakpoints helper cannot see a flex column's
- * inner width). */
+/** One village group's hero grid: renders two columns on desktop and tablet
+ * viewports, collapsing to a single column on narrow mobile devices. */
 function HeroGrid({
   heroes,
   village,
@@ -697,11 +693,9 @@ function HeroGrid({
 }) {
   const [width, setWidth] = useState(0);
 
-  const columns = width > 0
-    ? Math.max(1, Math.floor((width + HERO_CARD_GAP) / (HERO_CARD_MIN_WIDTH + HERO_CARD_GAP)))
-    : 1;
-  // The exact basis: the measured width less the gaps, split evenly, so
-  // the last card in a row never wraps early on rounding.
+  // 2 columns whenever container is at least 380 px; 1 column on narrow mobile.
+  // Defaults to 2 columns before layout measurement to avoid layout jump.
+  const columns = width > 0 ? (width >= 380 ? 2 : 1) : 2;
   const basis = width > 0
     ? Math.floor((width - (columns - 1) * HERO_CARD_GAP) / columns)
     : null;
@@ -735,7 +729,7 @@ const heroGridStyle = StyleSheet.create({
 interface HeroUnitProps {
   hero: NonNullable<PlayerResponse['heroes']>[number];
   /** The measured column width the card takes, or null before the grid
-   * has measured itself (the card then falls back to the full row). */
+   * has measured itself. */
   basis: number | null;
 }
 
@@ -754,7 +748,12 @@ function HeroUnit({ hero, basis }: HeroUnitProps) {
 
   return (
     <View
-      style={[styles.heroUnit, basis !== null ? { flexBasis: basis } : null]}
+      style={[
+        styles.heroUnit,
+        basis !== null
+          ? { width: basis, maxWidth: basis, flexBasis: basis }
+          : { flexBasis: '48%', flexGrow: 1 },
+      ]}
       accessibilityLabel={rowLabel}
     >
       <UnitIcon kind="hero" name={hero.name} />
@@ -900,10 +899,7 @@ interface AchievementsCardProps {
 // them. Tiles key on village-name-index because the live payload carries
 // duplicate names (STD-18).
 
-// The achievement tile's minimum width and the grid's gap: compact enough to
-// deal two or three columns on desktop while keeping the name and counter
-// legible on narrow viewports.
-const ACHIEVEMENT_CARD_MIN_WIDTH = 220;
+// The achievement tile grid's gap.
 const ACHIEVEMENT_CARD_GAP = 8;
 
 const ACHIEVEMENT_FILTERS: ReadonlyArray<AchievementFilter> = [
@@ -1014,9 +1010,8 @@ function AchievementsCard({ achievements }: AchievementsCardProps) {
   );
 }
 
-/** One village group's achievement grid: measures its own width and deals
- * the tiles into even 220 px-plus columns, matching HeroGrid's onLayout
- * measurement so two or three compact tiles sit side by side on desktop. */
+/** One village group's achievement grid: renders two columns on desktop and
+ * tablet viewports, collapsing to a single column on narrow mobile devices. */
 function AchievementGrid({
   achievements,
   village,
@@ -1026,12 +1021,9 @@ function AchievementGrid({
 }) {
   const [width, setWidth] = useState(0);
 
-  const columns = width > 0
-    ? Math.max(
-        1,
-        Math.floor((width + ACHIEVEMENT_CARD_GAP) / (ACHIEVEMENT_CARD_MIN_WIDTH + ACHIEVEMENT_CARD_GAP)),
-      )
-    : 1;
+  // 2 columns whenever container is at least 380 px; 1 column on narrow mobile.
+  // Defaults to 2 columns before layout measurement to avoid layout jump.
+  const columns = width > 0 ? (width >= 380 ? 2 : 1) : 2;
   const basis = width > 0
     ? Math.floor((width - (columns - 1) * ACHIEVEMENT_CARD_GAP) / columns)
     : null;
@@ -1063,7 +1055,7 @@ const achievementGridStyle = StyleSheet.create({
 interface AchievementRowProps {
   achievement: NonNullable<PlayerResponse['achievements']>[number];
   /** The measured column width the tile takes, or null before the grid
-   * has measured itself (the tile then falls back to the full row). */
+   * has measured itself. */
   basis: number | null;
 }
 
@@ -1085,7 +1077,12 @@ function AchievementRow({ achievement, basis }: AchievementRowProps) {
 
   return (
     <View
-      style={[styles.achievementRow, basis !== null ? { flexBasis: basis } : null]}
+      style={[
+        styles.achievementRow,
+        basis !== null
+          ? { width: basis, maxWidth: basis, flexBasis: basis }
+          : { flexBasis: '48%', flexGrow: 1 },
+      ]}
       accessibilityLabel={rowLabel}
     >
       {/* Top line: the achievement name flexes on the left, the star trio
@@ -1756,11 +1753,10 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       color: c.textMuted,
       fontVariant: ['tabular-nums'],
     },
-    // The rail column (the prototype's fixed 96 px): the level rail with
-    // the pair under it, so the long-grind reading sits at the card's
-    // right edge whatever the name's width.
+    // The rail column (compact 84 px): the level rail with the pair under
+    // it, fitting cleanly within 2-column hero cards without crowding equipment.
     heroRailColumn: {
-      width: 96,
+      width: 84,
       gap: t.spacing[1],
       flexShrink: 0,
     },
