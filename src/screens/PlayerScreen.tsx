@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   Image,
+  Pressable,
   StyleSheet,
   Text,
   View,
@@ -25,9 +26,12 @@ import UnitIcon from '../components/UnitIcon';
 import { fetchPlayer, PlayerFetchError, type PlayerResponse } from '../api/player';
 import { busyRetryDelayMs, shouldRetryBusy } from '../lib/busy-retry';
 import {
+  ACHIEVEMENT_FILTER_LABELS,
   achievementProgress,
+  filterAchievements,
   formatProgressPair,
   groupAchievementsByVillage,
+  type AchievementFilter,
 } from '../lib/achievement-progress';
 import { heroProgress, formatLevelPair } from '../lib/hero-progress';
 import { clanRoleLabel } from '../lib/clan-role';
@@ -68,8 +72,8 @@ import {
 //
 // The two-column desktop layout places the identity card and the two
 // verdict cards (rushed analysis and upgrade next) in the left column,
-// while the right column holds the three ledger cards: heroes,
-// achievements, and the progression grid. On mobile they stack in the
+// while the right column holds the three ledger cards: heroes, the
+// progression grid, and achievements last. On mobile they stack in the
 // same logical order.
 //
 // Breadcrumbs locate the page the way the clan detail's do (07 section 3):
@@ -338,8 +342,8 @@ function PlayerSuccess({ player, onRefresh, isRefreshing }: PlayerSuccessProps) 
   );
   const upgradeNextCard = <UpgradeNextCard verdict={verdict} />;
   const heroCard = <HeroCard heroes={player.heroes} />;
-  const achievementsCard = <AchievementsCard achievements={player.achievements} />;
   const progressionCard = <ProgressionCard player={player} />;
+  const achievementsCard = <AchievementsCard achievements={player.achievements} />;
 
   return twoColumns ? (
     <View style={styles.columns}>
@@ -350,8 +354,8 @@ function PlayerSuccess({ player, onRefresh, isRefreshing }: PlayerSuccessProps) 
       </View>
       <View style={styles.analysisColumn}>
         {heroCard}
-        {achievementsCard}
         {progressionCard}
+        {achievementsCard}
       </View>
     </View>
   ) : (
@@ -361,8 +365,8 @@ function PlayerSuccess({ player, onRefresh, isRefreshing }: PlayerSuccessProps) 
         {rushedCard}
         {upgradeNextCard}
         {heroCard}
-        {achievementsCard}
         {progressionCard}
+        {achievementsCard}
       </View>
     </View>
   );
@@ -808,151 +812,19 @@ function HeroUnit({ hero, basis }: HeroUnitProps) {
   );
 }
 
-// ---------- achievements card (T-M2-3, FR-08, SR-15) ----------
-
-interface AchievementsCardProps {
-  /** The parsed achievements from the single player response. Undefined
-   * only when the payload carries none; the card renders its quiet empty
-   * notice then, a within-success degradation the way a missing badge is
-   * on the clan card. */
-  achievements: PlayerResponse['achievements'];
-}
-
-// The achievements list with progress rails and stars. The rows come off
-// the player response the shell already fetched: no second call, no second
-// loading state, the fetch is the shell's own (SR-15).
-//
-// The rows follow the owner's prototype layout: a headline with the name,
-// the star trio (gold for earned tiers, quiet for the open ones), and the
-// value/target pair closing the line; the rail full width under it; the
-// requirement text with the stars-earned count under that. Stars are the
-// API's count, never derived from the fill.
-//
-// The rows group by village under quiet headers: the live payload
-// interleaves home, builder base, and clan capital rows, and a flat render
-// would mix them. A completed row (all three stars in) mutes to the quiet
-// treatment — secondary name, no requirement text — so the in-progress
-// rows draw the eye; on a maxed account the card reads as a quiet ledger,
-// which is the honest reading of a finished list.
-//
-// Rows key on village-name-index: the live payload carries duplicate names
-// (one locked "Keep Your Account Safe!" beside the completed one), so the
-// name alone is not a stable identity (STD-18).
-function AchievementsCard({ achievements }: AchievementsCardProps) {
-  const { theme } = useTheme();
-  const base = useMemo(() => createBaseStyles(theme), [theme]);
-  const styles = useMemo(() => createStyles(theme), [theme]);
-
-  if (!achievements || achievements.length === 0) {
-    return (
-      <EmptyState
-        title="No achievements in this payload"
-        body="The game API returned no achievements for this player. Refresh in a moment; a brand-new account can genuinely hold none."
-      />
-    );
-  }
-
-  const groups = groupAchievementsByVillage(achievements);
-
-  return (
-    <View
-      style={[base.panelRaised, styles.achievementsCard]}
-      accessibilityLabel={`Achievements, ${achievements.length} rows`}
-    >
-      <View style={styles.achievementsHeader}>
-        <Text style={base.title}>Achievements</Text>
-        <Text style={styles.achievementsCount}>
-          {formatProgressPair(
-            achievements.filter((entry) => entry.stars >= 3).length,
-            achievements.length,
-          )}{' '}
-          complete
-        </Text>
-      </View>
-
-      {groups.map((group, groupIndex) => (
-        <View key={group.village} style={styles.achievementsGroup}>
-          {groupIndex > 0 ? <View style={styles.achievementsDivider} aria-hidden /> : null}
-          <Text style={styles.achievementsGroupLabel}>{group.label}</Text>
-          <View style={styles.achievementsRows}>
-            {group.rows.map((achievement, index) => (
-              <AchievementRow
-                key={`${group.village}-${achievement.name}-${index}`}
-                achievement={achievement}
-              />
-            ))}
-          </View>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-interface AchievementRowProps {
-  achievement: NonNullable<PlayerResponse['achievements']>[number];
-}
-
-function AchievementRow({ achievement }: AchievementRowProps) {
-  const { theme } = useTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
-  const c = theme.colors;
-
-  const progress = achievementProgress(achievement);
-  const isComplete = progress.isComplete;
-
-  // The completed row's quiet treatment: the name demoted to secondary and
-  // the requirement line dropped (its target is met, the row is a record,
-  // not a todo); the stars stay in the headline, all gold, because the
-  // rating is the row's verdict.
-  const rowLabel = isComplete
-    ? `${achievement.name}, complete, ${progress.stars.earned} of ${progress.stars.total} stars, ${formatProgressPair(achievement.value, achievement.target)}`
-    : `${achievement.name}, ${achievement.info}, ${formatProgressPair(achievement.value, achievement.target)}, ${progress.stars.earned} of ${progress.stars.total} stars`;
-
-  return (
-    <View style={styles.achievementRow} accessibilityLabel={rowLabel}>
-      {/* The headline, the prototype's layout: the name flexes, the star
-          trio rates it, the value/target pair closes the line. */}
-      <View style={styles.achievementTop}>
-        <Text style={isComplete ? styles.achievementNameDone : styles.achievementName} numberOfLines={1}>
-          {achievement.name}
-        </Text>
-        <View style={styles.achievementStars} aria-hidden>
-          {Array.from({ length: progress.stars.total }, (_, index) => (
-            <Glyph
-              key={index}
-              name="star"
-              color={index < progress.stars.earned ? c.accent : c.panelBorderStrong}
-            />
-          ))}
-        </View>
-        <Text style={isComplete ? styles.achievementPairDone : styles.achievementPair}>
-          {formatProgressPair(achievement.value, achievement.target)}
-        </Text>
-      </View>
-      <ProgressRail progress={progress} showStars={false} />
-      {!isComplete ? (
-        <Text style={styles.achievementInfo} numberOfLines={2}>
-          {achievement.info}
-          {progress.stars.earned > 0
-            ? ` \u00B7 ${progress.stars.earned} of ${progress.stars.total} stars earned`
-            : ''}
-        </Text>
-      ) : null}
-    </View>
-  );
-}
-
 // ---------- progression card (T-M2-5, FR-16, SR-16) ----------
 
 interface ProgressionCardProps {
   player: PlayerResponse;
 }
 
-// The progression grid card. Every unit of both villages with its icon,
-// current level, and a maxed chip, grouped by village and category. The
-// grid renders entirely from the same single player response the shell
-// already fetched (SR-16): no second call, no second loading state, and
-// no network request beyond the player fetch (AC-07). The grid is
+// The progression grid card. Every non-hero unit of both villages with its
+// icon, current level, and a maxed chip, grouped by village and category
+// (Home Village: Troops, Spells, Equipments, Pets, Siege; Builder Base:
+// Troops). Heroes live on their own dedicated card above and are excluded
+// here. The grid renders entirely from the same single player response the
+// shell already fetched (SR-16): no second call, no second loading state,
+// and no network request beyond the player fetch (AC-07). The grid is
 // virtualized because a real account carries ~100 unit tiles across both
 // villages (07 section 3).
 //
@@ -975,7 +847,7 @@ function ProgressionCard({ player }: ProgressionCardProps) {
     return (
       <EmptyState
         title="No units in this payload"
-        body="The game API returned no troops, spells, heroes, or equipment for this player. Refresh in a moment; even a brand-new account carries its opening units."
+        body="The game API returned no troops, spells, equipment, pets, or siege machines for this player. Refresh in a moment; even a brand-new account carries its opening units."
       />
     );
   }
@@ -990,6 +862,260 @@ function ProgressionCard({ player }: ProgressionCardProps) {
         <Text style={styles.progressionCount}>{tileCount} units</Text>
       </View>
       <ProgressionGrid groups={groups} />
+    </View>
+  );
+}
+
+// ---------- achievements card (T-M2-3, FR-08, SR-15) ----------
+
+interface AchievementsCardProps {
+  /** The parsed achievements from the single player response. Undefined
+   * only when the payload carries none; the card renders its quiet empty
+   * notice then, a within-success degradation the way a missing badge is
+   * on the clan card. */
+  achievements: PlayerResponse['achievements'];
+}
+
+// The achievements ledger card with filter pills, progress rails, and stars.
+// The rows come off the player response the shell already fetched: no second
+// call, no second loading state, the fetch is the shell's own (SR-15).
+//
+// Because a live payload carries ~54 achievements across three villages, a
+// single-column vertical list creates an overly long scroll. Instead, the
+// card pairs a filter bar (All / In Progress / Completed) with a responsive
+// multi-column grid of compact achievement tiles (measured through onLayout
+// just like HeroGrid). Each tile places the achievement name and star trio
+// on the top line, the progress rail beside the tabular value/target counter
+// on the meter line, and a single-line requirement note on in-progress tiles
+// only. Completed tiles (all three stars in) mute their text and omit the
+// requirement line so finished items take minimal height while in-progress
+// items draw the eye.
+//
+// Tiles group by village under quiet headers: the live payload interleaves
+// home, builder base, and clan capital rows, and a flat render would mix
+// them. Tiles key on village-name-index because the live payload carries
+// duplicate names (STD-18).
+
+// The achievement tile's minimum width and the grid's gap: compact enough to
+// deal two or three columns on desktop while keeping the name and counter
+// legible on narrow viewports.
+const ACHIEVEMENT_CARD_MIN_WIDTH = 220;
+const ACHIEVEMENT_CARD_GAP = 8;
+
+const ACHIEVEMENT_FILTERS: ReadonlyArray<AchievementFilter> = [
+  'all',
+  'inProgress',
+  'complete',
+];
+
+function AchievementsCard({ achievements }: AchievementsCardProps) {
+  const { theme } = useTheme();
+  const base = useMemo(() => createBaseStyles(theme), [theme]);
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  const [filter, setFilter] = useState<AchievementFilter>('all');
+
+  if (!achievements || achievements.length === 0) {
+    return (
+      <EmptyState
+        title="No achievements in this payload"
+        body="The game API returned no achievements for this player. Refresh in a moment; a brand-new account can genuinely hold none."
+      />
+    );
+  }
+
+  const completedCount = achievements.filter((entry) => entry.stars >= 3).length;
+  const inProgressCount = achievements.length - completedCount;
+  const filterCounts: Record<AchievementFilter, number> = {
+    all: achievements.length,
+    inProgress: inProgressCount,
+    complete: completedCount,
+  };
+
+  const filtered = filterAchievements(achievements, filter);
+  const groups = groupAchievementsByVillage(filtered);
+
+  return (
+    <View
+      style={[base.panelRaised, styles.achievementsCard]}
+      accessibilityLabel={`Achievements, ${achievements.length} rows`}
+    >
+      <View style={styles.achievementsHeader}>
+        <Text style={base.title}>Achievements</Text>
+        <Text style={styles.achievementsCount}>
+          {formatProgressPair(completedCount, achievements.length)} complete
+        </Text>
+      </View>
+
+      <View
+        style={styles.achievementsFilters}
+        accessibilityRole="toolbar"
+        accessibilityLabel="Filter achievements"
+      >
+        {ACHIEVEMENT_FILTERS.map((mode) => {
+          const active = filter === mode;
+          const label = ACHIEVEMENT_FILTER_LABELS[mode];
+          const count = filterCounts[mode];
+          return (
+            <Pressable
+              key={mode}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={`${label}, ${count} achievements`}
+              onPress={() => setFilter(mode)}
+              style={({ pressed }) => [
+                styles.achievementFilterPill,
+                active && styles.achievementFilterPillActive,
+                pressed && !active && styles.achievementFilterPillPressed,
+              ]}
+            >
+              <Text
+                style={
+                  active
+                    ? styles.achievementFilterTextActive
+                    : styles.achievementFilterText
+                }
+              >
+                {label}
+              </Text>
+              <Text
+                style={
+                  active
+                    ? styles.achievementFilterCountActive
+                    : styles.achievementFilterCount
+                }
+              >
+                {count}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {groups.length === 0 ? (
+        <Text style={styles.achievementsEmptyFilter}>
+          {filter === 'inProgress'
+            ? 'Every achievement in this payload is already complete.'
+            : 'No achievements are completed yet.'}
+        </Text>
+      ) : (
+        groups.map((group, groupIndex) => (
+          <View key={group.village} style={styles.achievementsGroup}>
+            {groupIndex > 0 ? <View style={styles.achievementsDivider} aria-hidden /> : null}
+            <Text style={styles.achievementsGroupLabel}>{group.label}</Text>
+            <AchievementGrid achievements={group.rows} village={group.village} />
+          </View>
+        ))
+      )}
+    </View>
+  );
+}
+
+/** One village group's achievement grid: measures its own width and deals
+ * the tiles into even 220 px-plus columns, matching HeroGrid's onLayout
+ * measurement so two or three compact tiles sit side by side on desktop. */
+function AchievementGrid({
+  achievements,
+  village,
+}: {
+  achievements: NonNullable<PlayerResponse['achievements']>;
+  village: string;
+}) {
+  const [width, setWidth] = useState(0);
+
+  const columns = width > 0
+    ? Math.max(
+        1,
+        Math.floor((width + ACHIEVEMENT_CARD_GAP) / (ACHIEVEMENT_CARD_MIN_WIDTH + ACHIEVEMENT_CARD_GAP)),
+      )
+    : 1;
+  const basis = width > 0
+    ? Math.floor((width - (columns - 1) * ACHIEVEMENT_CARD_GAP) / columns)
+    : null;
+
+  return (
+    <View
+      style={achievementGridStyle}
+      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+    >
+      {achievements.map((achievement, index) => (
+        <AchievementRow
+          key={`${village}-${achievement.name}-${index}`}
+          achievement={achievement}
+          basis={basis}
+        />
+      ))}
+    </View>
+  );
+}
+
+const achievementGridStyle = StyleSheet.create({
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: ACHIEVEMENT_CARD_GAP,
+  },
+}).grid;
+
+interface AchievementRowProps {
+  achievement: NonNullable<PlayerResponse['achievements']>[number];
+  /** The measured column width the tile takes, or null before the grid
+   * has measured itself (the tile then falls back to the full row). */
+  basis: number | null;
+}
+
+function AchievementRow({ achievement, basis }: AchievementRowProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  const c = theme.colors;
+
+  const progress = achievementProgress(achievement);
+  const isComplete = progress.isComplete;
+
+  // The completed tile's quiet treatment: the name demoted to secondary and
+  // the requirement line dropped (its target is met, the tile is a record,
+  // not a todo); the stars stay in the headline, all gold, because the
+  // rating is the tile's verdict.
+  const rowLabel = isComplete
+    ? `${achievement.name}, complete, ${progress.stars.earned} of ${progress.stars.total} stars, ${formatProgressPair(achievement.value, achievement.target)}`
+    : `${achievement.name}, ${achievement.info}, ${formatProgressPair(achievement.value, achievement.target)}, ${progress.stars.earned} of ${progress.stars.total} stars`;
+
+  return (
+    <View
+      style={[styles.achievementRow, basis !== null ? { flexBasis: basis } : null]}
+      accessibilityLabel={rowLabel}
+    >
+      {/* Top line: the achievement name flexes on the left, the star trio
+          rates it on the right. */}
+      <View style={styles.achievementTop}>
+        <Text style={isComplete ? styles.achievementNameDone : styles.achievementName} numberOfLines={1}>
+          {achievement.name}
+        </Text>
+        <View style={styles.achievementStars} aria-hidden>
+          {Array.from({ length: progress.stars.total }, (_, index) => (
+            <Glyph
+              key={index}
+              name="star"
+              color={index < progress.stars.earned ? c.accent : c.panelBorderStrong}
+            />
+          ))}
+        </View>
+      </View>
+      {/* Meter line: the progress rail stretches beside the tabular
+          value/target counter so both fit on a single compact row without
+          crowding the achievement title. */}
+      <View style={styles.achievementMeterRow}>
+        <View style={styles.achievementRailWrap}>
+          <ProgressRail progress={progress} showStars={false} />
+        </View>
+        <Text style={isComplete ? styles.achievementPairDone : styles.achievementPair}>
+          {formatProgressPair(achievement.value, achievement.target)}
+        </Text>
+      </View>
+      {!isComplete ? (
+        <Text style={styles.achievementInfo} numberOfLines={1}>
+          {achievement.info}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -1064,14 +1190,14 @@ function PlayerLoading({ busyRetrying }: PlayerLoadingProps) {
   const rushedBlock = sectionBlock('sk-rushed');
   const upgradeBlock = sectionBlock('sk-upgrade');
   const heroBlock = sectionBlock('sk-heroes');
-  const achievementsBlock = sectionBlock('sk-achievements');
   const progressionBlock = sectionBlock('sk-progression');
+  const achievementsBlock = sectionBlock('sk-achievements');
 
   return twoColumns ? (
     <View style={styles.columns} aria-hidden>
       {/* The identity column holds the card skeleton plus the rushed and
           upgrade-next skeletons; the analysis column holds the hero,
-          achievements, and progression skeletons. */}
+          progression, and achievements skeletons. */}
       <View style={styles.identityColumn}>
         {identityCard}
         {rushedBlock}
@@ -1079,8 +1205,8 @@ function PlayerLoading({ busyRetrying }: PlayerLoadingProps) {
       </View>
       <View style={styles.analysisColumn}>
         {heroBlock}
-        {achievementsBlock}
         {progressionBlock}
+        {achievementsBlock}
       </View>
     </View>
   ) : (
@@ -1090,8 +1216,8 @@ function PlayerLoading({ busyRetrying }: PlayerLoadingProps) {
         {rushedBlock}
         {upgradeBlock}
         {heroBlock}
-        {achievementsBlock}
         {progressionBlock}
+        {achievementsBlock}
       </View>
     </View>
   );
@@ -1651,11 +1777,30 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       color: c.textMuted,
     },
 
+    // ---------- progression card (T-M2-5) ----------
+    progressionCard: {
+      gap: t.spacing[4],
+    },
+    progressionHeader: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      justifyContent: 'space-between',
+      flexWrap: 'wrap',
+      columnGap: t.spacing[3],
+    },
+    progressionCount: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.sm,
+      fontWeight: t.fontWeight.regular,
+      color: c.textMuted,
+      fontVariant: ['tabular-nums'],
+    },
+
     // ---------- achievements card ----------
-    // The card carries the panelRaised chrome the identity card uses, so the
-    // analysis surfaces read as one family once the other two cards land.
+    // The card carries the panelRaised chrome the identity and hero cards
+    // use, so the analysis surfaces read as one family.
     achievementsCard: {
-      gap: t.spacing[5],
+      gap: t.spacing[4],
     },
     achievementsHeader: {
       flexDirection: 'row',
@@ -1673,8 +1818,68 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       color: c.textMuted,
       fontVariant: ['tabular-nums'],
     },
+    // Filter pills (All / In Progress / Completed): 44 px minimum touch
+    // target and focus ring per STD-17, wrapping cleanly on narrow screens.
+    achievementsFilters: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: t.spacing[2],
+    },
+    achievementFilterPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      columnGap: t.spacing[2],
+      minHeight: t.layout.touchTargetMin,
+      paddingHorizontal: t.spacing[3],
+      paddingVertical: t.spacing[1],
+      borderRadius: t.radius.pill,
+      backgroundColor: c.fillQuiet,
+      borderWidth: 1,
+      borderColor: c.panelBorder,
+      outlineColor: c.focusRing,
+      outlineOffset: t.layout.focusRingOffset,
+    },
+    achievementFilterPillActive: {
+      backgroundColor: c.accentSoft,
+      borderColor: c.accent,
+    },
+    achievementFilterPillPressed: {
+      backgroundColor: c.panel,
+    },
+    achievementFilterText: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.xs,
+      fontWeight: t.fontWeight.medium,
+      color: c.textSecondary,
+    },
+    achievementFilterTextActive: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.xs,
+      fontWeight: t.fontWeight.semibold,
+      color: c.accent,
+    },
+    achievementFilterCount: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.xs,
+      fontWeight: t.fontWeight.regular,
+      color: c.textMuted,
+      fontVariant: ['tabular-nums'],
+    },
+    achievementFilterCountActive: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.xs,
+      fontWeight: t.fontWeight.semibold,
+      color: c.accent,
+      fontVariant: ['tabular-nums'],
+    },
+    achievementsEmptyFilter: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.sm,
+      fontWeight: t.fontWeight.regular,
+      color: c.textMuted,
+    },
     achievementsGroup: {
-      gap: t.spacing[3],
+      gap: t.spacing[2],
     },
     achievementsDivider: {
       height: 1,
@@ -1690,14 +1895,18 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       textTransform: 'uppercase',
       letterSpacing: LABEL_TRACKING,
     },
-    achievementsRows: {
-      gap: t.spacing[4],
-    },
-    // One row (the prototype's layout): the headline with the name, the
-    // star trio, and the pair on one line; the rail full width under it;
-    // the requirement text under that.
+    // One compact achievement tile inside the measured multi-column grid:
+    // quiet fill, hairline border, tight internal rhythm so 54 rows read as
+    // a scannable ledger grid rather than a towering single-column list.
     achievementRow: {
-      gap: t.spacing[2],
+      backgroundColor: c.fillQuiet,
+      borderWidth: 1,
+      borderColor: c.panelBorder,
+      borderRadius: t.radius[2],
+      paddingHorizontal: t.spacing[3],
+      paddingVertical: t.spacing[2],
+      gap: t.spacing[1],
+      minWidth: 0,
     },
     achievementTop: {
       flexDirection: 'row',
@@ -1713,7 +1922,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontWeight: t.fontWeight.semibold,
       color: c.textPrimary,
     },
-    // The completed row's demotion: secondary ink, the ledger treatment.
+    // The completed tile's demotion: secondary ink, the ledger treatment.
     achievementNameDone: {
       flex: 1,
       minWidth: 0,
@@ -1729,6 +1938,16 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       columnGap: 2,
       flexShrink: 0,
     },
+    achievementMeterRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      columnGap: t.spacing[2],
+      minWidth: 0,
+    },
+    achievementRailWrap: {
+      flex: 1,
+      minWidth: 0,
+    },
     achievementInfo: {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.xs,
@@ -1736,14 +1955,14 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       lineHeight: Math.round(t.lineHeight.normal * t.fontSize.xs),
       color: c.textMuted,
     },
-    // The value/target pair: tabular figures so the columns of pairs align
-    // down the card; the size is the pair the roster's number cells keep.
+    // The value/target pair: tabular figures beside the rail.
     achievementPair: {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.xs,
       fontWeight: t.fontWeight.medium,
       color: c.textSecondary,
       fontVariant: ['tabular-nums'],
+      flexShrink: 0,
     },
     achievementPairDone: {
       fontFamily: t.fontFamily.sans,
@@ -1751,25 +1970,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontWeight: t.fontWeight.regular,
       color: c.textMuted,
       fontVariant: ['tabular-nums'],
-    },
-
-    // progression card (T-M2-5)
-    progressionCard: {
-      gap: t.spacing[4],
-    },
-    progressionHeader: {
-      flexDirection: 'row',
-      alignItems: 'baseline',
-      justifyContent: 'space-between',
-      flexWrap: 'wrap',
-      columnGap: t.spacing[3],
-    },
-    progressionCount: {
-      fontFamily: t.fontFamily.sans,
-      fontSize: t.fontSize.sm,
-      fontWeight: t.fontWeight.regular,
-      color: c.textMuted,
-      fontVariant: ['tabular-nums'],
+      flexShrink: 0,
     },
   });
 }

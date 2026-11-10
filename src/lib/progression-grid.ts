@@ -1,46 +1,57 @@
 // The progression grid adapter (T-M2-5, FR-16, SR-16).
 //
-// The progression grid renders every unit of both villages with its icon,
-// current level, and a maxed-for-Town-Hall chip, grouped by village and
-// category. The grid reads entirely from the same single GET /api/player/:tag
+// The progression grid renders every non-hero unit of both villages with its
+// icon, current level, and a maxed chip, grouped by village and category.
+// Heroes have their own dedicated HeroCard section on the player screen, so
+// the progression grid excludes the `heroes` array and splits the remaining
+// inventory into five distinct categories: troops, spells, equipments, pets,
+// and siege. The grid reads entirely from the same single GET /api/player/:tag
 // response the shell already fetched (SR-16): no second call, no second
 // loading state, and no network request beyond the player fetch (AC-07).
 //
 // The adapter here is the bridge between the player payload and the grid's
-// render shape: it re-buckets the payload's four unit arrays (troops,
-// spells, heroes, heroEquipment) into the four categories (troops, spells,
-// heroes, petsSiege), groups them by village, and produces one flat list of
-// tiles the grid can render. The adapter is pure (no React, no network),
-// the same split the rushed engine keeps (STD-09): the rule lives here, the
-// tile and the grid own only the paint.
+// render shape: it re-buckets the payload's three non-hero unit arrays
+// (troops, spells, heroEquipment) into the five categories, groups them by
+// village, and produces one flat list of tiles the grid can render. The
+// adapter is pure (no React, no network), the same split the rushed engine
+// keeps (STD-09): the rule lives here, the tile and the grid own only the
+// paint.
 //
 // Categorization reuses the rushed engine's reference lists (SIEGE_MACHINE_NAMES,
 // PET_NAMES) so the grid and the rushed analysis never disagree about which
-// category a unit belongs to. Super troops are kept in the grid (the player
-// can see which super troops are active), where the rushed engine drops them
-// (a super troop's level is the boosted variant's scale, not the real lab
-// level). The grid is an inventory view; the rushed analysis is a verdict.
+// units are siege machines or pets. Super troops are kept in the grid (the
+// player can see which super troops are active), where the rushed engine
+// drops them (a super troop's level is the boosted variant's scale, not the
+// real lab level). The grid is an inventory view; the rushed analysis is a
+// verdict.
 
 import type { PlayerUnit, PlayerResponse } from '../api/player';
 import {
   SIEGE_MACHINE_NAMES,
   PET_NAMES,
-  type RushedCategory,
 } from '../engines/rushed';
 
-/** The four categories the grid groups by, matching the rushed engine. */
-export type ProgressionCategory = RushedCategory;
+/** The five categories the progression grid groups by (heroes live in their
+ * own dedicated HeroCard section). */
+export type ProgressionCategory = 'troops' | 'spells' | 'equipments' | 'pets' | 'siege';
 
-/** Display labels for the category groups, matching the rushed engine. */
+/** Display labels for the progression category groups. */
 export const PROGRESSION_CATEGORY_LABELS: Record<ProgressionCategory, string> = {
   troops: 'Troops',
   spells: 'Spells',
-  heroes: 'Heroes',
-  petsSiege: 'Pets & Siege',
+  equipments: 'Equipments',
+  pets: 'Pets',
+  siege: 'Siege',
 };
 
 /** The order categories render in within each village. */
-const CATEGORY_ORDER: ReadonlyArray<ProgressionCategory> = ['troops', 'spells', 'heroes', 'petsSiege'];
+const CATEGORY_ORDER: ReadonlyArray<ProgressionCategory> = [
+  'troops',
+  'spells',
+  'equipments',
+  'pets',
+  'siege',
+];
 
 /**
  * One tile in the progression grid. Carries everything the tile needs to
@@ -86,33 +97,31 @@ export interface ProgressionCategoryBlock {
 }
 
 /**
- * Converts the player payload's four unit arrays into the village-grouped,
+ * Converts the player payload's non-hero unit arrays into the village-grouped,
  * category-blocked tiles the progression grid renders. Pure: the input
  * arrays are untouched, a fresh group array comes back.
  *
  * Super troops are kept (the grid is an inventory view), unlike the rushed
- * engine which drops them. Siege machines and pets are routed into the
- * petsSiege category using the rushed engine's reference lists, so the two
- * views agree on which category a unit belongs to. Builder-base units are
- * kept (the grid shows both villages, unlike the rushed analysis which is
- * home-village only). Hero equipment from the flat `heroEquipment` array is
- * routed into the heroes category, so every piece the player owns renders
- * (the hero panel reads only the nested per-hero equipment; the grid is the
- * inventory view that reads the flat array too, FR-16).
+ * engine which drops them. Siege machines and pets are routed into their own
+ * siege and pets categories using the rushed engine's reference lists, so the
+ * two views agree on unit identities. Builder-base troops are kept (the grid
+ * shows both villages, unlike the rushed analysis which is home-village only).
+ * Hero equipment from the flat `heroEquipment` array is routed into the
+ * equipments category, while heroes themselves are omitted because the
+ * HeroCard section already displays them.
  */
 export function playerToProgressionTiles(player: PlayerResponse): ProgressionVillageGroup[] {
   const tiles = collectTiles(player);
   return groupTilesByVillage(tiles);
 }
 
-// ---------- internal: collect tiles from the four arrays ----------
+// ---------- internal: collect tiles from the three non-hero arrays ----------
 
 function collectTiles(player: PlayerResponse): ProgressionTile[] {
   const tiles: ProgressionTile[] = [];
 
   const troops = player.troops ?? [];
   const spells = player.spells ?? [];
-  const heroes = player.heroes ?? [];
   const heroEquipment = player.heroEquipment ?? [];
 
   for (const unit of troops) {
@@ -124,22 +133,21 @@ function collectTiles(player: PlayerResponse): ProgressionTile[] {
     tiles.push(toTile(unit, 'spells'));
   }
 
-  for (const unit of heroes) {
-    tiles.push(toTile(unit, 'heroes'));
-  }
-
   for (const unit of heroEquipment) {
-    tiles.push(toTile(unit, 'heroes'));
+    tiles.push(toTile(unit, 'equipments'));
   }
 
   return tiles;
 }
 
-/** Routes a troops-array unit into troops or petsSiege using the rushed
+/** Routes a troops-array unit into troops, pets, or siege using the rushed
  * engine's reference lists, so the grid and the rushed analysis agree. */
 function categorizeTroop(name: string): ProgressionCategory {
-  if (SIEGE_MACHINE_NAMES.has(name) || PET_NAMES.has(name)) {
-    return 'petsSiege';
+  if (SIEGE_MACHINE_NAMES.has(name)) {
+    return 'siege';
+  }
+  if (PET_NAMES.has(name)) {
+    return 'pets';
   }
   return 'troops';
 }

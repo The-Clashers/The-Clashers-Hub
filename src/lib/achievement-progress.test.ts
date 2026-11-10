@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   achievementProgress,
+  ACHIEVEMENT_FILTER_LABELS,
   ACHIEVEMENT_MAX_STARS,
+  filterAchievements,
   formatProgressPair,
   groupAchievementsByVillage,
   railFill,
@@ -132,5 +134,49 @@ describe('formatProgressPair', () => {
 describe('village grouping delegation', () => {
   it('re-exports the shared rule from lib/village', () => {
     expect(groupAchievementsByVillage).toBe(groupByVillage);
+  });
+});
+
+describe('filterAchievements', () => {
+  const sample = [
+    { name: 'Empire Builder', stars: 3, value: 4, target: 4 },
+    { name: 'Wall Buster', stars: 2, value: 1800, target: 2000 },
+    { name: 'Keep Your Account Safe!', stars: 0, value: 0, target: 1 },
+    { name: 'Sweet Victory!', stars: 3, value: 3622, target: 1250 },
+  ] as const;
+
+  it('returns every row in order under the all filter without mutating the input', () => {
+    const frozen = Object.freeze([...sample]);
+    const result = filterAchievements(frozen, 'all');
+    expect(result.map((row) => row.name)).toEqual([
+      'Empire Builder',
+      'Wall Buster',
+      'Keep Your Account Safe!',
+      'Sweet Victory!',
+    ]);
+  });
+
+  it('returns only rows with fewer than 3 stars under inProgress', () => {
+    const result = filterAchievements(sample, 'inProgress');
+    expect(result.map((row) => row.name)).toEqual([
+      'Wall Buster',
+      'Keep Your Account Safe!',
+    ]);
+  });
+
+  it('returns only rows with 3 or more stars under complete', () => {
+    const result = filterAchievements(sample, 'complete');
+    expect(result.map((row) => row.name)).toEqual([
+      'Empire Builder',
+      'Sweet Victory!',
+    ]);
+  });
+
+  it('exposes labels for all three filter modes', () => {
+    expect(ACHIEVEMENT_FILTER_LABELS).toEqual({
+      all: 'All',
+      inProgress: 'In Progress',
+      complete: 'Completed',
+    });
   });
 });
