@@ -351,6 +351,7 @@ draw, which is why the ambience layer uses react-native-svg, the chart
 | Component | Purpose |
 |---|---|
 | `NavBar` | the thin fixed row every page renders: the shield brand lockup, `LookupSearch`, the page links (Home with its home glyph), the theme toggle, plus the in-flow spacer that reserves its height; frosted glass since the rework (canvas veil + shared blur) |
+| `Footer` | the global site footer: brand lockup, explore navigation, external resources, Supercell Fan Content Policy disclaimer, and MIT license notice |
 | `GlassAmbience` | the canvas's two glow fields: one fixed, pointer-transparent SVG behind every screen, the radial gradients Views cannot draw |
 | `LookupSearch` + `LookupModePicker` | the one search box (nav-thin and hero-sized): the mode picker is the small icon dropdown that says player or clan; player mode is tag-only, clan mode takes a name or `#tag` |
 | `Breadcrumbs` | the location line detail screens render instead of a header: `Home › Clans › <name>`, WAI-ARIA breadcrumb pattern |

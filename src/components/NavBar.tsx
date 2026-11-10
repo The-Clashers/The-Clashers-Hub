@@ -158,12 +158,18 @@ function BrandMark({
  * drawn on react-native-svg the way the Gauge and the glow fields are.
  * Color comes from the theme tokens, never a hard-coded hex, so the mark
  * follows the accent through both themes. */
-function BrandShield({ color }: { color: ReturnType<typeof useTheme>['theme']['colors'] }) {
+export function BrandShield({
+  color,
+  size = BRAND_SHIELD_SIZE,
+}: {
+  color: ReturnType<typeof useTheme>['theme']['colors'];
+  size?: number;
+}) {
   return (
     <Svg
       viewBox="0 0 24 24"
-      width={BRAND_SHIELD_SIZE}
-      height={BRAND_SHIELD_SIZE}
+      width={size}
+      height={size}
       style={brandShieldStyle}
       aria-hidden
     >
