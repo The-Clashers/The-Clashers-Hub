@@ -4,6 +4,8 @@ export {
   lightTheme,
   darkTheme,
   themeByName,
+  themeFor,
+  densityFor,
   lightColors,
   darkColors,
   spacing,
@@ -12,6 +14,7 @@ export {
   fontSize,
   fontWeight,
   lineHeight,
+  letterSpacing,
   layout,
   motion,
   zIndex,
@@ -21,13 +24,21 @@ export {
   type ThemeTokens,
   type ColorTokenName,
   type ColorTokens,
+  type Density,
   type SpacingStep,
   type RadiusStep,
   type ShadowStep,
   type FontSizeStep,
   type FontWeightName,
   type LineHeightName,
+  type LetterSpacingName,
   type Breakpoint,
 } from './tokens';
 export { ThemeProvider, useTheme, type ThemeName } from './ThemeProvider';
-export { baseStyles, createBaseStyles, glassSurfaceFilter, type BaseStyles } from './baseStyles';
+export {
+  baseStyles,
+  createBaseStyles,
+  glassSurfaceFilter,
+  glassEdge,
+  type BaseStyles,
+} from './baseStyles';
