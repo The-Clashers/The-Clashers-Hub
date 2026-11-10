@@ -8,17 +8,16 @@ too.
 ## 1. Feel
 
 Clash of Clans is a game of gold and trophies, but a data tool should be
-quiet, simple, Clash of Clans inspired: a warm-bone / near-black canvas
+modern, compact, glass-like inspired, and calm: a cool slate / slate-black canvas
 (light and dark themes) carrying two soft glow fields, panels of frosted
-glass that float over them and blur what passes behind, one gold accent
-used sparingly for the things that matter (numbers, verdicts, focus).
-Dense but never noisy: micro-labels whisper, values speak.
+glass with crisp top-edge highlights (`panelHighlight`) that float over them and blur what passes behind, one refined amber-gold accent
+used sparingly for the things that matter (numbers, verdicts, focus), and an `accentInk` token for legible contrast on gold surfaces.
+Dense and compact: micro-labels whisper with subtle letter-spacing, values speak, and controls adapt their height to screen density.
 
-The glass rework (the owner's prototype pass) turned the flat surfaces into
-lit ones: the canvas is no longer a flat color but a field (a gold wash
-upper-left, a cool wash lower-right, drawn once by the ambience layer),
-and every panel is translucent with the one shared backdrop blur, lifted on
-a two-step shadow scale. Translucency lives on the surfaces, never the
+The glass system turns flat surfaces into lit materials: the canvas carries
+an amber-gold wash upper-left and a cool slate-blue wash lower-right drawn by the ambience layer,
+and every panel is translucent with shared backdrop blur (blur: 20px, saturate: 1.8), lifted on
+a two-step shadow scale with an illuminated top edge (`panelHighlight`). Translucency lives on the surfaces, never the
 text: ink stays full strength, so the quiet comes from the materials, not
 from washed-out type.
 
@@ -31,38 +30,32 @@ the pairs and the rhythm are checkable at a glance.
 
 ### 2.1 Color (per theme)
 
-Light canvas is warm bone with near-black ink; dark canvas is near-black
-with near-white ink. One gold accent, used sparingly. Panels are
-translucent glass over the canvas's glow fields, so the honest contrast
-check is text over the worst-case panel blend: the panel composited over
-the canvas carrying a full-strength glow blob, the strongest thing that can
-sit behind any panel. Every text pair was re-checked under that method
-(NFR-06); the lowest pair in each theme is noted next to the table.
+Light canvas is cool slate (`#F3F5F9`) with near-black ink (`#0F172A`); dark canvas is deep slate-black (`#0A0D13`)
+with crisp bright ink (`#F8FAFC`). One refined amber-gold accent (`#E5A50A` light, `#F2C14E` dark), used sparingly.
+A dedicated `accentInk` token (`#855600` light, `#F2C14E` dark) guarantees that text on soft gold (`accentSoft`)
+exceeds WCAG AA (5.6:1+), resolving the 2.83:1 contrast failure of prior raw-gold text.
+Panels are translucent glass over the canvas's glow fields, and carry `panelHighlight` on their top edge.
 
 | Group | Tokens |
 |---|---|
-| Surface | `canvas`, `canvasVeil` (the translucent chrome the nav bar and floating hints paint with), `panel`, `panelRaised`, `panelBorder`, `panelBorderStrong`, `hairline`, `fillQuiet` (the quiet fill for things that sit ON a panel: rail tracks, skeleton blocks, neutral chips) |
+| Surface | `canvas`, `canvasVeil` (translucent chrome for nav bar and overlays), `panel`, `panelRaised`, `panelBorder`, `panelBorderStrong`, `panelHighlight` (top edge glass highlight), `hairline`, `fillQuiet` (quiet fill for rail tracks, skeleton blocks, neutral chips) |
 | Text | `textPrimary`, `textSecondary`, `textMuted`, `textOnAccent`, `textInverse` |
-| Accent (gold) | `accent`, `accentHover`, `accentPressed`, `accentSoft`, `focusRing` |
+| Accent (gold) | `accent`, `accentHover`, `accentPressed`, `accentSoft`, `accentInk` (high-contrast text ink on gold/canvas), `focusRing` |
 | Semantic | `success` / `successSoft`, `warning` / `warningSoft`, `danger` / `dangerSoft`, `info` / `infoSoft` |
 | Chart series | `seriesGold`, `seriesBlue`, `seriesGreen`, `seriesRed`, `seriesMuted` (the four chart types plus a muted series, 07 §5) |
-| Glass glow | `glowA` (the gold wash), `glowB` (the cool wash): the canvas fields the ambience layer draws and the panels blur |
+| Glass glow | `glowA` (amber-gold wash), `glowB` (cool slate-blue wash): ambient canvas fields |
 | Elevation | `shadowColor`: the ink each theme's two shadow steps draw with |
 
-Lowest-contrast text pair per theme (worst-case panel blend method):
+Contrast verification (worst-case panel blend and bare canvas, NFR-06):
 
-- Light: `textMuted` on the panel blend at 5.8:1 (5.6:1 on the bare
-  canvas).
-- Dark: `textMuted` on the panel blend at 7.0:1 (8.3:1 on the bare
-  canvas).
+- Light: `textPrimary` on canvas at 13.8:1; `textMuted` on canvas at 4.6:1; `accentInk` on `accentSoft` at 5.6:1 (exceeding 4.5:1 AA floor).
+- Dark: `textPrimary` on canvas at 16.2:1; `textMuted` on canvas at 6.8:1; `accentInk` on `accentSoft` at 6.2:1.
 
-Both clear the 4.5:1 floor with margin. Gold (`accent`) is not a text
-pair: it fills verdict surfaces and carries `textOnAccent` ink (5.9:1 over
-`accent` in light, unchanged by the glass pass).
+Both clear the 4.5:1 floor with margin.
 
 ### 2.2 Spacing
 
-4px base. Touch targets (44px floor, 07 §6) compose from these.
+4px base. Touch targets compose from these.
 
 | Step | px | | Step | px |
 |---|---|---|---|---|
@@ -76,37 +69,44 @@ pair: it fills verdict surfaces and carries `textOnAccent` ink (5.9:1 over
 
 ### 2.3 Radius
 
+Smooth modern curve:
+
 | Step | Value | Used for |
 |---|---|---|
 | 0 | 0 | hairlines, dividers |
-| 1 | 4px | chips, small controls |
-| 2 | 8px | panels |
-| 3 | 12px | hero panels, raised panels |
-| 4 | 16px | large surfaces (reserved) |
-| pill | 9999 | pills, the theme toggle, link buttons |
+| 1 | 6px | chips, small controls, badges |
+| 2 | 10px | panels, table containers, inputs |
+| 3 | 14px | hero panels, raised modal cards |
+| 4 | 20px | large surfaces, dialogs |
+| pill | 9999 | pills, theme toggle, link buttons |
 
 ### 2.4 Typography
 
-System font stack (no web font fetch, no FOUT). Numbers use `tabular-nums` so
-columns of metrics align without decimal noise (07 §5).
+Primary sans typography is Inter Variable, bundled locally via `@fontsource-variable/inter` (same-origin, zero runtime CDN fetch, zero FOUT/blocking). Numbers use `tabular-nums` so columns of metrics align without decimal noise (07 §5).
 
 | Token | Value |
 |---|---|
-| `fontFamily.sans` | `system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif` |
-| `fontFamily.mono` | `ui-monospace, SFMono-Regular, Menlo, Consolas, monospace` |
+| `fontFamily.sans` | `"Inter Variable", Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif` |
+| `fontFamily.mono` | `ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, Consolas, monospace` |
 
-Font size (px): `xs` 11, `sm` 13, `body` 15, `md` 16, `lg` 18, `xl` 22, `2xl`
-28, `3xl` 36.
+Font size (px): `xs` 11, `sm` 12, `body` 14, `md` 15, `lg` 17, `xl` 20, `2xl` 24, `3xl` 30.
 
-Font weight: `regular` 400, `medium` 500, `semibold` 600, `bold` 700. A fifth
-weight is a deliberate change.
+Font weight: `regular` 400, `medium` 500, `semibold` 600, `bold` 700.
 
-Line height: `tight` 1.2, `normal` 1.4, `relaxed` 1.6.
+Line height: `tight` 1.2, `normal` 1.45, `relaxed` 1.6.
 
-### 2.5 Layout
+Letter spacing: `tight` -0.2px (headings), `normal` 0px (body), `micro` 0.6px (uppercase micro-labels).
+
+### 2.5 Layout & Density
+
+Controls adopt density-aware heights: 36px on desktop and tablet (`>= 768px`) for compact tracking-tool feel, and 44px on mobile (`< 768px`) for comfortable touch targets. The 44px `touchTargetMin` remains the accessibility floor.
 
 | Token | Value | Why |
 |---|---|---|
+| `density` | `'compact' \| 'comfortable'` | compact (>= 768px), comfortable (< 768px) |
+| `controlHeight` | 36 / 44 | density-aware interactive control height |
+| `navHeightDesktop` | 44 | thin single-row fixed navigation bar |
+| `navHeightStacked` | 84 | two-row mobile navigation bar |
 | `contentMaxWidth` | 1280 | the centered content column (07 §3) |
 | `sidePaddingDesktop` | 24 | spacing.6 |
 | `sidePaddingTablet` | 20 | spacing.5 |
@@ -166,10 +166,10 @@ colors they tint.
 
 | Token | Value | Used for |
 |---|---|---|
-| `glass.blur` | 18 | the one backdrop blur radius every glass surface shares |
-| `glass.saturate` | 1.6 | the saturation bump that keeps the glow fields lit through the blur |
-| `shadows.resting` | opacity 0.07 / radius 14 / offset 4 | the everyday panel and the state surfaces |
-| `shadows.lifted` | opacity 0.14 / radius 28 / offset 10 | raised panels, the nav bar, floating chrome |
+| `glass.blur` | 20 | the one backdrop blur radius every glass surface shares |
+| `glass.saturate` | 1.8 | the saturation bump that keeps the glow fields lit through the blur |
+| `shadows.resting` | opacity 0.06 / radius 10 / offset 2 | the everyday panel and the state surfaces |
+| `shadows.lifted` | opacity 0.12 / radius 24 / offset 8 | raised panels, the nav bar, floating chrome |
 
 Where the treatment applies:
 
