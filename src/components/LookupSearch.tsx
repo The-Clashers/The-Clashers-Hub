@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { useTheme, glassSurfaceFilter } from '../theme';
 import Glyph from './Glyph';
 import LookupModePicker, { type LookupMode } from './LookupModePicker';
@@ -42,11 +42,24 @@ export default function LookupSearch({ variant = 'bar', onNavigate }: LookupSear
   const hero = variant === 'hero';
   const styles = useMemo(() => createStyles(theme, variant), [theme, variant]);
   const navigate = useNavigate();
+  const location = useLocation();
   const go = onNavigate ?? ((route: string) => navigate(route));
 
   const [mode, setMode] = useState<LookupMode>('clan');
   const [draft, setDraft] = useState('');
   const [hint, setHint] = useState<string | null>(null);
+
+  // Auto-dismiss floating hint on navigation
+  useEffect(() => {
+    setHint(null);
+  }, [location.pathname]);
+
+  // Auto-dismiss floating hint after 3.5 seconds
+  useEffect(() => {
+    if (hint === null) return;
+    const timer = setTimeout(() => setHint(null), 3500);
+    return () => clearTimeout(timer);
+  }, [hint]);
 
   const submit = () => {
     const raw = draft.trim();
@@ -124,6 +137,7 @@ export default function LookupSearch({ variant = 'bar', onNavigate }: LookupSear
           value={draft}
           onChangeText={handleChange}
           onSubmitEditing={submit}
+          onBlur={() => setTimeout(() => setHint(null), 250)}
           placeholder={placeholder}
           placeholderTextColor={theme.colors.textMuted}
           accessibilityLabel={mode === 'player' ? 'Player tag' : 'Clan name or tag'}
@@ -234,6 +248,11 @@ function createStyles(t: ReturnType<typeof useTheme>['theme'], variant: LookupVa
             top: '100%',
             left: 0,
             marginTop: t.spacing[1],
+            zIndex: t.zIndex.overlay,
+            borderWidth: 1,
+            borderColor: c.panelBorder,
+            shadowColor: c.shadowColor,
+            ...t.shadows.lifted,
           }),
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.xs,
@@ -244,7 +263,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme'], variant: LookupVa
       ...glassSurfaceFilter(t),
       backgroundColor: c.canvasVeil,
       paddingHorizontal: t.spacing[2],
-      paddingVertical: 2,
+      paddingVertical: 3,
       borderRadius: t.radius[1],
       alignSelf: 'flex-start',
     },

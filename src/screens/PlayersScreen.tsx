@@ -32,10 +32,6 @@ export default function PlayersScreen() {
 
           <View style={[base.panelRaised, styles.lookupPanel]}>
             <TagInput label="Player tag" />
-            <Text style={styles.footnote}>
-              Find the tag on the player's in-game profile: it starts with #. The # prefix is
-              optional here.
-            </Text>
           </View>
         </View>
       </View>
@@ -46,7 +42,6 @@ export default function PlayersScreen() {
 // ---------- styles ----------
 
 function createStyles(t: ReturnType<typeof useTheme>['theme']) {
-  const c = t.colors;
   return StyleSheet.create({
     column: {
       flex: 1,
@@ -57,11 +52,6 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     },
     lookupPanel: {
       gap: t.spacing[4],
-    },
-    footnote: {
-      fontFamily: t.fontFamily.sans,
-      fontSize: t.fontSize.sm,
-      color: c.textMuted,
     },
   });
 }
