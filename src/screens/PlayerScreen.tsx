@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Image,
   StyleSheet,
@@ -14,6 +14,7 @@ import CategoryBars from '../components/CategoryBars';
 import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';
 import Gauge from '../components/Gauge';
+import Glyph from '../components/Glyph';
 import LevelRail from '../components/LevelRail';
 import PillButton from '../components/PillButton';
 import ProgressRail from '../components/ProgressRail';
@@ -46,25 +47,31 @@ import {
 // The player detail shell (T-M2-1, FR-06, FR-14). The roster's tap-through
 // and the tag boxes both land here (golden paths A and B), on the shareable
 // /player/:tag URL the route map documents. The shell owns the fetch and its
-// states and lays out the page the prototype rework fixed: a full-width
-// identity card, then the analysis in two two-column grids.
+// states and lays out the page the design language fixes: two columns from
+// 1024 px up (identity + analysis), stacked below it — the layout the
+// prototype rework tried to replace and the owner put back, with the
+// prototype's two actions kept on the card.
 //
-// The identity card carries the FR-06 header the prototype drew: the avatar
-// monogram, the name with the Town Hall / tag / role chips beside it, the
-// season chips (league with its icon, trophies, war stars, attack wins, XP,
-// the donation pair), and an actions column on the right holding the
-// compare button and the manual refresh control. The refresh control moved
-// here from the page footer (the owner's placement call): freshness belongs
-// to the card whose data it describes, the same corner the clan screen's
-// footer row occupies but one card closer to the numbers.
+// The identity card carries the FR-06 header: the name, the tag with the
+// clan name beside it, then the stat cells (Town Hall, league, XP level,
+// clan role). The league cell reads the ranked-ladder tier (leagueTier, the
+// same field the roster's rank column reads) with its icon in the 24 px
+// slot, falling back to the classic league object when the payload carries
+// no tier, so the site's two league displays never disagree about which
+// ladder they show. The role label comes from lib/clan-role.ts, the one
+// table the roster reads, so "admin" says Elder here too. Under the stat
+// grid the card's actions block holds the two buttons the owner took from
+// the prototype: the gold compare pill with the compare glyph, and the
+// manual refresh control (the ghost pill with the refresh glyph and the
+// last-refresh text riding in the cached pill) — freshness belongs to the
+// card whose data it describes, beside the compare action.
 //
-// The analysis grids (from 1024 px up, stacked below):
-// - Grid one, the verdict: the rushed analysis card (the flagship dial and
-//   its category bars, T-M2-2's card half) beside the upgrade-next list
-//   (the engine's top deficits as "what to fix first").
-// - Grid two, the ledgers: the hero and achievements cards in one column,
-//   the progression grid in the other. Long lists left, the tall tile grid
-//   right, the same balance the prototype struck.
+// The analysis column holds the five M2 sections in a stack: the rushed
+// analysis card and the upgrade-next list (T-M2-2's card half, the verdict
+// pair), then the hero, achievements, and progression cards — the hero
+// cards and the achievement rows follow the prototype's icon layouts (the
+// icon-anchored hero card with its rail, the star-rated achievement
+// headline), and the progression grid renders the prototype's tile wall.
 //
 // Breadcrumbs locate the page the way the clan detail's do (07 section 3):
 // Home > Players > <player name>, the tag from the URL until the name is in
@@ -78,22 +85,23 @@ import {
 const PLAYER_STALE_TIME_MS = 300_000;
 
 // The league icon slot (07 section 7): API icon in a fixed box, so a slow
-// CDN load never reflows the chip row. The identity chips read the small
-// size at 16 px, half the header's old 24 px slot, chips are one line tall.
-const LEAGUE_ICON_SLOT = 16;
+// CDN load never reflows the stat grid.
+const LEAGUE_ICON_SLOT = 24;
 
-// The avatar monogram's slot (the prototype's avatar-lg): a fixed circle the
-// initials sit in, gold-ringed on the accent-soft field.
-const AVATAR_SIZE = 56;
-
-// Line widths chosen to read as a name and a chips line; the identity
-// skeleton mirrors the card's real shapes so the first paint holds the
-// layout the data lands into (06 section 3).
+// Line widths chosen to read as a name and a tag line; the stat cells mirror
+// the uniform grid they stand in for.
 const SKELETON_NAME_WIDTH = 200;
+const SKELETON_META_WIDTH = 170;
 
-// The analysis blocks the skeleton draws, matching the five panels the
-// success state renders (rushed, upgrade next, heroes, achievements,
-// progression).
+// The header stat cells the skeleton draws, matching the grid's count.
+const SKELETON_STAT_CELLS = 4;
+
+// The analysis sections the skeleton draws, matching the five sections
+// the success state renders (the rushed card, the upgrade-next list, the
+// hero card, the achievements card, the progression grid). Each skeleton
+// block mirrors the section it stands in for: a title line and a body line
+// inside the shared state panel, so the layout-matched skeleton (06
+// section 3) keeps its shape through the loading state.
 const SKELETON_SECTIONS = 5;
 
 // Micro-label tracking: the one-off 0.6 px tracking the design language
@@ -196,7 +204,7 @@ export default function PlayerScreen() {
   );
 }
 
-// ---------- success: identity card + analysis grids ----------
+// ---------- success: identity card + analysis sections ----------
 
 interface PlayerSuccessProps {
   player: PlayerResponse;
@@ -212,11 +220,12 @@ function PlayerSuccess({ player, onRefresh, isRefreshing }: PlayerSuccessProps) 
   const styles = useMemo(() => createStyles(theme), [theme]);
   const navigate = useNavigate();
 
-  // The two-column rule (07 section 3): the analysis grids pair up from
-  // 1024 px up, stacked below it. Read through useWindowDimensions into the
-  // breakpoints helper, never CSS media queries.
+  // The two-column rule (07 section 3): identity + analysis from 1024 px up,
+  // stacked below it. Read through useWindowDimensions into the breakpoints
+  // helper, never CSS media queries.
   const { width } = useWindowDimensions();
-  const twoColumns = breakpointFor(width) === 'desktop';
+  const breakpoint = breakpointFor(width);
+  const twoColumns = breakpoint === 'desktop';
 
   // The rushed verdict (the flagship engine, T-M2-2): computed here once
   // from the same single response the shell fetched, then handed to the
@@ -231,185 +240,137 @@ function PlayerSuccess({ player, onRefresh, isRefreshing }: PlayerSuccessProps) 
     [player.troops, player.spells, player.heroes, player.heroEquipment],
   );
 
-  // The identity card the prototype drew: avatar, name + chips, season
-  // chips, and the actions column (compare, refresh) on the right.
+  // The header reads the ranked-ladder tier (the same field the roster's
+  // rank column reads) and falls back to the classic league object when
+  // the payload carries no tier, so the player header and the roster never
+  // disagree about which ladder they show.
+  const league = player.leagueTier ?? player.league;
+
+  // The FR-06 header cells. The values speak (tabular figures), the labels
+  // whisper, the same rhythm the clan detail card's stat grid keeps. The
+  // league cell pairs the tier icon with the tier name; a clanless player
+  // renders the quiet dash in the clan role cell, and a player with no
+  // league at all renders Unranked as text.
+  const stats: ReadonlyArray<HeaderStat> = [
+    { label: 'Town Hall', value: String(player.townHallLevel) },
+    { label: 'League', value: league?.name ?? 'Unranked', iconUri: league?.iconUrls?.small },
+    { label: 'XP level', value: String(player.expLevel) },
+    { label: 'Clan role', value: player.role ? clanRoleLabel(player.role) : '\u2014' },
+  ];
+
+  // The stat grid wraps two cells per row inside the identity column (the
+  // column the two-column layout gives the card is too narrow for four),
+  // and follows the clan card's own rule when the card runs full width:
+  // four per row from tablet up, two below.
+  const cellBasis = twoColumns || breakpoint === 'mobile' || breakpoint === 'small'
+    ? styles.statCellHalf
+    : styles.statCellQuarter;
+
+  // The identity card: the FR-06 header (name, tag | clan, stat grid) the
+  // design language has always fixed, with the prototype's two actions
+  // riding at the card's foot — the compare pill and the refresh control
+  // share the actions block under a second hairline.
   const identityCard = (
     <View
       style={[base.panelRaised, styles.identityCard]}
       accessibilityLabel={`${player.name} player detail`}
     >
-      <View style={styles.identityRow}>
-        <View style={styles.avatar} aria-hidden>
-          <Text style={styles.avatarText}>{monogramFor(player.name)}</Text>
+      <View style={styles.identityText}>
+        <Text style={base.title} numberOfLines={1}>
+          {player.name}
+        </Text>
+        <View style={styles.identityMeta}>
+          <Text style={styles.tagLine}>{player.tag}</Text>
+          {player.clan ? (
+            <>
+              <Text style={styles.metaDot} aria-hidden>
+                |
+              </Text>
+              <Text style={styles.clanLine} numberOfLines={1}>
+                {player.clan.name}
+              </Text>
+            </>
+          ) : null}
         </View>
+      </View>
 
-        <View style={styles.identityText}>
-          <View style={styles.nameRow}>
-            <Text style={base.title} numberOfLines={1}>
-              {player.name}
-            </Text>
-            <View style={styles.chipRow}>
-              <View style={styles.chipGold}>
-                <Text style={styles.chipGoldText}>{`TH ${player.townHallLevel}`}</Text>
+      <View style={styles.statDivider} aria-hidden />
+
+      <View style={styles.statGrid}>
+        {stats.map((stat) => (
+          <View key={stat.label} style={[styles.statCell, cellBasis]}>
+            <Text style={styles.statLabel}>{stat.label}</Text>
+            {stat.iconUri ? (
+              <View style={styles.statValueRow}>
+                <Image
+                  source={{ uri: stat.iconUri }}
+                  style={styles.leagueIcon}
+                  accessibilityLabel={`${stat.value} league icon`}
+                />
+                <Text style={styles.statValue} numberOfLines={1}>
+                  {stat.value}
+                </Text>
               </View>
-              <View style={styles.chipTag}>
-                <Text style={styles.chipTagText}>{player.tag}</Text>
-              </View>
-              {player.role ? (
-                <View style={roleChipStyle(styles, player.role)}>
-                  <Text style={roleChipTextStyle(styles, player.role)}>
-                    {clanRoleLabel(player.role)}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
+            ) : (
+              <Text style={styles.statValue} numberOfLines={1}>
+                {stat.value}
+              </Text>
+            )}
           </View>
-
-          <View style={styles.metaRow}>
-            <LeagueChip
-              name={(player.leagueTier ?? player.league)?.name}
-              iconUri={(player.leagueTier ?? player.league)?.iconUrls?.small}
-            />
-            <MetaChip label={`${formatCount(player.trophies)} trophies`} present={player.trophies !== undefined} />
-            <MetaChip label={`${formatCount(player.warStars)} war stars`} present={player.warStars !== undefined} />
-            <MetaChip label={`${formatCount(player.attackWins)} attack wins`} present={player.attackWins !== undefined} />
-            <MetaChip label={`XP ${player.expLevel}`} present />
-            {player.donations !== undefined || player.donationsReceived !== undefined ? (
-              <MetaChip
-                label={`${formatCount(player.donations ?? 0)} : ${formatCount(player.donationsReceived ?? 0)} this season`}
-                present
-              />
-            ) : null}
-          </View>
-        </View>
-
-        <View style={styles.actionsColumn}>
-          <PillButton
-            label="Compare this player"
-            onPress={() => navigate('/compare')}
-            hint="Opens the compare screen. Player versus player pairing lands with the compare cards."
-          />
-          <RefreshControl
-            onRefresh={onRefresh}
-            ageSeconds={player.age}
-            isRefreshing={isRefreshing}
-          />
-        </View>
+        ))}
       </View>
-    </View>
-  );
 
-  const rushedCard = <RushedAnalysisCard verdict={verdict} townHallLevel={player.townHallLevel} />;
-  const upgradeCard = <UpgradeNextCard verdict={verdict} />;
-  const heroCard = <HeroCard heroes={player.heroes} />;
-  const achievementsCard = <AchievementsCard achievements={player.achievements} />;
-  const progressionCard = <ProgressionCard player={player} />;
+      <View style={styles.statDivider} aria-hidden />
 
-  if (!twoColumns) {
-    return (
-      <View style={styles.detailWrap}>
-        {identityCard}
-        <View style={styles.columnStack}>
-          {rushedCard}
-          {upgradeCard}
-          {heroCard}
-          {achievementsCard}
-          {progressionCard}
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.detailWrap}>
-      {identityCard}
-      <View style={styles.columnStack}>
-        <View style={styles.gridRow}>
-          <View style={styles.gridColumn}>{rushedCard}</View>
-          <View style={styles.gridColumn}>{upgradeCard}</View>
-        </View>
-        <View style={styles.gridRow}>
-          <View style={styles.gridColumn}>
-            {heroCard}
-            {achievementsCard}
-          </View>
-          <View style={styles.gridColumn}>{progressionCard}</View>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-// ---------- identity chip helpers ----------
-
-/** The avatar's initials: the first letter of the first two name segments. */
-function monogramFor(name: string): string {
-  const parts = name.trim().split(/\s+/).filter((part) => part.length > 0);
-  if (parts.length === 0) return '#';
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-}
-
-/** The house number format (lib/achievement-progress.ts keeps the same). */
-function formatCount(value: number | undefined): string {
-  return Math.max(0, value ?? 0).toLocaleString('en-US');
-}
-
-/** The league chip: the tier icon beside the tier name, Unranked when none. */
-function LeagueChip({ name, iconUri }: { name?: string; iconUri?: string }) {
-  const { theme } = useTheme();
-  const styles = useMemo(() => createChipStyles(theme), [theme]);
-
-  return (
-    <View style={styles.chipMeta} accessibilityLabel={name ? `League, ${name}` : 'Unranked'}>
-      {iconUri ? (
-        <Image
-          source={{ uri: iconUri }}
-          style={styles.leagueIcon}
-          accessibilityLabel={`${name} league icon`}
+      {/* The actions block (the owner's prototype placement): the compare
+          action above the refresh control, both on the card whose data
+          they act on. */}
+      <View style={styles.cardActions}>
+        <PillButton
+          label="Compare this player"
+          icon="compare"
+          onPress={() => navigate('/compare')}
+          hint="Opens the compare screen. Player versus player pairing lands with the compare cards."
+          stretch
         />
-      ) : null}
-      <Text style={styles.chipMetaValue} numberOfLines={1}>
-        {name ?? 'Unranked'}
-      </Text>
+        <RefreshControl
+          onRefresh={onRefresh}
+          ageSeconds={player.age}
+          isRefreshing={isRefreshing}
+        />
+      </View>
+    </View>
+  );
+
+  const sections = (
+    <>
+      <RushedAnalysisCard verdict={verdict} townHallLevel={player.townHallLevel} />
+      <UpgradeNextCard verdict={verdict} />
+      <HeroCard heroes={player.heroes} />
+      <AchievementsCard achievements={player.achievements} />
+      <ProgressionCard player={player} />
+    </>
+  );
+
+  return twoColumns ? (
+    <View style={styles.columns}>
+      <View style={styles.identityColumn}>{identityCard}</View>
+      <View style={styles.analysisColumn}>{sections}</View>
+    </View>
+  ) : (
+    <View style={styles.stackedColumn}>
+      {identityCard}
+      <View style={styles.sectionStack}>{sections}</View>
     </View>
   );
 }
 
-/** One season chip; a counter the payload omitted renders nothing at all. */
-function MetaChip({ label, present }: { label: string; present: boolean }) {
-  const { theme } = useTheme();
-  const styles = useMemo(() => createChipStyles(theme), [theme]);
-
-  if (!present) return null;
-  return (
-    <View style={styles.chipMeta}>
-      <Text style={styles.chipMetaText} numberOfLines={1}>
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-// The role chip's tone: the leader takes the gold reserve, the senior
-// roles take the info tone, a plain member stays quiet. The classes ride
-// the styles object so the mapping stays style-only.
-function roleChipStyle(
-  styles: ReturnType<typeof createStyles>,
-  role: string,
-) {
-  if (role === 'leader') return styles.chipGold;
-  if (role === 'coLeader' || role === 'admin') return styles.chipInfo;
-  return styles.chipQuiet;
-}
-
-function roleChipTextStyle(
-  styles: ReturnType<typeof createStyles>,
-  role: string,
-) {
-  if (role === 'leader') return styles.chipGoldText;
-  if (role === 'coLeader' || role === 'admin') return styles.chipInfoText;
-  return styles.chipQuietText;
+/** One header stat cell: a label, a value, and (the league cell only) the
+ * API icon that pairs with the value. */
+interface HeaderStat {
+  label: string;
+  value: string;
+  iconUri?: string;
 }
 
 // ---------- rushed analysis card (T-M2-2, FR-07, SR-14) ----------
@@ -623,30 +584,41 @@ interface HeroCardProps {
 // fetched: no second call, no second loading state, the fetch is the
 // shell's own (SR-15).
 //
-// Rows group by village under quiet headers (the grouping rule the
+// The hero cards follow the owner's prototype layout: one compact card per
+// hero, the bundled unit icon anchoring it (lib/icon-map.ts resolves the
+// hero's picture, placeholder.svg when the game ships content the map has
+// not met), the name with a gold MAX chip beside it when the hero is
+// maxed, the "level X of Y" line under the name, and the level rail
+// right-aligned in a fixed-width column with the pair under it — the
+// long-grind reading at a glance. The cards wrap in measured rows of at
+// least 240 px, the prototype's heroes grid.
+//
+// Cards group by village under quiet headers (the grouping rule the
 // achievements card established, now shared through lib/village.ts): home
-// heroes and builder-base heroes never mix, groups keep
-// first-appearance order, rows keep API order. One row per hero: the
-// bundled unit icon anchors the name line (lib/icon-map.ts resolves the
-// hero's picture, placeholder.svg when the game ships content the map
-// has not met), the name and the level/maximum pair share the line beside it
-// (heroes carry no requirement text the way achievements do, so the line
-// has room), the LevelRail under it, and the equipment the API nests on
-// the hero entry as quiet indented rows below with their own smaller
-// icons — equipment renders under the hero it is equipped
-// on, the only place the payload exposes it per hero; the flat
-// heroEquipment inventory belongs to the progression grid (FR-16).
+// heroes and builder-base heroes never mix, groups keep first-appearance
+// order, cards keep API order. The equipment the API nests on the hero
+// entry renders as quiet rows under the hero's name line with their own
+// smaller icons — equipment renders under the hero it is equipped on, the
+// only place the payload exposes it per hero; the flat heroEquipment
+// inventory belongs to the progression grid (FR-16).
 //
-// A maxed hero mutes to the ledger treatment the completed achievement
-// row takes (secondary name, muted pair), so the heroes still climbing
-// draw the eye; on a maxed account the card reads as a quiet ledger. A
-// hero with a null maxLevel (brand-new content the API has not caught up
-// to, SR-14's shape) renders its level alone with no rail and no pair,
-// and the card footnotes the count instead of inventing a maximum.
+// A maxed hero mutes its text to the ledger treatment the completed
+// achievement row takes (secondary name, muted sub-line), but the MAX chip
+// stays gold and the icon stays at full strength: the chip is the verdict,
+// the picture is identity, and dimming either would read as broken, not
+// quiet. A hero with a null maxLevel (brand-new content the API has not
+// caught up to, SR-14's shape) renders its level alone with no rail, and
+// the card footnotes the count instead of inventing a maximum.
 //
-// Rows key on village-name-index, the same stable identity the
+// Cards key on village-name-index, the same stable identity the
 // achievement rows key on (STD-18): the payload could carry duplicate
 // names, and the name alone is not a stable identity.
+
+// The hero card's minimum width and the grid's gap: the prototype's
+// minmax(240px, 1fr) heroes grid.
+const HERO_CARD_MIN_WIDTH = 240;
+const HERO_CARD_GAP = 10;
+
 function HeroCard({ heroes }: HeroCardProps) {
   const { theme } = useTheme();
   const base = useMemo(() => createBaseStyles(theme), [theme]);
@@ -665,6 +637,11 @@ function HeroCard({ heroes }: HeroCardProps) {
   const maxedCount = heroes.filter((hero) => heroProgress(hero).isMaxed).length;
   const withoutMaxCount = heroes.filter((hero) => hero.maxLevel === null).length;
 
+  // The header's count line, the prototype's reading: total levels banked
+  // against the total ceiling, with the maxed count beside it.
+  const totalLevels = heroes.reduce((sum, hero) => sum + hero.level, 0);
+  const totalCeiling = heroes.reduce((sum, hero) => sum + (hero.maxLevel ?? 0), 0);
+
   return (
     <View
       style={[base.panelRaised, styles.heroCard]}
@@ -673,7 +650,7 @@ function HeroCard({ heroes }: HeroCardProps) {
       <View style={styles.heroHeader}>
         <Text style={base.title}>Heroes</Text>
         <Text style={styles.heroCount}>
-          {formatProgressPair(maxedCount, heroes.length)} maxed
+          {`${totalLevels} of ${totalCeiling} total levels \u00B7 ${formatProgressPair(maxedCount, heroes.length)} maxed`}
         </Text>
       </View>
 
@@ -681,14 +658,7 @@ function HeroCard({ heroes }: HeroCardProps) {
         <View key={group.village} style={styles.heroGroup}>
           {groupIndex > 0 ? <View style={styles.heroDivider} aria-hidden /> : null}
           <Text style={styles.heroGroupLabel}>{group.label}</Text>
-          <View style={styles.heroRows}>
-            {group.rows.map((hero, index) => (
-              <HeroRow
-                key={`${group.village}-${hero.name}-${index}`}
-                hero={hero}
-              />
-            ))}
-          </View>
+          <HeroGrid heroes={group.rows} village={group.village} />
         </View>
       ))}
 
@@ -703,17 +673,68 @@ function HeroCard({ heroes }: HeroCardProps) {
   );
 }
 
-interface HeroRowProps {
-  hero: NonNullable<PlayerResponse['heroes']>[number];
+/** One village group's hero grid: measures its own width and deals the
+ * cards even 240 px-plus columns, the prototype's auto-fit grid read
+ * through onLayout (the breakpoints helper cannot see a flex column's
+ * inner width). */
+function HeroGrid({
+  heroes,
+  village,
+}: {
+  heroes: NonNullable<PlayerResponse['heroes']>;
+  village: string;
+}) {
+  const [width, setWidth] = useState(0);
+
+  const columns = width > 0
+    ? Math.max(1, Math.floor((width + HERO_CARD_GAP) / (HERO_CARD_MIN_WIDTH + HERO_CARD_GAP)))
+    : 1;
+  // The exact basis: the measured width less the gaps, split evenly, so
+  // the last card in a row never wraps early on rounding.
+  const basis = width > 0
+    ? Math.floor((width - (columns - 1) * HERO_CARD_GAP) / columns)
+    : null;
+
+  return (
+    <View
+      style={heroGridStyle}
+      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+    >
+      {heroes.map((hero, index) => (
+        <HeroUnit
+          key={`${village}-${hero.name}-${index}`}
+          hero={hero}
+          basis={basis}
+        />
+      ))}
+    </View>
+  );
 }
 
-function HeroRow({ hero }: HeroRowProps) {
+// The hero grid's own shape is theme-free (a wrapping row with the grid's
+// gap), so it is one static style sheet, not a per-theme one.
+const heroGridStyle = StyleSheet.create({
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: HERO_CARD_GAP,
+  },
+}).grid;
+
+interface HeroUnitProps {
+  hero: NonNullable<PlayerResponse['heroes']>[number];
+  /** The measured column width the card takes, or null before the grid
+   * has measured itself (the card then falls back to the full row). */
+  basis: number | null;
+}
+
+function HeroUnit({ hero, basis }: HeroUnitProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const progress = heroProgress(hero);
 
-  // The row's own label: the name with the level/maximum pair (and the
+  // The card's own label: the name with the level/maximum pair (and the
   // maxed verdict when it holds). The rail adds its fill percent; the
   // equipment rows carry their own labels.
   const rowLabel = progress.hasMax
@@ -721,33 +742,40 @@ function HeroRow({ hero }: HeroRowProps) {
     : `${hero.name}, level ${hero.level}`;
 
   return (
-    <View style={styles.heroRow} accessibilityLabel={rowLabel}>
-      <View style={styles.heroLine}>
-        <UnitIcon kind="hero" name={hero.name} />
-        <View style={styles.heroText}>
+    <View
+      style={[styles.heroUnit, basis !== null ? { flexBasis: basis } : null]}
+      accessibilityLabel={rowLabel}
+    >
+      <UnitIcon kind="hero" name={hero.name} />
+      <View style={styles.heroUnitText}>
+        <View style={styles.heroNameRow}>
           <Text style={progress.isMaxed ? styles.heroNameDone : styles.heroName} numberOfLines={1}>
             {hero.name}
           </Text>
-          <Text style={progress.isMaxed ? styles.heroPairDone : styles.heroPair} numberOfLines={1}>
-            {progress.hasMax ? formatLevelPair(hero.level, progress.maxLevel) : `Lv ${hero.level}`}
-          </Text>
+          {progress.isMaxed ? (
+            <View style={styles.chipGold}>
+              <Text style={styles.chipGoldText}>MAX</Text>
+            </View>
+          ) : null}
         </View>
-      </View>
-      {progress.hasMax ? <LevelRail fill={progress.fill} /> : null}
-      {hero.equipment ? (
-        <View style={styles.heroEquipment}>
-          {hero.equipment.map((item, index) => (
-            <View
-              key={`${item.name}-${index}`}
-              style={styles.equipmentRow}
-              accessibilityLabel={
-                item.maxLevel !== null
-                  ? `${item.name}, level ${item.level} of ${item.maxLevel}`
-                  : `${item.name}, level ${item.level}`
-              }
-            >
-              <UnitIcon kind="equipment" name={item.name} size="sm" />
-              <View style={styles.equipmentText}>
+        <Text style={styles.heroSub} numberOfLines={1}>
+          {progress.hasMax
+            ? `level ${hero.level} of ${progress.maxLevel}`
+            : `level ${hero.level}`}
+        </Text>
+        {hero.equipment ? (
+          <View style={styles.heroEquipment}>
+            {hero.equipment.map((item, index) => (
+              <View
+                key={`${item.name}-${index}`}
+                style={styles.equipmentRow}
+                accessibilityLabel={
+                  item.maxLevel !== null
+                    ? `${item.name}, level ${item.level} of ${item.maxLevel}`
+                    : `${item.name}, level ${item.level}`
+                }
+              >
+                <UnitIcon kind="equipment" name={item.name} size="sm" />
                 <Text style={styles.equipmentName} numberOfLines={1}>
                   {item.name}
                 </Text>
@@ -757,10 +785,22 @@ function HeroRow({ hero }: HeroRowProps) {
                     : `Lv ${item.level}`}
                 </Text>
               </View>
-            </View>
-          ))}
+            ))}
+          </View>
+        ) : null}
+      </View>
+      {progress.hasMax ? (
+        <View style={styles.heroRailColumn}>
+          <LevelRail fill={progress.fill} />
+          <Text style={styles.heroRailPair}>
+            {formatLevelPair(hero.level, progress.maxLevel)}
+          </Text>
         </View>
-      ) : null}
+      ) : (
+        // The rail column keeps its width even without a maximum, so a
+        // null-max hero does not reflow its siblings' text.
+        <View style={styles.heroRailColumn} aria-hidden />
+      )}
     </View>
   );
 }
@@ -779,12 +819,18 @@ interface AchievementsCardProps {
 // the player response the shell already fetched: no second call, no second
 // loading state, the fetch is the shell's own (SR-15).
 //
+// The rows follow the owner's prototype layout: a headline with the name,
+// the star trio (gold for earned tiers, quiet for the open ones), and the
+// value/target pair closing the line; the rail full width under it; the
+// requirement text with the stars-earned count under that. Stars are the
+// API's count, never derived from the fill.
+//
 // The rows group by village under quiet headers: the live payload
 // interleaves home, builder base, and clan capital rows, and a flat render
 // would mix them. A completed row (all three stars in) mutes to the quiet
-// treatment — secondary name, no requirement text, no open star — so the
-// in-progress rows draw the eye; on a maxed account the card reads as a
-// quiet ledger, which is the honest reading of a finished list.
+// treatment — secondary name, no requirement text — so the in-progress
+// rows draw the eye; on a maxed account the card reads as a quiet ledger,
+// which is the honest reading of a finished list.
 //
 // Rows key on village-name-index: the live payload carries duplicate names
 // (one locked "Keep Your Account Safe!" beside the completed one), so the
@@ -846,35 +892,49 @@ interface AchievementRowProps {
 function AchievementRow({ achievement }: AchievementRowProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const c = theme.colors;
 
   const progress = achievementProgress(achievement);
   const isComplete = progress.isComplete;
 
-  // The completed row's quiet treatment: the name demoted to secondary, the
-  // requirement line dropped (its target is met, the row is a record, not a
-  // todo), and the stars all gold with no open marker beside them.
+  // The completed row's quiet treatment: the name demoted to secondary and
+  // the requirement line dropped (its target is met, the row is a record,
+  // not a todo); the stars stay in the headline, all gold, because the
+  // rating is the row's verdict.
   const rowLabel = isComplete
     ? `${achievement.name}, complete, ${progress.stars.earned} of ${progress.stars.total} stars, ${formatProgressPair(achievement.value, achievement.target)}`
     : `${achievement.name}, ${achievement.info}, ${formatProgressPair(achievement.value, achievement.target)}, ${progress.stars.earned} of ${progress.stars.total} stars`;
 
   return (
     <View style={styles.achievementRow} accessibilityLabel={rowLabel}>
-      <View style={styles.achievementText}>
+      {/* The headline, the prototype's layout: the name flexes, the star
+          trio rates it, the value/target pair closes the line. */}
+      <View style={styles.achievementTop}>
         <Text style={isComplete ? styles.achievementNameDone : styles.achievementName} numberOfLines={1}>
           {achievement.name}
         </Text>
-        {!isComplete ? (
-          <Text style={styles.achievementInfo} numberOfLines={2}>
-            {achievement.info}
-          </Text>
-        ) : null}
-      </View>
-      <View style={styles.achievementRailWrap}>
+        <View style={styles.achievementStars} aria-hidden>
+          {Array.from({ length: progress.stars.total }, (_, index) => (
+            <Glyph
+              key={index}
+              name="star"
+              color={index < progress.stars.earned ? c.accent : c.panelBorderStrong}
+            />
+          ))}
+        </View>
         <Text style={isComplete ? styles.achievementPairDone : styles.achievementPair}>
           {formatProgressPair(achievement.value, achievement.target)}
         </Text>
-        <ProgressRail progress={progress} />
       </View>
+      <ProgressRail progress={progress} showStars={false} />
+      {!isComplete ? (
+        <Text style={styles.achievementInfo} numberOfLines={2}>
+          {achievement.info}
+          {progress.stars.earned > 0
+            ? ` \u00B7 ${progress.stars.earned} of ${progress.stars.total} stars earned`
+            : ''}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -960,27 +1020,26 @@ function PlayerLoading({ busyRetrying }: PlayerLoadingProps) {
       accessibilityRole="progressbar"
       accessibilityLabel="Loading player"
     >
-      <View style={styles.identityRow}>
-        <View style={styles.avatarSkeleton} aria-hidden />
-        <View style={styles.identityText}>
-          <View style={styles.nameRow}>
-            <SkeletonBlock width={SKELETON_NAME_WIDTH} height={theme.fontSize.xl} pulse={pulse} />
-            <View style={styles.chipRow}>
-              {Array.from({ length: 3 }, (_, index) => (
-                <SkeletonBlock key={index} width={56} height={20} pulse={pulse} />
-              ))}
-            </View>
+      {/* The header the data lands into: the name line, the tag + clan
+          line, then the four stat cells the grid draws. */}
+      <View style={styles.identityText}>
+        <SkeletonBlock width={SKELETON_NAME_WIDTH} height={theme.fontSize.xl} pulse={pulse} />
+        <SkeletonBlock width={SKELETON_META_WIDTH} height={theme.fontSize.sm} pulse={pulse} />
+      </View>
+      <View style={styles.statDivider} aria-hidden />
+      <View style={styles.statGrid}>
+        {Array.from({ length: SKELETON_STAT_CELLS }, (_, index) => (
+          <View key={index} style={[styles.statCell, styles.statCellQuarter]}>
+            <SkeletonBlock width={64} height={theme.fontSize.xs} pulse={pulse} />
+            <SkeletonBlock width="80%" height={theme.fontSize.sm} pulse={pulse} />
           </View>
-          <View style={styles.metaRow}>
-            {Array.from({ length: 4 }, (_, index) => (
-              <SkeletonBlock key={index} width={92} height={20} pulse={pulse} />
-            ))}
-          </View>
-        </View>
-        <View style={styles.actionsColumn}>
-          <SkeletonBlock width={150} height={36} radiusStep="pill" pulse={pulse} />
-          <SkeletonBlock width={110} height={36} radiusStep="pill" pulse={pulse} />
-        </View>
+        ))}
+      </View>
+      <View style={styles.statDivider} aria-hidden />
+      {/* The actions block: the compare pill above the refresh row. */}
+      <View style={styles.cardActions}>
+        <SkeletonBlock width={170} height={36} radiusStep="pill" pulse={pulse} />
+        <SkeletonBlock width={130} height={28} radiusStep="pill" pulse={pulse} />
       </View>
       <Text style={[base.caption, styles.loadingCaption]}>
         {busyRetrying
@@ -999,30 +1058,20 @@ function PlayerLoading({ busyRetrying }: PlayerLoadingProps) {
     </View>
   );
 
-  return (
-    <View style={styles.detailWrap}>
+  return twoColumns ? (
+    <View style={styles.columns} aria-hidden>
+      {/* The identity column holds the card skeleton; the analysis column
+          holds one block per section, the five the success state draws. */}
+      <View style={styles.identityColumn}>{identityCard}</View>
+      <View style={styles.analysisColumn}>
+        {Array.from({ length: SKELETON_SECTIONS }, (_, index) => sectionBlock(`sk-${index}`))}
+      </View>
+    </View>
+  ) : (
+    <View style={styles.stackedColumn} aria-hidden>
       {identityCard}
-      <View style={styles.columnStack} aria-hidden>
-        {twoColumns ? (
-          <>
-            {/* The verdict grid: rushed beside upgrade next. */}
-            <View style={styles.gridRow}>
-              <View style={styles.gridColumn}>{sectionBlock('sk-rushed')}</View>
-              <View style={styles.gridColumn}>{sectionBlock('sk-upgrade')}</View>
-            </View>
-            {/* The ledgers grid: heroes above achievements in one column,
-                the tall progression grid in the other. */}
-            <View style={styles.gridRow}>
-              <View style={styles.gridColumn}>
-                {sectionBlock('sk-heroes')}
-                {sectionBlock('sk-achievements')}
-              </View>
-              <View style={styles.gridColumn}>{sectionBlock('sk-progression')}</View>
-            </View>
-          </>
-        ) : (
-          Array.from({ length: SKELETON_SECTIONS }, (_, index) => sectionBlock(`sk-${index}`))
-        )}
+      <View style={styles.sectionStack}>
+        {Array.from({ length: SKELETON_SECTIONS }, (_, index) => sectionBlock(`sk-${index}`))}
       </View>
     </View>
   );
@@ -1116,41 +1165,6 @@ function PlayerError({ error, onRetry, onLookup, isRetrying, tag }: PlayerErrorP
 
 // ---------- styles ----------
 
-// The identity chips' own small sheet: LeagueChip and MetaChip are components
-// (STD-13: they own their styles), but they do not need the whole screen
-// sheet to draw one chip, so they build this lightweight one instead.
-function createChipStyles(t: ReturnType<typeof useTheme>['theme']) {
-  const c = t.colors;
-  return StyleSheet.create({
-    chipMeta: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      columnGap: t.spacing[1],
-      backgroundColor: c.fillQuiet,
-      borderRadius: t.radius[1],
-      paddingHorizontal: t.spacing[2],
-      paddingVertical: 3,
-    },
-    chipMetaText: {
-      fontFamily: t.fontFamily.sans,
-      fontSize: t.fontSize.xs,
-      fontWeight: t.fontWeight.regular,
-      color: c.textSecondary,
-      fontVariant: ['tabular-nums'],
-    },
-    chipMetaValue: {
-      fontFamily: t.fontFamily.sans,
-      fontSize: t.fontSize.xs,
-      fontWeight: t.fontWeight.semibold,
-      color: c.textPrimary,
-    },
-    leagueIcon: {
-      width: LEAGUE_ICON_SLOT,
-      height: LEAGUE_ICON_SLOT,
-    },
-  });
-}
-
 function createStyles(t: ReturnType<typeof useTheme>['theme']) {
   const c = t.colors;
   return StyleSheet.create({
@@ -1168,103 +1182,134 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       gap: t.spacing[5],
     },
 
-    // The prototype layout: the full-width identity card above, then the
-    // analysis in two two-column grids (stacked below 1024). The wrap and
-    // the column stack carry the vertical rhythm.
-    detailWrap: {
-      gap: t.spacing[4],
-    },
-    columnStack: {
-      gap: t.spacing[4],
-    },
-    gridRow: {
+    // The two-column rule (07 section 3): identity + analysis from 1024 px
+    // up. The columns top-align; the identity card is a fixed shape and the
+    // analysis sections carry the variable content, so neither stretches to
+    // match the other's height.
+    columns: {
       flexDirection: 'row',
       alignItems: 'flex-start',
-      columnGap: t.spacing[4],
+      columnGap: t.spacing[5],
     },
-    gridColumn: {
-      flexBasis: '48%',
+    // The identity card keeps about a third of the row and never grows into
+    // the analysis column's room; it may shrink a little on the narrower
+    // desktop viewports, where its stat grid already wraps two per row.
+    identityColumn: {
+      flexBasis: '36%',
+      flexGrow: 0,
+      flexShrink: 1,
+      minWidth: 0,
+    },
+    analysisColumn: {
+      flexBasis: '58%',
       flexGrow: 1,
       flexShrink: 1,
       minWidth: 0,
       gap: t.spacing[4],
     },
-
-    // The identity card: avatar, text block, actions column in one row that
-    // wraps when the window cannot hold it.
-    identityCard: {
+    stackedColumn: {
+      gap: t.spacing[5],
+    },
+    sectionStack: {
       gap: t.spacing[4],
     },
-    identityRow: {
+
+    // The identity card: name, the tag + clan line, a hairline, the stat
+    // grid, a second hairline, then the actions block. The card carries the
+    // panelRaised chrome the clan detail card uses, so the site's two
+    // detail headers read as one family.
+    identityCard: {
+      gap: t.spacing[5],
+    },
+    identityText: {
+      gap: t.spacing[1],
+    },
+    identityMeta: {
       flexDirection: 'row',
-      alignItems: 'flex-start',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      columnGap: t.spacing[2],
+      rowGap: t.spacing[1],
+    },
+    tagLine: {
+      fontFamily: t.fontFamily.mono,
+      fontSize: t.fontSize.sm,
+      color: c.textMuted,
+    },
+    metaDot: {
+      fontSize: t.fontSize.xs,
+      color: c.hairline,
+    },
+    clanLine: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.sm,
+      color: c.textMuted,
+    },
+    statDivider: {
+      height: 1,
+      backgroundColor: c.hairline,
+    },
+    // The stat grid, the same wrap the clan detail card renders: cells flex
+    // within their row so the grid stays even at any width.
+    statGrid: {
+      flexDirection: 'row',
       flexWrap: 'wrap',
       columnGap: t.spacing[4],
       rowGap: t.spacing[4],
     },
-    avatar: {
-      width: AVATAR_SIZE,
-      height: AVATAR_SIZE,
-      borderRadius: AVATAR_SIZE / 2,
-      backgroundColor: c.accentSoft,
-      borderWidth: 2,
-      borderColor: c.accent,
-      alignItems: 'center',
-      justifyContent: 'center',
+    statCell: {
+      flexGrow: 1,
+      flexShrink: 1,
+      gap: t.spacing[1],
     },
-    avatarText: {
+    // The basis sits under a half row so the wrap lands on even columns
+    // while flexGrow fills each line to the edges; the quarter basis is the
+    // clan card's four-up form, used only when the card runs full width.
+    statCellHalf: {
+      flexBasis: '46%',
+    },
+    statCellQuarter: {
+      flexBasis: '22%',
+    },
+    statLabel: {
       fontFamily: t.fontFamily.sans,
-      fontSize: t.fontSize.xl,
-      fontWeight: t.fontWeight.bold,
-      color: c.accent,
+      fontSize: t.fontSize.xs,
+      fontWeight: t.fontWeight.medium,
+      color: c.textMuted,
+      textTransform: 'uppercase',
+      letterSpacing: LABEL_TRACKING,
     },
-    avatarSkeleton: {
-      width: AVATAR_SIZE,
-      height: AVATAR_SIZE,
-      borderRadius: AVATAR_SIZE / 2,
-      backgroundColor: c.fillQuiet,
-    },
-    identityText: {
-      flex: 1,
-      minWidth: 240,
-      gap: t.spacing[3],
-    },
-    nameRow: {
+    statValueRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      flexWrap: 'wrap',
       columnGap: t.spacing[2],
-      rowGap: t.spacing[2],
+      minWidth: 0,
     },
-    chipRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      flexWrap: 'wrap',
-      columnGap: t.spacing[2],
-      rowGap: t.spacing[2],
+    statValue: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.sm,
+      fontWeight: t.fontWeight.semibold,
+      color: c.textPrimary,
+      fontVariant: ['tabular-nums'],
     },
-    metaRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      flexWrap: 'wrap',
-      columnGap: t.spacing[2],
-      rowGap: t.spacing[2],
+    // The league icon slot (07 section 7): fixed 24 px box.
+    leagueIcon: {
+      width: LEAGUE_ICON_SLOT,
+      height: LEAGUE_ICON_SLOT,
     },
-    // The actions column: the compare action and the refresh control,
-    // stacked on the card's right edge; wraps under the text block on
-    // narrow windows.
-    actionsColumn: {
-      alignItems: 'flex-end',
+    // The actions block at the card's foot (the owner's prototype
+    // placement): the compare pill above the refresh control, both on the
+    // card whose data they act on.
+    cardActions: {
       gap: t.spacing[2],
     },
     loadingCaption: {
       marginTop: t.spacing[1],
     },
 
-    // ---------- chips (the identity card's vocabulary) ----------
-    // The TH chip takes the gold reserve (the badge's one glance fact); the
-    // tag chip stays quiet mono; the role chip tones by seniority; the
-    // season chips are the quiet meta row.
+    // ---------- chips (the cards' vocabulary) ----------
+    // The MAX chip takes the gold reserve (the badge's one glance fact);
+    // the band and deficit chips tone by verdict.
     chipGold: {
       backgroundColor: c.accentSoft,
       borderRadius: t.radius[1],
@@ -1277,19 +1322,6 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontWeight: t.fontWeight.semibold,
       color: c.accent,
       fontVariant: ['tabular-nums'],
-    },
-    chipTag: {
-      borderWidth: 1,
-      borderColor: c.panelBorder,
-      borderRadius: t.radius[1],
-      paddingHorizontal: t.spacing[2],
-      paddingVertical: 2,
-    },
-    chipTagText: {
-      fontFamily: t.fontFamily.mono,
-      fontSize: t.fontSize.xs,
-      fontWeight: t.fontWeight.regular,
-      color: c.textMuted,
     },
     chipInfo: {
       backgroundColor: c.infoSoft,
@@ -1490,33 +1522,30 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       textTransform: 'uppercase',
       letterSpacing: LABEL_TRACKING,
     },
-    heroRows: {
-      gap: t.spacing[4],
-    },
-    // One row: the icon + name line on top, the level rail full width
-    // under it, the equipment rows indented below.
-    heroRow: {
-      gap: t.spacing[2],
-    },
-    // The name line: the hero's unit icon anchors it (32 px slot, 07
-    // section 4), the text block takes the remaining width. Center-aligned
-    // so the icon sits level with the name whatever the pair's digits.
-    heroLine: {
+    // One hero card (the prototype's layout): the icon anchoring the left
+    // edge, the name + sub-line + equipment block filling the middle, and
+    // the rail column pinned right with the pair under it.
+    heroUnit: {
       flexDirection: 'row',
       alignItems: 'center',
       columnGap: t.spacing[3],
+      backgroundColor: c.fillQuiet,
+      borderWidth: 1,
+      borderColor: c.panelBorder,
+      borderRadius: t.radius[2],
+      paddingHorizontal: t.spacing[3],
+      paddingVertical: t.spacing[2],
       minWidth: 0,
     },
-    // The name and the pair share the line beside the icon (heroes carry
-    // no requirement text the way achievements do, so the line has room);
-    // the block flexes so the pair right-aligns to the card's edge, not
-    // the icon's, and the tabular figures stack down the card.
-    heroText: {
-      flexDirection: 'row',
-      alignItems: 'baseline',
-      justifyContent: 'space-between',
-      columnGap: t.spacing[3],
+    heroUnitText: {
       flex: 1,
+      minWidth: 0,
+      gap: t.spacing[1],
+    },
+    heroNameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      columnGap: t.spacing[2],
       minWidth: 0,
     },
     heroName: {
@@ -1525,57 +1554,45 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontWeight: t.fontWeight.semibold,
       color: c.textPrimary,
     },
-    // The maxed row's demotion: secondary ink, the ledger treatment the
-    // completed achievement row takes.
+    // The maxed card's text demotion: secondary ink, the ledger treatment
+    // the completed achievement row takes. The MAX chip beside the name
+    // stays gold and the icon keeps its full strength — the chip is the
+    // verdict, the picture is identity.
     heroNameDone: {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.sm,
       fontWeight: t.fontWeight.regular,
       color: c.textSecondary,
     },
-    heroPair: {
-      fontFamily: t.fontFamily.sans,
-      fontSize: t.fontSize.xs,
-      fontWeight: t.fontWeight.medium,
-      color: c.textSecondary,
-      fontVariant: ['tabular-nums'],
-    },
-    heroPairDone: {
+    // The "level X of Y" sub-line under the name.
+    heroSub: {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.xs,
       fontWeight: t.fontWeight.regular,
       color: c.textMuted,
       fontVariant: ['tabular-nums'],
     },
-    // The equipment block: indented one step so the rows read as
-    // belonging to the hero above them, never as peers of the hero rows.
+    // The equipment block: quiet rows under the hero's name line with
+    // their own smaller icons, so equipment reads as belonging to its
+    // hero without breaking the card's single-glance shape.
     heroEquipment: {
-      paddingLeft: t.spacing[4],
       gap: t.spacing[1],
+      marginTop: t.spacing[1],
     },
     // The equipment row: the small icon slot (20 px, the quiet variant)
-    // beside the name + pair line, center-aligned the way the hero line
-    // keeps, one scale down.
+    // beside the name, the pair right-aligned to the card's rail edge.
     equipmentRow: {
       flexDirection: 'row',
       alignItems: 'center',
       columnGap: t.spacing[2],
       minWidth: 0,
     },
-    // The name and pair share the remaining line; the pair right-aligns
-    // to the same card edge the hero pairs stack against.
-    equipmentText: {
-      flexDirection: 'row',
-      alignItems: 'baseline',
-      justifyContent: 'space-between',
-      columnGap: t.spacing[2],
-      flex: 1,
-      minWidth: 0,
-    },
     // Equipment rows keep the quiet treatment always (secondary name,
     // muted pair): they are inventory detail under their hero, and the
     // pair itself carries the maxed reading ("27 / 27").
     equipmentName: {
+      flex: 1,
+      minWidth: 0,
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.xs,
       fontWeight: t.fontWeight.regular,
@@ -1586,6 +1603,22 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontSize: t.fontSize.xs,
       fontWeight: t.fontWeight.regular,
       color: c.textMuted,
+      fontVariant: ['tabular-nums'],
+    },
+    // The rail column (the prototype's fixed 96 px): the level rail with
+    // the pair under it, so the long-grind reading sits at the card's
+    // right edge whatever the name's width.
+    heroRailColumn: {
+      width: 96,
+      gap: t.spacing[1],
+      flexShrink: 0,
+    },
+    heroRailPair: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.xs,
+      fontWeight: t.fontWeight.regular,
+      color: c.textMuted,
+      textAlign: 'right',
       fontVariant: ['tabular-nums'],
     },
     // The quiet footnote for heroes without an exposed maximum.
@@ -1639,17 +1672,21 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     achievementsRows: {
       gap: t.spacing[4],
     },
-    // One row: the text block on top, the pair + rail under it. The rail
-    // pair right-aligns with the rail's track so the numbers read as the
-    // bar's own scale.
+    // One row (the prototype's layout): the headline with the name, the
+    // star trio, and the pair on one line; the rail full width under it;
+    // the requirement text under that.
     achievementRow: {
       gap: t.spacing[2],
     },
-    achievementText: {
-      gap: t.spacing[1],
+    achievementTop: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      columnGap: t.spacing[2],
       minWidth: 0,
     },
     achievementName: {
+      flex: 1,
+      minWidth: 0,
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.sm,
       fontWeight: t.fontWeight.semibold,
@@ -1657,10 +1694,19 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     },
     // The completed row's demotion: secondary ink, the ledger treatment.
     achievementNameDone: {
+      flex: 1,
+      minWidth: 0,
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.sm,
       fontWeight: t.fontWeight.regular,
       color: c.textSecondary,
+    },
+    // The star trio: the rating glyphs from the kit's Glyph set, gold for
+    // earned tiers, the strong border tone for the open ones.
+    achievementStars: {
+      flexDirection: 'row',
+      columnGap: 2,
+      flexShrink: 0,
     },
     achievementInfo: {
       fontFamily: t.fontFamily.sans,
@@ -1668,9 +1714,6 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontWeight: t.fontWeight.regular,
       lineHeight: Math.round(t.lineHeight.normal * t.fontSize.xs),
       color: c.textMuted,
-    },
-    achievementRailWrap: {
-      gap: t.spacing[2],
     },
     // The value/target pair: tabular figures so the columns of pairs align
     // down the card; the size is the pair the roster's number cells keep.

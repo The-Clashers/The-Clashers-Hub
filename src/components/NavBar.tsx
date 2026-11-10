@@ -1,8 +1,10 @@
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { useLocation, useNavigate } from 'react-router';
 import { useTheme, breakpointFor, glassSurfaceFilter } from '../theme';
 import { ThemeToggle } from './ThemeToggle';
+import Glyph from './Glyph';
 import LookupSearch from './LookupSearch';
 
 // The nav bar (07 section 3, the owner's layout): a thin fixed row like a
@@ -43,10 +45,13 @@ interface NavLinkSpec {
   route: string;
   /** Active when the pathname is the route itself or a detail under it. */
   matchPrefixes: ReadonlyArray<string>;
+  /** The leading glyph the link carries (the home mark); most links stay
+   * text-only. */
+  icon?: 'home';
 }
 
 const NAV_LINKS: ReadonlyArray<NavLinkSpec> = [
-  { label: 'Home', route: '/', matchPrefixes: ['/'] },
+  { label: 'Home', route: '/', matchPrefixes: ['/'], icon: 'home' },
   { label: 'Players', route: '/players', matchPrefixes: ['/players', '/player/'] },
   { label: 'Clans', route: '/clans', matchPrefixes: ['/clans', '/clan/'] },
   { label: 'Contributors', route: '/contributors', matchPrefixes: ['/contributors'] },
@@ -76,7 +81,7 @@ export default function NavBar() {
       >
         <View style={styles.inner}>
           <View style={styles.row}>
-            <BrandMark styles={styles} onPress={() => navigate('/')} />
+            <BrandMark styles={styles} onPress={() => navigate('/')} showMicro={!stacked} />
             {stacked ? null : (
               <View style={styles.lookupWrap}>
                 <LookupSearch variant="bar" />
@@ -111,13 +116,25 @@ export default function NavBar() {
 
 // ---------- brand mark ----------
 
+// The brand shield's box (the prototype's 30 px brand mark) and the mark's
+// own drawing constants.
+const BRAND_SHIELD_SIZE = 30;
+
 function BrandMark({
   styles,
   onPress,
+  showMicro,
 }: {
   styles: ReturnType<typeof createStyles>;
   onPress: () => void;
+  /** Whether the tagline renders under the name: the desktop row has the
+   * height for the two-line lockup, the stacked rows are at their
+   * tightest and keep the name alone (the prototype hides the micro line
+   * on small screens the same way). */
+  showMicro: boolean;
 }) {
+  const { theme } = useTheme();
+
   return (
     <Pressable
       accessibilityRole="link"
@@ -125,13 +142,56 @@ function BrandMark({
       onPress={onPress}
       style={({ pressed }) => [styles.brand, pressed && styles.brandPressed]}
     >
-      <View style={styles.brandDot} />
-      <Text style={styles.brandText} numberOfLines={1}>
-        The Clashers Hub
-      </Text>
+      <BrandShield color={theme.colors} />
+      <View style={styles.brandTextBlock}>
+        <Text style={styles.brandText} numberOfLines={1}>
+          The Clashers Hub
+        </Text>
+        {showMicro ? (
+          <Text style={styles.brandMicro} numberOfLines={1}>
+            clan and player analytics, live and login-free
+          </Text>
+        ) : null}
+      </View>
     </Pressable>
   );
 }
+
+/** The brand shield (the owner's prototype logo, verbatim paths): the
+ * gold-rimmed shield with the filled inner field and the on-accent star,
+ * drawn on react-native-svg the way the Gauge and the glow fields are.
+ * Color comes from the theme tokens, never a hard-coded hex, so the mark
+ * follows the accent through both themes. */
+function BrandShield({ color }: { color: ReturnType<typeof useTheme>['theme']['colors'] }) {
+  return (
+    <Svg
+      viewBox="0 0 24 24"
+      width={BRAND_SHIELD_SIZE}
+      height={BRAND_SHIELD_SIZE}
+      style={brandShieldStyle}
+      aria-hidden
+    >
+      <Path
+        d="M12 1.5l8.5 3.2v6.4c0 5.3-3.6 9.7-8.5 11.6-4.9-1.9-8.5-6.3-8.5-11.6V4.7z"
+        fill="none"
+        stroke={color.accent}
+        strokeWidth={1.6}
+      />
+      <Path
+        d="M12 5.2l5.2 2v4.2c0 3.3-2.2 6-5.2 7.2-3-1.2-5.2-3.9-5.2-7.2V7.2z"
+        fill={color.accent}
+      />
+      <Path
+        d="M12 8.1l1.9 3.9 4.3.6-3.1 3 .7 4.3-3.8-2-3.8 2 .7-4.3-3.1-3 4.3-.6z"
+        fill={color.textOnAccent}
+      />
+    </Svg>
+  );
+}
+
+// The shield never flexes or shrinks beside the brand text (the same
+// flex-none rule the button glyphs keep).
+const brandShieldStyle = { flexShrink: 0 } as const;
 
 // ---------- nav link ----------
 
@@ -143,6 +203,8 @@ interface NavLinkProps {
 }
 
 function NavLink({ spec, active, onPress, styles }: NavLinkProps) {
+  const { theme } = useTheme();
+
   return (
     <Pressable
       accessibilityRole="link"
@@ -155,9 +217,18 @@ function NavLink({ spec, active, onPress, styles }: NavLinkProps) {
         pressed && styles.linkPressed,
       ]}
     >
-      <Text style={[styles.linkText, active && styles.linkTextActive]} numberOfLines={1}>
-        {spec.label}
-      </Text>
+      <View style={styles.linkContent}>
+        {spec.icon ? (
+          <Glyph
+            name={spec.icon}
+            size={14}
+            color={active ? theme.colors.textPrimary : theme.colors.textMuted}
+          />
+        ) : null}
+        <Text style={[styles.linkText, active && styles.linkTextActive]} numberOfLines={1}>
+          {spec.label}
+        </Text>
+      </View>
     </Pressable>
   );
 }
@@ -219,17 +290,26 @@ function createStyles(t: ReturnType<typeof useTheme>['theme'], stacked: boolean)
     brandPressed: {
       opacity: 0.7,
     },
-    brandDot: {
-      width: 10,
-      height: 10,
-      borderRadius: 9999,
-      backgroundColor: c.accent,
+    // The brand's two-line lockup: the name over the tagline, the shield
+    // beside them (the prototype's brand block).
+    brandTextBlock: {
+      minWidth: 0,
+      flexShrink: 1,
     },
     brandText: {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.md,
       fontWeight: t.fontWeight.bold,
       color: c.textPrimary,
+      flexShrink: 1,
+    },
+    // The tagline (the prototype's brand-micro): the caption voice, one
+    // step quieter than the name.
+    brandMicro: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.xs,
+      fontWeight: t.fontWeight.regular,
+      color: c.textMuted,
       flexShrink: 1,
     },
 
@@ -268,6 +348,14 @@ function createStyles(t: ReturnType<typeof useTheme>['theme'], stacked: boolean)
     },
     linkPressed: {
       opacity: 0.7,
+    },
+    // The link's inner row: the glyph (when the link carries one) beside
+    // the label, centered.
+    linkContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      columnGap: t.spacing[1],
+      minWidth: 0,
     },
     linkText: {
       fontFamily: t.fontFamily.sans,

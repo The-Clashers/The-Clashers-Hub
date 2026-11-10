@@ -4,10 +4,14 @@ import { useTheme } from '../theme';
 import PillButton from './PillButton';
 import { cooldownRemainingSeconds, dataAgeHint } from '../lib/refresh';
 
-// The manual refresh control (F-19 / FR-18, 07 section 4): the pill button
-// that re-issues the same GET, the 60 s cooldown that follows each use, and
-// the data-age hint that says out loud when the tier answered from its
-// cache instead of pretending the answer is fresh (06 section 2).
+// The manual refresh control (F-19 / FR-18, 07 section 4): the ghost pill
+// button with the refresh glyph that re-issues the same GET, the 60 s
+// cooldown that follows each use, and the data-age pill that says out loud
+// when the tier answered from its cache instead of pretending the answer
+// is fresh (06 section 2). The age pill is the prototype's cached pill: a
+// quiet pill with the small success dot, the "Fetched just now" /
+// "Cached, Ns ago" line riding in it—the small last-refresh text the
+// owner asked to sit with the button.
 //
 // The control never decides freshness itself. The screen hands it the age
 // the tier injected into the current response and the query's in-flight
@@ -68,10 +72,14 @@ export default function RefreshControl({ onRefresh, ageSeconds, isRefreshing }: 
 
   return (
     <View style={styles.row}>
-      <Text style={styles.hint}>{dataAgeHint(ageSeconds)}</Text>
+      <View style={styles.agePill}>
+        <View style={styles.ageDot} aria-hidden />
+        <Text style={styles.ageText}>{dataAgeHint(ageSeconds)}</Text>
+      </View>
       <PillButton
         label={label}
-        variant="secondary"
+        variant="ghost"
+        icon="refresh"
         onPress={handleRefresh}
         disabled={coolingDown || isRefreshing}
         hint="Sends the same request again. The server cache decides what comes back, and the button waits 60 seconds after each use."
@@ -83,7 +91,7 @@ export default function RefreshControl({ onRefresh, ageSeconds, isRefreshing }: 
 function createStyles(t: ReturnType<typeof useTheme>['theme']) {
   const c = t.colors;
   return StyleSheet.create({
-    // The freshness row: the quiet hint first, the action last, right where
+    // The freshness row: the age pill first, the action last, right where
     // each screen's age line used to sit. Wraps rather than squeezes when
     // a narrow phone runs out of room.
     row: {
@@ -93,14 +101,36 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       flexWrap: 'wrap',
       gap: t.spacing[3],
     },
-    // The same caption treatment the base styles give the screens' quiet
-    // lines, owned here so the component stands alone (STD-13).
-    hint: {
+    // The cached pill (the prototype's .cached-pill): the quiet pill the
+    // last-refresh line rides in, with the small success dot saying the
+    // answer is live through the tier. The pill takes the panel tone and
+    // the hairline border so it reads as chrome, not as a chip with a
+    // verdict.
+    agePill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      columnGap: t.spacing[1],
+      borderRadius: t.radius.pill,
+      borderWidth: 1,
+      borderColor: c.panelBorder,
+      backgroundColor: c.panel,
+      paddingHorizontal: t.spacing[2],
+      paddingVertical: 3,
+    },
+    ageDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: c.success,
+    },
+    // The last-refresh line itself, in the caption voice with tabular
+    // figures so the ticking seconds never jitter the pill's width.
+    ageText: {
       fontFamily: t.fontFamily.sans,
-      fontSize: t.fontSize.sm,
+      fontSize: t.fontSize.xs,
       fontWeight: t.fontWeight.regular,
-      lineHeight: Math.round(t.lineHeight.normal * t.fontSize.sm),
-      color: c.textSecondary,
+      color: c.textMuted,
+      fontVariant: ['tabular-nums'],
     },
   });
 }

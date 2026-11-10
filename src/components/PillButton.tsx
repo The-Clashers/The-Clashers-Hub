@@ -2,13 +2,17 @@ import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
 import { useTheme } from '../theme';
 import { linkEnterActivation } from '../lib/link-activation';
+import Glyph, { type GlyphName } from './Glyph';
 
 // The one pill button (07 section 4). Search, the retry actions, and the
 // footer links were three copies of the same accent pill inside the search
 // screen; this is that button, once. Primary is the gold accent with
 // on-accent ink, secondary is a raised panel with a border for the quieter
-// actions, and the arrow variant renders the trailing " ->" mark the
-// footer-style links carry.
+// actions, ghost is the prototype's transparent pill with the strong border
+// (the refresh button's look), and the arrow variant renders the trailing
+// " ->" mark the footer-style links carry. An optional leading glyph
+// (`icon`) draws the prototype's button marks—the compare arrows, the
+// refresh circle—inside the pill beside the label.
 //
 // The component owns its styles (STD-13): callers pass a label and
 // behavior, never a stylesheet. Focus visibility is the same outline pair
@@ -24,8 +28,13 @@ export interface PillButtonProps {
   /** Button text; doubles as the accessibility label. */
   label: string;
   onPress: () => void;
-  /** Primary (gold) or secondary (raised panel). Defaults to primary. */
-  variant?: 'primary' | 'secondary';
+  /** Primary (gold), secondary (raised panel), or ghost (transparent with
+   * the strong border, the prototype's quiet action). Defaults to
+   * primary. */
+  variant?: 'primary' | 'secondary' | 'ghost';
+  /** A leading UI glyph (the prototype's button marks): drawn inside the
+   * pill before the label, colored the same ink the label takes. */
+  icon?: GlyphName;
   /** ARIA role: buttons act, links navigate. Defaults to 'button'. */
   role?: 'button' | 'link';
   /** Extra instruction for screen readers when the label alone is not enough. */
@@ -44,6 +53,7 @@ export default function PillButton({
   variant = 'primary',
   role = 'button',
   hint,
+  icon,
   arrow = false,
   stretch = false,
   disabled = false,
@@ -51,6 +61,7 @@ export default function PillButton({
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const secondary = variant === 'secondary';
+  const ghost = variant === 'ghost';
 
   return (
     <Pressable
@@ -67,13 +78,20 @@ export default function PillButton({
         styles.button,
         stretch && styles.buttonStretch,
         secondary && styles.buttonSecondary,
-        pressed && styles.buttonPressed,
+        ghost && styles.buttonGhost,
+        pressed && (ghost || secondary ? styles.buttonQuietPressed : styles.buttonPressed),
         disabled && styles.buttonDisabled,
       ]}
     >
-      <Text style={[styles.text, secondary && styles.textSecondary]}>{label}</Text>
+      {icon ? (
+        <Glyph
+          name={icon}
+          color={secondary || ghost ? theme.colors.textPrimary : theme.colors.textOnAccent}
+        />
+      ) : null}
+      <Text style={[styles.text, (secondary || ghost) && styles.textSecondary]}>{label}</Text>
       {arrow ? (
-        <Text style={[styles.arrow, secondary && styles.textSecondary]} aria-hidden>
+        <Text style={[styles.arrow, (secondary || ghost) && styles.textSecondary]} aria-hidden>
           {' ->'}
         </Text>
       ) : null}
@@ -106,8 +124,23 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       borderWidth: 1,
       borderColor: c.panelBorderStrong,
     },
+    // The ghost pill (the prototype's btn-ghost): transparent over its
+    // host panel with the strong border, so the glass shows through and
+    // the control reads as an action etched onto the card rather than
+    // raised above it.
+    buttonGhost: {
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      borderColor: c.panelBorderStrong,
+    },
     buttonPressed: {
       backgroundColor: c.accentPressed,
+    },
+    // The ghost and secondary press feedback: a wash of the panel tone,
+    // the same hover the prototype's quiet buttons take (gold would turn
+    // a quiet action into a verdict).
+    buttonQuietPressed: {
+      backgroundColor: c.panel,
     },
     buttonDisabled: {
       opacity: 0.5,

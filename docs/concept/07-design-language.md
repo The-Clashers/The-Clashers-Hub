@@ -196,9 +196,15 @@ draw, which is why the ambience layer uses react-native-svg, the chart
 
 - Centered content column, max width 1280, side padding from the spacing scale.
 - **Global nav bar:** a thin fixed row at the top like a tracker site (the
-  owner's layout): brand, the lookup box (its small icon dropdown picks
+  owner's layout): the brand, the lookup box (its small icon dropdown picks
   player or clan), the page links (Home, Players, Clans, Contributors), and
-  the theme toggle. One row at 48 px from 1024 px up; below that a two-row
+  the theme toggle. The brand is the prototype's shield logo — the
+  gold-rimmed shield with its filled field and star, drawn on
+  react-native-svg from theme tokens so it follows the accent — beside the
+  two-line lockup (name over the "clan and player analytics, live and
+  login-free" tagline; the tagline drops off the stacked tiers). The Home
+  link carries the prototype's home glyph beside its label. One row at
+  48 px from 1024 px up; below that a two-row
   90 px stack (brand + links + toggle, then the lookup full width) so the
   lookup never squeezes. Fixed, not sticky: a sticky bar is constrained to
   its containing block, which is exactly viewport-height here. The bar is
@@ -241,74 +247,70 @@ draw, which is why the ambience layer uses react-native-svg, the chart
   read as one family. No sort controls: the row order is the engine's
   judgment. Attacks left reads the current-war endpoint and dashes when
   there is no war to count.
-- **Player detail (the prototype rework):** a full-width identity card
-  above the analysis, then the analysis in two two-column grids from
-  1024 px up (stacked below). The identity card (the T-M2-1 shell, redrawn
-  to the owner's prototype) carries the avatar monogram (56 px circle,
-  accent-soft field, gold ring, the name's initials), the name with its
-  chips beside it (Town Hall on the gold soft chip, the tag on a quiet
-  mono chip, the clan role toned by seniority: leader gold, elders info,
-  members quiet), the season chips (the league tier icon + name with the
-  classic league object as fallback, trophies, war stars, attack wins, XP,
-  and the donation pair "N : N this season", each chip dropping out
-  cleanly when the payload omits its counter), and an actions column on
-  the card's right edge holding the compare button (primary gold) above
-  the manual refresh control (the owner's placement call: freshness lives
-  on the card whose data it describes; the clan screen keeps its footer
-  row until its own pass). Breadcrumbs `Home › Players › <name>` sit above
-  with the clan card's clearance.
-  Grid one is the verdict: the rushed analysis card (T-M2-2's card half)
-  beside the upgrade-next list. The rushed card centers the `Gauge` dial
-  (the overall deficit percentage as a gold arc on a semicircle, the
-  number in its throat, "DEFICIT VS TH CEILING" under it), the band chip
-  under the dial, the reading's own scale note (units measured, already
-  maxed, the band scale), the per-category `CategoryBars` (each bar
-  colored by the band that category's own percentage falls into), and the
-  skipped-units footnote when the engine counts any (SR-14). The
-  upgrade-next list renders the engine's top deficits worst-first: rank
-  circle, name, level/maximum pair, and the gap as a warning chip; a
-  maxed account gets the designed "nothing to catch up" reading (AC-04),
-  never a fabricated todo list. Grid two is the ledgers: the hero and
-  achievements cards in one column, the progression grid in the other —
-  long lists left, the tall tile grid right, the same balance the
-  prototype struck.
-  The achievements card (T-M2-3) renders on the panelRaised chrome: the
-  "N / M complete" count line in tabular figures under the title, rows
-  grouped by village under quiet uppercase headers (the payload
-  interleaves home, builder base, and clan capital rows; groups keep
-  first-appearance order), and one row per achievement with the
-  requirement text under the name, the value/target pair in tabular
-  figures above a `ProgressRail` whose earned stars take the gold accent.
-  Stars are the API's count, never derived from the fill: the payload
-  proves they are independent (2 stars at 25% of the target, 1 star past
-  it). A completed row (all three stars in) mutes to the ledger
-  treatment: secondary name, no requirement line, no open star marker,
+- **Player detail:** two columns from 1024 px up (identity + analysis),
+  stacked below — the layout the prototype rework tried to replace and the
+  owner put back, with the prototype's two actions kept on the card. The
+  identity column holds the FR-06 header: the name, the tag with the clan
+  name beside it, a hairline, then the stat grid (Town Hall, league with
+  the tier icon in the 24 px slot falling back to the classic league
+  object, XP level, clan role), two cells per row inside the column and
+  four when the card runs full width, then a second hairline and the
+  actions block: the compare button (primary gold pill with the compare
+  glyph) above the manual refresh control (the ghost pill with the
+  refresh glyph and the last-refresh text riding in the cached pill —
+  the owner's placement call: freshness lives on the card whose data it
+  describes; the clan screen keeps its footer row until its own pass).
+  Breadcrumbs `Home › Players › <name>` sit above with the clan card's
+  clearance.
+  The analysis column stacks the five sections. The rushed analysis card
+  (T-M2-2's card half) centers the `Gauge` dial (the overall deficit
+  percentage as a gold arc on a semicircle, the number in its throat,
+  "DEFICIT VS TH CEILING" under it), the band chip under the dial, the
+  reading's own scale note (units measured, already maxed, the band
+  scale), the per-category `CategoryBars` (each bar colored by the band
+  that category's own percentage falls into), and the skipped-units
+  footnote when the engine counts any (SR-14). The upgrade-next list
+  renders the engine's top deficits worst-first: rank circle, name,
+  level/maximum pair, and the gap as a warning chip; a maxed account gets
+  the designed "nothing to catch up" reading (AC-04), never a fabricated
+  todo list.
+  The hero card (T-M2-4) renders the prototype's hero cards: one compact
+  card per hero in measured rows of at least 240 px — the bundled unit
+  icon (`UnitIcon`, 32 px slot, the typed map in `lib/icon-map.ts`
+  resolving every hero the API names, placeholder.svg for content the map
+  has not met), the name with a gold MAX chip when maxed, the "level X of
+  Y" sub-line, the equipment the API nests on the hero entry as quiet
+  rows under the name line (small 20 px icon, name + pair), and the
+  `LevelRail` right-aligned in a fixed 96 px column with the pair under
+  it. Rows group by village through the shared rule the achievements
+  card established (`lib/village.ts`, first-appearance order), and the
+  header count reads "N of M total levels · K maxed". A maxed hero mutes
+  its text to the ledger treatment (the MAX chip and the icon keep their
+  strength: the chip is the verdict, the picture is identity); a hero
+  with a null maxLevel renders its level alone with no rail, and the card
+  footnotes the count instead of inventing a maximum.
+  The achievements card (T-M2-3) renders the prototype's rows: a headline
+  with the name, the star trio (`Glyph` stars, gold for earned tiers,
+  quiet for the open ones), and the value/target pair closing the line;
+  the `ProgressRail` full width under it (the stars live in the headline,
+  so the rail draws its track alone); the requirement text with the
+  stars-earned count under that. Stars are the API's count, never derived
+  from the fill: the payload proves they are independent (2 stars at 25%
+  of the target, 1 star past it). A completed row (all three stars in)
+  mutes to the ledger treatment: secondary name, no requirement line,
   so the in-progress rows draw the eye; on a maxed account the card reads
   as a quiet ledger, which is the honest reading of a finished list. The
-  rows key on village-name-index because the live payload carries
-  duplicate names (one locked "Keep Your Account Safe!" beside the
-  completed one).
-  The hero card (T-M2-4) renders on the same panelRaised chrome: an
-  "N / M maxed" count line in tabular figures under the title, rows
-  grouped by village through the shared rule the achievements card
-  established (moved to `lib/village.ts`, groups keep first-appearance
-  order), one row per hero with the bundled unit icon anchoring the name
-  line (`UnitIcon`, 32 px slot, the map in `lib/icon-map.ts` resolving
-  every hero the API names, placeholder.svg when the game ships content
-  the map has not met) beside the name and the level/maximum pair sharing
-  one line (heroes carry no requirement text, so the line has room) above
-  a `LevelRail` — the fill sized by the level/max fraction, no star
-  markers, the same 6 px track and gold fill the `ProgressRail` draws.
-  The equipment the API nests on each hero entry renders as quiet
-  indented rows under that hero (small 20 px icon, name + pair, no
-  rails): equipment belongs to the hero it is equipped on, and the flat
-  `heroEquipment` inventory belongs to the progression grid (FR-16). The
-  icons stay at full strength through the maxed mute: the mute is text
-  hierarchy (the ledger reading), and dimming a unit's picture would
-  read as broken, not quiet. A maxed hero mutes to the ledger treatment
-  the completed achievement row takes; a hero with a null maxLevel
-  (brand-new content) renders its level alone with no rail, and the card
-  footnotes the count instead of inventing a maximum.
+  rows group by village under quiet uppercase headers (the payload
+  interleaves home, builder base, and clan capital rows) and key on
+  village-name-index because the live payload carries duplicate names
+  (one locked "Keep Your Account Safe!" beside the completed one).
+  The progression grid (T-M2-5) renders the prototype's tile wall:
+  compact tiles in measured rows of at least 76 px — the bundled icon
+  centered on top, the name in two quiet lines under it, the level/max
+  pair at the bottom, and a gold MAX badge breaking the tile's top-right
+  corner when the unit is maxed (the maxed tile's border goes gold too).
+  Village and category headers dock above their blocks, the category
+  header carrying its "N units · M maxed" count line.
 - Breakpoints come from `useWindowDimensions` into a shared `breakpoints`
   helper, no CSS media queries scattered through components; RN paradigm is
   JS-driven layout.
@@ -316,7 +318,9 @@ draw, which is why the ambience layer uses react-native-svg, the chart
   retired from virtualization): 30 clans per page land in the document's
   own scroll, and a sentinel under the last card loads the next page when
   it nears the viewport, the same scroll model the roster uses. The
-  progression grid's ~100 unit tiles stay virtualized as the normal case.
+  progression grid's ~100 unit tiles stay virtualized as the normal case:
+  the tiles are chunked into grid lines of the measured column count, so
+  the FlatList keeps virtualizing the wall.
   Both page-flow lists rely on `scrollbar-gutter: stable` on the document
   root so the scrollbar's appearance never reflows the page (the owner's
   stable-window note).
@@ -331,27 +335,28 @@ draw, which is why the ambience layer uses react-native-svg, the chart
 
 | Component | Purpose |
 |---|---|
-| `NavBar` | the thin fixed row every page renders: brand, `LookupSearch`, the page links, the theme toggle, plus the in-flow spacer that reserves its height; frosted glass since the rework (canvas veil + shared blur) |
+| `NavBar` | the thin fixed row every page renders: the shield brand lockup, `LookupSearch`, the page links (Home with its home glyph), the theme toggle, plus the in-flow spacer that reserves its height; frosted glass since the rework (canvas veil + shared blur) |
 | `GlassAmbience` | the canvas's two glow fields: one fixed, pointer-transparent SVG behind every screen, the radial gradients Views cannot draw |
 | `LookupSearch` + `LookupModePicker` | the one search box (nav-thin and hero-sized): the mode picker is the small icon dropdown that says player or clan; player mode is tag-only, clan mode takes a name or `#tag` |
 | `Breadcrumbs` | the location line detail screens render instead of a header: `Home › Clans › <name>`, WAI-ARIA breadcrumb pattern |
 | `SearchBar` + `FilterRow` | clans page query controls; the search bar takes a clan name or a `#tag` (names under three characters taught inline), and the filters sit behind one `Filters` disclosure whose toggle carries the applied count: a wrapping grid of `Dropdown`s (clan size, war frequency, location, clan label, clan type, chat language, league required) plus two number boxes (min clan level; Town Hall required, capped at the reference max), two cells per row on a phone and four from tablet up (the cell basis follows the shared breakpoint helper) |
 | `Dropdown` | select-style control built on RN primitives: button trigger, portaled `listbox`, keyboard-complete (arrows, Enter, Escape, Home/End); the open list sizes its height to its options and only scrolls when it genuinely overflows |
 | `TagInput` | the player tag box: /player/:tag routing, through the one tag module ([03 §2](./03-features-list.md)) |
-| `PillButton` | the one pill button: search, retry, and footer-link actions all render it; primary gold, secondary raised panel, link role with the trailing arrow for footer-style links |
+| `PillButton` | the one pill button: search, retry, and footer-link actions all render it; primary gold, secondary raised panel, ghost (transparent with the strong border, the prototype's quiet action), optional leading `Glyph` (compare, refresh), link role with the trailing arrow for footer-style links |
 | `ClanCard` | search result row: badge, level, members, location, and the family-friendly tag on the title row (a property, not a stat, so no chip) |
 | `StatChip` | label + value pair used on headers and cards |
 | `RatioFlag` | donation-balance chip: shows the member's `ratio : 1` (one decimal), good/warn/dash states |
 | `LeagueRank` | the rank cell the roster and attention tables share: tier icon plus the rank number parsed from the tier name, dash when unranked |
 | `RosterTable` / `RosterCard` | the clan roster, table & card presentations |
 | `AttentionTable` / `AttentionCard` | the Needs Attention tab's worst-first view, table & card presentations |
-| `ProgressRail` | achievement value/target bar with star markers |
+| `Glyph` | the UI glyph set (the prototype's own paths on react-native-svg): compare, refresh, home, and the filled star — the marks the buttons, the Home link, and the achievement ratings draw |
+| `ProgressRail` | achievement value/target bar; the star row beside the track by default, or track-only (`showStars={false}`) when the row renders its star trio in the headline the prototype's layout draws |
 | `LevelRail` | the hero panel's level-versus-maximum bar: the fill without star markers, the same 6 px track and gold fill `ProgressRail` draws |
 | `CategoryBars` | rushed per-category horizontal bars: label, quiet track, band-colored fill, tabular percentage |
 | `Gauge` | overall rushed % dial (the flagship number): a semicircular SVG arc that fills gold with the deficit, built on react-native-svg |
-| `ProgressionGrid` | player progression tiles: `UnitIcon`, level, maxed-for-Town-Hall chip |
+| `ProgressionGrid` | player progression tile wall: measured rows of 76 px-plus tiles, each with `UnitIcon`, the two-line name, the level pair, and the gold MAX corner badge; village and category headers with their count lines |
 | `UnitIcon` | bundled game-icon lookup behind `lib/icon-map.ts` with the placeholder fallback, fixed 32 px slot (20 px small variant on quiet rows like the hero panel's equipment); shipped on the hero panel, reused by the `ProgressionGrid` tiles |
-| `RefreshControl` | manual refresh with cooldown and the "cached, Ns ago" hint; renders in the player card's actions column on the player screen and the footer row on the clan screen |
+| `RefreshControl` | manual refresh with cooldown, the ghost pill with the refresh glyph, and the cached pill carrying the last-refresh text ("Fetched just now" / "Cached, Ns ago"); renders in the player card's actions block on the player screen and the footer row on the clan screen |
 | `WarResultChip` | win/loss/tie pill |
 | `CompareRow` | metric row with both values + delta arrow |
 | `Legend` | the ONE chart legend pattern, all charts use it, no exceptions |
@@ -396,7 +401,7 @@ draw, which is why the ambience layer uses react-native-svg, the chart
 
 ## 7. Imagery
 
-Two icon sources, one rule each.
+Four icon sources, one rule each.
 
 - **API icons:** clan badges and league-tier icons come from the game API's own
   `iconUrls` (public CDN). They are rendered with RN `Image` (an `<img>` on
@@ -408,3 +413,16 @@ Two icon sources, one rule each.
   fixed 32 px slot, resolved through the typed icon map,
   `placeholder.svg` when a unit has no bundled icon, never a hotlink to a
   third-party CDN, never a wrong icon standing in for a missing one.
+- **UI glyphs:** the small stroke marks the chrome carries (compare on the
+  player card's button, refresh on the refresh control, home on the Home
+  link, the filled star on the achievement ratings) are the owner's
+  prototype's own paths, drawn by the `Glyph` component on react-native-svg
+  and colored from theme tokens — one set, one owner, no ad-hoc inline
+  SVGs in components.
+- **The brand mark and the favicon:** the shield — gold-rimmed, filled
+  field, on-accent star — is the site's logo (the nav bar's lockup draws
+  it on react-native-svg from the accent tokens) and its favicon
+  (inlined in `index.html` as an SVG data URI, the prototype's own gold
+  shield). The mark follows the theme's accent in the chrome; the favicon
+  keeps the prototype's fixed gold because a tab icon has no theme to
+  read.
