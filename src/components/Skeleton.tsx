@@ -16,7 +16,7 @@ const NAME_LINE_WIDTH = 200;
 const STATS_LINE_WIDTH = 280;
 
 // The same fixed badge slot the card renders its API icon into.
-const BADGE_SLOT = 48;
+const BADGE_SLOT = 40;
 
 export default function SkeletonCard() {
   const { theme } = useTheme();
@@ -39,11 +39,12 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     card: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: t.spacing[4],
-      padding: t.spacing[4],
+      gap: t.spacing[3],
+      padding: t.spacing[3],
       borderRadius: t.radius[2],
       borderWidth: 1,
       borderColor: c.panelBorder,
+      borderTopColor: c.panelHighlight,
       backgroundColor: c.panelRaised,
     },
     body: {

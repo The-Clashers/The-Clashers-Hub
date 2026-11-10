@@ -8,14 +8,9 @@ import { useTheme } from '../theme';
 // whispers (uppercase micro), the value speaks (tabular figures, 07
 // section 5), so columns of them align without decimal noise.
 
-// Micro-label tracking: the one-off 0.6 px tracking the design language
-// pairs with uppercase micro labels. It becomes a token the moment a
-// second value needs one.
-const LABEL_TRACKING = 0.6;
-
 // Keeps a label+value pair from wrapping into a staircase when a long value
 // (a location name) sits next to short ones in the same row.
-const STAT_MIN_WIDTH = 88;
+const STAT_MIN_WIDTH = 76;
 
 export interface StatChipProps {
   label: string;
@@ -48,7 +43,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontWeight: t.fontWeight.medium,
       color: c.textMuted,
       textTransform: 'uppercase',
-      letterSpacing: LABEL_TRACKING,
+      letterSpacing: t.letterSpacing.micro,
     },
     value: {
       fontFamily: t.fontFamily.sans,

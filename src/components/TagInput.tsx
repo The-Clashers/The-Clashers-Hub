@@ -148,7 +148,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontWeight: t.fontWeight.medium,
       color: c.textMuted,
       textTransform: 'uppercase',
-      letterSpacing: 0.6,
+      letterSpacing: t.letterSpacing.micro,
     },
     row: {
       flexDirection: 'row',
@@ -160,12 +160,13 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       // minWidth 0 lets the input shrink under its intrinsic empty width;
       // without it the Go button pokes past the 360 px floor (NFR-05).
       minWidth: 0,
-      minHeight: t.layout.touchTargetMin,
+      minHeight: t.layout.controlHeight,
       paddingHorizontal: t.spacing[4],
       paddingVertical: t.spacing[2],
       borderRadius: t.radius[2],
       borderWidth: 1,
       borderColor: c.panelBorderStrong,
+      borderTopColor: c.panelHighlight,
       backgroundColor: c.panelRaised,
       fontFamily: t.fontFamily.mono,
       fontSize: t.fontSize.md,
@@ -176,7 +177,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     button: {
       alignItems: 'center',
       justifyContent: 'center',
-      minHeight: t.layout.touchTargetMin,
+      minHeight: t.layout.controlHeight,
       paddingHorizontal: t.spacing[6],
       paddingVertical: t.spacing[2],
       borderRadius: t.radius.pill,
@@ -189,7 +190,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     },
     buttonText: {
       fontFamily: t.fontFamily.sans,
-      fontSize: t.fontSize.body,
+      fontSize: t.fontSize.sm,
       fontWeight: t.fontWeight.semibold,
       color: c.textOnAccent,
     },

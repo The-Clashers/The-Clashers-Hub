@@ -113,9 +113,11 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       borderRadius: t.radius.pill,
       borderWidth: 1,
       borderColor: c.panelBorder,
+      borderTopColor: c.panelHighlight,
       backgroundColor: c.panel,
       paddingHorizontal: t.spacing[2],
-      paddingVertical: 3,
+      paddingVertical: 2,
+      minHeight: 22,
     },
     ageDot: {
       width: 6,

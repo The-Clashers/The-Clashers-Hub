@@ -146,8 +146,8 @@ export default function CompareScreen() {
             >
               <Glyph
                 name="user"
-                size={16}
-                color={isPlayer ? theme.colors.accent : theme.colors.textMuted}
+                size={15}
+                color={isPlayer ? theme.colors.accentInk : theme.colors.textMuted}
               />
               <Text style={isPlayer ? styles.modeTabTextActive : styles.modeTabText}>
                 Compare Players
@@ -167,8 +167,8 @@ export default function CompareScreen() {
             >
               <Glyph
                 name="shield"
-                size={16}
-                color={!isPlayer ? theme.colors.accent : theme.colors.textMuted}
+                size={15}
+                color={!isPlayer ? theme.colors.accentInk : theme.colors.textMuted}
               />
               <Text style={!isPlayer ? styles.modeTabTextActive : styles.modeTabText}>
                 Compare Clans
@@ -290,13 +290,14 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       flexDirection: 'row',
       alignItems: 'center',
       columnGap: t.spacing[2],
-      minHeight: t.layout.touchTargetMin,
-      paddingHorizontal: t.spacing[4],
-      paddingVertical: t.spacing[2],
+      minHeight: t.layout.controlHeight,
+      paddingHorizontal: t.spacing[3],
+      paddingVertical: t.spacing[1],
       borderRadius: t.radius.pill,
       backgroundColor: c.fillQuiet,
       borderWidth: 1,
       borderColor: c.panelBorder,
+      borderTopColor: c.panelHighlight,
       outlineColor: c.focusRing,
       outlineOffset: t.layout.focusRingOffset,
     },
@@ -317,11 +318,11 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.sm,
       fontWeight: t.fontWeight.semibold,
-      color: c.accent,
+      color: c.accentInk,
     },
     comparePanel: {
-      gap: t.spacing[5],
-      padding: t.spacing[5],
+      gap: t.spacing[4],
+      padding: t.spacing[4],
     },
     inputsRow: {
       flexDirection: 'row',
@@ -340,20 +341,21 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontWeight: t.fontWeight.medium,
       color: c.textMuted,
       textTransform: 'uppercase',
-      letterSpacing: 0.6,
+      letterSpacing: t.letterSpacing.micro,
     },
     inputWrap: {
       borderRadius: t.radius[2],
       borderWidth: 1,
       borderColor: c.panelBorderStrong,
+      borderTopColor: c.panelHighlight,
       backgroundColor: c.panel,
     },
     textInput: {
-      minHeight: 46,
+      minHeight: t.layout.controlHeight,
       paddingHorizontal: t.spacing[3],
       paddingVertical: t.spacing[2],
       fontFamily: t.fontFamily.sans,
-      fontSize: t.fontSize.body,
+      fontSize: t.fontSize.sm,
       color: c.textPrimary,
       outlineColor: c.focusRing,
     },
@@ -372,9 +374,9 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       paddingVertical: t.spacing[2],
     },
     vsCircle: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
+      width: 32,
+      height: 32,
+      borderRadius: 16,
       backgroundColor: c.accentSoft,
       borderWidth: 1,
       borderColor: c.accent,
@@ -385,7 +387,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.xs,
       fontWeight: t.fontWeight.bold,
-      color: c.accent,
+      color: c.accentInk,
     },
     actionRow: {
       alignItems: 'flex-end',

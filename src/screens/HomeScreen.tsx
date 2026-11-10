@@ -97,10 +97,11 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     },
     header: {
       gap: t.spacing[2],
-      marginBottom: t.spacing[6],
+      marginBottom: t.spacing[4],
     },
     heroPanel: {
       gap: t.spacing[4],
+      borderTopColor: c.panelHighlight,
     },
     heroCaption: {
       fontFamily: t.fontFamily.sans,
@@ -114,17 +115,18 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       flexWrap: 'wrap',
       columnGap: t.spacing[4],
       rowGap: t.spacing[4],
-      marginTop: t.spacing[6],
+      marginTop: t.spacing[5],
     },
     linkCard: {
       flexGrow: 1,
       flexShrink: 1,
       flexBasis: 220,
       gap: t.spacing[2],
-      padding: t.spacing[5],
+      padding: t.spacing[4],
       borderRadius: t.radius[2],
       borderWidth: 1,
       borderColor: c.panelBorder,
+      borderTopColor: c.panelHighlight,
       backgroundColor: c.panel,
       outlineColor: c.focusRing,
       outlineOffset: t.layout.focusRingOffset,
@@ -149,7 +151,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontFamily: t.fontFamily.sans,
       fontSize: t.fontSize.sm,
       fontWeight: t.fontWeight.medium,
-      color: c.accent,
+      color: c.accentInk,
       marginTop: t.spacing[1],
     },
   });

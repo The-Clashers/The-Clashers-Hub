@@ -17,7 +17,7 @@ import { useTheme } from '../theme';
 // The row's rhythm: the label column holds the longest category name
 // ("Pets & Siege") on one line; the value column holds "100%" without
 // squeezing the track between them.
-const BAR_HEIGHT = 10;
+const BAR_HEIGHT = 8;
 
 export interface CategoryBarRow {
   /** Stable identity for the row's key (the category key). */
@@ -84,7 +84,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       flexDirection: 'row',
       alignItems: 'center',
       columnGap: t.spacing[3],
-      minHeight: 22,
+      minHeight: 20,
     },
     label: {
       fontFamily: t.fontFamily.sans,

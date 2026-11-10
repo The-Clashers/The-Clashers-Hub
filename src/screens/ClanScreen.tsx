@@ -407,7 +407,7 @@ interface ClanLoadingProps {
 
 // The identity block's fixed badge slot (the success state renders the
 // API badge at this size, 07 section 7).
-const SKELETON_BADGE_SLOT = 48;
+const SKELETON_BADGE_SLOT = 40;
 
 // Line widths chosen to read as a name and a meta line; the stat cells
 // mirror the uniform grid they stand in for.
@@ -1045,7 +1045,7 @@ function createDonationBarStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontWeight: t.fontWeight.medium,
       color: c.textMuted,
       textTransform: 'uppercase',
-      letterSpacing: 0.6,
+      letterSpacing: t.letterSpacing.micro,
     },
     ratioRow: {
       flexDirection: 'row',
@@ -1054,11 +1054,12 @@ function createDonationBarStyles(t: ReturnType<typeof useTheme>['theme']) {
     },
     ratioInput: {
       width: 56,
-      minHeight: t.layout.touchTargetMin,
+      minHeight: t.layout.controlHeight,
       paddingHorizontal: t.spacing[2],
       borderRadius: t.radius[1],
       borderWidth: 1,
       borderColor: c.panelBorderStrong,
+      borderTopColor: c.panelHighlight,
       backgroundColor: c.panelRaised,
       fontFamily: t.fontFamily.mono,
       fontSize: t.fontSize.md,
@@ -1182,14 +1183,14 @@ function createClanLoadingStyles(t: ReturnType<typeof useTheme>['theme']) {
       overflow: 'hidden',
     },
     rosterHeaderRow: {
-      minHeight: t.layout.touchTargetMin,
+      minHeight: t.layout.controlHeight,
       paddingHorizontal: t.spacing[3],
       justifyContent: 'center',
       borderBottomWidth: 1,
       borderBottomColor: c.panelBorder,
     },
     rosterRow: {
-      minHeight: t.layout.touchTargetMin,
+      minHeight: t.layout.controlHeight,
       paddingHorizontal: t.spacing[3],
       justifyContent: 'center',
       borderBottomWidth: 1,
@@ -1256,7 +1257,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontWeight: t.fontWeight.semibold,
       color: c.textSecondary,
       textTransform: 'uppercase',
-      letterSpacing: 0.6,
+      letterSpacing: t.letterSpacing.micro,
     },
     metaDot: {
       fontSize: t.fontSize.xs,
@@ -1267,19 +1268,19 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontSize: t.fontSize.xs,
       color: c.textMuted,
       textTransform: 'uppercase',
-      letterSpacing: 0.6,
+      letterSpacing: t.letterSpacing.micro,
     },
-    // The badge slot (07 section 7): 48 px, the size the design language
+    // The badge slot (07 section 7): 40 px, the compact size the design language
     // documents for API badges.
     badge: {
-      width: 48,
-      height: 48,
+      width: 40,
+      height: 40,
       borderRadius: t.radius[2],
       backgroundColor: c.panel,
     },
     badgePlaceholder: {
-      width: 48,
-      height: 48,
+      width: 40,
+      height: 40,
       borderRadius: t.radius[2],
       backgroundColor: c.hairline,
     },
@@ -1320,7 +1321,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontWeight: t.fontWeight.medium,
       color: c.textMuted,
       textTransform: 'uppercase',
-      letterSpacing: 0.6,
+      letterSpacing: t.letterSpacing.micro,
     },
     statValue: {
       fontFamily: t.fontFamily.sans,

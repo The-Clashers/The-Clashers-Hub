@@ -10,6 +10,7 @@
 | Routing | **React Router** (library mode) | shareable URLs are a product feature (`/player/:tag`) | |
 | Data fetching | **TanStack Query** | caching, retries, background refetch, designed loading/error states for free | |
 | Charts | **react-native-svg** + small custom chart components | keeps the chart layer inside the RN paradigm; a DOM chart library would break the "written in React Native" story | |
+| Typography | **@fontsource-variable/inter** | Bundled variable font (wght 100-900) served locally from same origin; zero third-party CDN calls, no tracking, no FOUT | open source (OFL) |
 | API tier | **Vercel serverless functions** (Node, `/api/*`) | thin proxy that owns the game API key; deployed on the same origin as the app, so there is no CORS and no client-side env config | Vercel Hobby |
 | Game data | **official Clash of Clans API** via the **RoyaleAPI proxy** | solves the API key's static-IP allowlist problem ([04 §"The allowlist problem"](./04-api-strategy.md)) | free |
 | Tests | **Vitest** + Testing Library | our engines are pure TS, so table-driven tests are cheap to write and fast to run | |

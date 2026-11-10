@@ -89,11 +89,11 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      paddingHorizontal: t.spacing[3],
-      paddingVertical: t.spacing[1],
+      paddingHorizontal: t.spacing[2],
+      paddingVertical: 2,
       borderRadius: t.radius.pill,
       borderWidth: 1,
-      minHeight: 24,
+      minHeight: 22,
     },
     // good: success token, the member is pulling their weight
     chipGood: {

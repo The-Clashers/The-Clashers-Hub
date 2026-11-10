@@ -36,7 +36,7 @@ const SKELETON_ROWS = 5;
 
 // The avatar slot: a fixed box so a slow CDN load never reflows the row
 // (the same rule the badge and league icons follow, 07 section 7).
-const AVATAR_SLOT = 40;
+const AVATAR_SLOT = 32;
 
 export default function ContributorsScreen() {
   const { theme } = useTheme();
@@ -254,7 +254,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     },
     header: {
       gap: t.spacing[2],
-      marginBottom: t.spacing[6],
+      marginBottom: t.spacing[4],
     },
     listFooter: {
       marginTop: t.spacing[3],
@@ -291,8 +291,8 @@ function createRowStyles(t: ReturnType<typeof useTheme>['theme']) {
     row: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: t.spacing[4],
-      paddingVertical: t.spacing[3],
+      gap: t.spacing[3],
+      paddingVertical: t.spacing[2],
       borderBottomWidth: 1,
       borderBottomColor: c.hairline,
       outlineColor: c.focusRing,
@@ -318,7 +318,7 @@ function createRowStyles(t: ReturnType<typeof useTheme>['theme']) {
     },
     avatarInitial: {
       fontFamily: t.fontFamily.sans,
-      fontSize: t.fontSize.md,
+      fontSize: t.fontSize.sm,
       fontWeight: t.fontWeight.semibold,
       color: c.textSecondary,
     },

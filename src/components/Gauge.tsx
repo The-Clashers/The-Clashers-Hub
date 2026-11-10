@@ -28,9 +28,9 @@ const ARC_PATH = 'M 20 120 A 90 90 0 0 1 200 120';
 const ARC_LENGTH = Math.PI * 90;
 
 // The rendered width: the dial keeps its proportions at any percentage, and
-// 230 px centers comfortably in the analysis column at every breakpoint the
+// 200 px centers compactly in the analysis column at every breakpoint the
 // two-column layout serves.
-const DIAL_WIDTH = 230;
+const DIAL_WIDTH = 200;
 
 export interface GaugeProps {
   /** The percentage to draw, 0 to 100. Null renders "not available". */

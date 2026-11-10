@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useLocation, useNavigate } from 'react-router';
-import { useTheme, breakpointFor, glassSurfaceFilter } from '../theme';
+import { useTheme, breakpointFor, glassSurfaceFilter, glassEdge } from '../theme';
 import { ThemeToggle } from './ThemeToggle';
 import Glyph, { type GlyphName } from './Glyph';
 import LookupSearch from './LookupSearch';
@@ -35,10 +35,6 @@ import LookupSearch from './LookupSearch';
 // bar's own height is compact, and keyboard focus plus the gold ring
 // apply everywhere.
 
-// The one-row desktop height and the two-row height below 1024. The
-// spacer and the fixed bar read the same constants.
-const NAV_HEIGHT_DESKTOP = 48;
-const NAV_HEIGHT_STACKED = 90;
 
 interface NavLinkSpec {
   label: string;
@@ -70,7 +66,7 @@ export default function NavBar() {
   const styles = useMemo(() => createStyles(theme, stacked), [theme, stacked]);
   const location = useLocation();
   const navigate = useNavigate();
-  const barHeight = stacked ? NAV_HEIGHT_STACKED : NAV_HEIGHT_DESKTOP;
+  const barHeight = stacked ? theme.layout.navHeightStacked : theme.layout.navHeightDesktop;
 
   return (
     <>
@@ -116,9 +112,9 @@ export default function NavBar() {
 
 // ---------- brand mark ----------
 
-// The brand shield's box (the prototype's 30 px brand mark) and the mark's
+// The brand shield's box (the prototype's 26 px brand mark) and the mark's
 // own drawing constants.
-const BRAND_SHIELD_SIZE = 30;
+const BRAND_SHIELD_SIZE = 26;
 
 function BrandMark({
   styles,
@@ -253,6 +249,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme'], stacked: boolean)
       right: 0,
       zIndex: t.zIndex.sticky,
       ...glassSurfaceFilter(t),
+      ...glassEdge(t),
       backgroundColor: c.canvasVeil,
       borderBottomWidth: 1,
       borderBottomColor: c.hairline,
@@ -281,7 +278,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme'], stacked: boolean)
       flexDirection: 'row',
       alignItems: 'center',
       columnGap: t.spacing[2],
-      minHeight: t.layout.touchTargetMin,
+      minHeight: t.layout.controlHeight,
       paddingRight: t.spacing[2],
       borderRadius: t.radius[1],
       outlineColor: c.focusRing,
@@ -335,7 +332,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme'], stacked: boolean)
     },
     link: {
       paddingHorizontal: stacked ? t.spacing[2] : t.spacing[3],
-      minHeight: t.layout.touchTargetMin,
+      minHeight: t.layout.controlHeight,
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: t.radius[1],

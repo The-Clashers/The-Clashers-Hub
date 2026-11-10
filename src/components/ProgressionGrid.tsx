@@ -31,11 +31,11 @@ import type {
 // list row is one grid line and the virtualization keeps working.
 
 /** The tile's minimum width: below this the name stops fitting beside
- * itself and the wall reads as a list. The prototype's minmax(76px, 1fr). */
-const TILE_MIN_WIDTH = 76;
+ * itself and the wall reads as a list. Compact minmax(68px, 1fr). */
+const TILE_MIN_WIDTH = 68;
 
 /** The gap between tiles, and between tile rows. */
-const TILE_GAP = 8;
+const TILE_GAP = 6;
 
 /** The tile row's horizontal padding, each side (the tile's width math
  * subtracts it so the last tile lands on the row's right edge). */
@@ -266,7 +266,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontWeight: t.fontWeight.semibold,
       color: c.textMuted,
       textTransform: 'uppercase',
-      letterSpacing: 0.6,
+      letterSpacing: t.letterSpacing.micro,
     },
 
     // category header: the label with the count line beside it, the
@@ -287,7 +287,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontWeight: t.fontWeight.medium,
       color: c.textMuted,
       textTransform: 'uppercase',
-      letterSpacing: 0.6,
+      letterSpacing: t.letterSpacing.micro,
     },
     categoryCount: {
       fontFamily: t.fontFamily.sans,
@@ -315,6 +315,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       backgroundColor: c.fillQuiet,
       borderWidth: 1,
       borderColor: c.panelBorder,
+      borderTopColor: c.panelHighlight,
       borderRadius: t.radius[2],
       paddingHorizontal: t.spacing[1],
       paddingTop: 10,

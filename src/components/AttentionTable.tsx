@@ -48,9 +48,6 @@ const COLUMN_WIDTHS = {
   attacks: 100,
 } as const;
 
-// Micro-label tracking, the same constant the roster header keeps.
-const HEADER_LABEL_TRACKING = 0.6;
-
 interface ColumnSpec {
   id: 'number' | 'rank' | 'name' | 'role' | 'donated' | 'received' | 'ratio' | 'attacks';
   label: string;
@@ -233,6 +230,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       borderRadius: t.radius[2],
       borderWidth: 1,
       borderColor: c.panelBorder,
+      borderTopColor: c.panelHighlight,
       overflow: 'hidden',
     },
     headerRow: {
@@ -244,7 +242,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       backgroundColor: c.panel,
       borderBottomWidth: 1,
       borderBottomColor: c.panelBorder,
-      minHeight: t.layout.touchTargetMin,
+      minHeight: t.layout.controlHeight,
     },
     headerLabel: {
       fontFamily: t.fontFamily.sans,
@@ -252,7 +250,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontWeight: t.fontWeight.medium,
       color: c.textMuted,
       textTransform: 'uppercase',
-      letterSpacing: HEADER_LABEL_TRACKING,
+      letterSpacing: t.letterSpacing.micro,
     },
     headerLabelLeft: {
       textAlign: 'left',
@@ -269,7 +267,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       alignItems: 'center',
       gap: t.spacing[2],
       paddingHorizontal: t.spacing[3],
-      minHeight: t.layout.touchTargetMin,
+      minHeight: t.layout.controlHeight,
       borderBottomWidth: 1,
       borderBottomColor: c.hairline,
       outlineColor: c.focusRing,
