@@ -32,6 +32,8 @@ export function createBaseStyles(t: ThemeTokens) {
   return StyleSheet.create({
     appRoot: {
       flex: 1,
+      flexGrow: 1,
+      flexShrink: 0,
       backgroundColor: c.canvas,
       color: c.textPrimary,
       fontFamily: t.fontFamily.sans,

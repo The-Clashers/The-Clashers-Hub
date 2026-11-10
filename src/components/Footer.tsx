@@ -163,6 +163,8 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       borderTopColor: c.panelBorder,
       borderStyle: 'solid',
       backgroundColor: c.panel,
+      width: '100%',
+      flexShrink: 0,
       marginTop: 'auto',
       paddingTop: t.spacing[6],
       paddingBottom: t.spacing[6],
