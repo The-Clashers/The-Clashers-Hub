@@ -254,6 +254,26 @@ draw, which is why the ambience layer uses react-native-svg, the chart
   read as one family. No sort controls: the row order is the engine's
   judgment. Attacks left reads the current-war endpoint and dashes when
   there is no war to count.
+- **War (current) tab:** the current-war view (T-M3-1) stacks three bands
+  under the tab bar. The state banner: a tone dot and headline reading the
+  war's state (preparation day, battle day, war ended, or no war), with
+  the team size and the war clock in the support line and the ended state
+  reading the verdict; the dot is info blue on preparation, the one gold
+  accent while battle day is live, and success / danger / muted on an
+  ended win / loss / tie from the viewed clan's side. The standings row:
+  one card per side (badge, name, the tag / level line, then the three
+  numbers the game itself scores a war by: stars with the gold star glyph,
+  destruction, attacks used over the total allowance), two-up from tablet
+  and stacked below; the leading side wears a gold `Leading` chip during
+  battle day and the winner a green `Winner` chip once ended, both resolved
+  through the game's own stars-then-destruction rule in
+  `lib/war-standings.ts` so the view agrees with the game's result screen.
+  The rosters: `Clan` first, `Opponent` under its own quiet badge heading,
+  each a per-member table ordered by the war map's own positions (#, name,
+  TH, attacks used, stars, average destruction) with the same 768 px
+  switch to cards the attention table keeps; rows tap through to player
+  detail, and a member with zero attacks shows the dash, never a zero
+  destruction average (SR-19's rule, applied to the raw view).
 - **Player detail:** two columns from 1024 px up (identity + analysis),
   stacked below — the layout the prototype rework tried to replace and the
   owner put back, with the prototype's two actions kept on the card. The
@@ -366,6 +386,9 @@ draw, which is why the ambience layer uses react-native-svg, the chart
 | `LeagueRank` | the rank cell the roster and attention tables share: tier icon plus the rank number parsed from the tier name, dash when unranked |
 | `RosterTable` / `RosterCard` | the clan roster, table & card presentations |
 | `AttentionTable` / `AttentionCard` | the Needs Attention tab's worst-first view, table & card presentations |
+| `WarBanner` | the current-war view's state banner: tone dot, headline, and support line reading the war's state (preparation, battle day, ended with the verdict, or no war), the team size, and the war clock |
+| `WarStandings` | both clans' standings cards: badge, name, level, stars, destruction, attacks used; the `Leading` / `Winner` verdict chip resolved through `lib/war-standings.ts` (stars, then destruction), two-up from tablet and stacked below |
+| `WarMemberTable` / `WarMemberCard` | the war rosters' per-member attack view, table & card presentations: map position, name, TH, attacks used, stars, average destruction (the dash for zero-attack members, never a zero average) |
 | `Glyph` | the UI glyph set (the prototype's own paths on react-native-svg): compare, refresh, home, star, user, shield, search, and code — the marks buttons, nav links, mode pickers, and ratings draw |
 | `ProgressRail` | achievement value/target bar; the star row beside the track by default, or track-only (`showStars={false}`) when the row renders its star trio in the headline the prototype's layout draws |
 | `LevelRail` | the hero panel's level-versus-maximum bar: the fill without star markers, the same 6 px track and gold fill `ProgressRail` draws |
