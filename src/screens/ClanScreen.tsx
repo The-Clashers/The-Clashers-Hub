@@ -20,11 +20,22 @@ import RosterTable from '../components/RosterTable';
 import RosterCard from '../components/RosterCard';
 import AttentionTable from '../components/AttentionTable';
 import AttentionCard from '../components/AttentionCard';
+import WarBanner from '../components/WarBanner';
+import WarStandings from '../components/WarStandings';
+import WarMemberTable from '../components/WarMemberTable';
+import WarMemberCard from '../components/WarMemberCard';
 import SkeletonCard from '../components/Skeleton';
 import SkeletonBlock, { useSkeletonPulse } from '../components/SkeletonBlock';
 import Dropdown from '../components/Dropdown';
 import { fetchClan, ClanFetchError, type ClanMember } from '../api/clan';
-import { attacksLeftFor, fetchCurrentWar } from '../api/war';
+import {
+  attacksLeftFor,
+  fetchCurrentWar,
+  WarFetchError,
+  type CurrentWarResponse,
+  type WarClan,
+} from '../api/war';
+import { leadingSide } from '../lib/war-standings';
 import { busyRetryDelayMs, shouldRetryBusy } from '../lib/busy-retry';
 import { warFrequencyLabel } from '../lib/war-frequency';
 import { canonicalTagFromRoute, playerRouteFor } from '../lib/tag';
@@ -70,10 +81,13 @@ import {
 // The tab bar reads `?tab=` from the URL (03 section 2 "Screens & URLs") so
 // a deep link to the War, Log, or Needs Attention tab is shareable (F-12).
 // Roster is the default when the param is absent or holds an unknown value.
-// The War and Log tabs keep their designed placeholders until M3; the
-// Roster tab renders the real roster from the same single clan fetch
-// (SR-09); the Needs Attention tab renders the worst-first donation view
-// with its own table and the war-attacks column (the owner's layout).
+// The War tab renders the current-war view (T-M3-1: state banner, both
+// clans' standings, per-member attack tables for both rosters, all from
+// the single cached war fetch); the Log tab keeps its designed placeholder
+// until T-M3-2; the Roster tab renders the real roster from the same
+// single clan fetch (SR-09); the Needs Attention tab renders the
+// worst-first donation view with its own table and the war-attacks column
+// (the owner's layout).
 //
 // The route param carries the bare tag (shareable URLs carry no `#` and no
 // `%23`, see src/lib/tag.ts), canonicalized back through the tag module so
@@ -103,9 +117,10 @@ function tabFromValue(raw: string | null): ClanTab {
 // cache layers decay together, the same pairing the hello screen uses.
 const CLAN_STALE_TIME_MS = 180_000;
 
-// The war fetch mirrors the tier's 120 s war TTL (04 section 5). It only
-// runs while the Needs Attention tab is open (the attacks-left column is
-// its only reader today); the M3 war view will reuse the same cache entry.
+// The war fetch mirrors the tier's 120 s war TTL (04 section 5). It runs
+// while the War or Needs Attention tab is open; the War tab renders its
+// whole state matrix from it and the attention tab reads the attacks-left
+// column, both through the same cache entry.
 const WAR_STALE_TIME_MS = 120_000;
 
 export default function ClanScreen() {
@@ -153,19 +168,50 @@ export default function ClanScreen() {
     },
   });
 
-  // The current war, fetched only while the Needs Attention tab is open:
-  // the attacks-left column is its only reader today, and a clan that is
-  // not in a war makes this a wasted upstream call on every visit. A
-  // failure here never breaks the tab, the column renders dashes and the
-  // note line says why (the state matrix belongs to the clan fetch; the
-  // war fetch is supplementary).
+  // The current war, fetched while the War or Needs Attention tab is
+  // open: the War tab renders its whole state matrix from it (T-M3-1),
+  // and the attention tab reads the attacks-left column. On the
+  // attention tab a failure never breaks the tab (dashes and the note
+  // line); on the War tab the same failure is the tab's own error state,
+  // so the retry policy mirrors the clan fetch's: the busy outcome paces
+  // itself through lib/busy-retry and the permanent kinds stop early.
   const warQuery = useQuery({
     queryKey: ['war', tag] as const,
     queryFn: () => fetchCurrentWar(tag),
-    enabled: query.isSuccess && activeTab === 'attention',
+    enabled: query.isSuccess && (activeTab === 'war' || activeTab === 'attention'),
     staleTime: WAR_STALE_TIME_MS,
-    retry: (failureCount) => failureCount < 1,
+    retry: (failureCount, error) => {
+      if (error instanceof WarFetchError) {
+        // The clan itself already loaded when this query runs at all, so
+        // a war 404 is an anomaly no retry can fix, and a bad_request is
+        // our own URL being wrong. The busy outcome auto-retries with
+        // backoff (06 section 3).
+        if (error.result.kind === 'not_found' || error.result.kind === 'bad_request') {
+          return false;
+        }
+        if (error.result.kind === 'busy') {
+          return shouldRetryBusy(failureCount);
+        }
+      }
+      return failureCount < 1;
+    },
+    retryDelay: (failureCount, error) => {
+      if (error instanceof WarFetchError && error.result.kind === 'busy') {
+        return busyRetryDelayMs(error.result.retryAfter, failureCount);
+      }
+      // Only the single default retry ever waits on this: the library's
+      // own first backoff.
+      return 1_000;
+    },
   });
+
+  // True while the war fetch is auto-retrying a busy answer: the War
+  // tab's skeleton keeps its shape and the caption switches to the "one
+  // moment" note, the same slow-fetch read the clan loading state gives.
+  const warBusyRetrying =
+    warQuery.isPending &&
+    warQuery.failureReason instanceof WarFetchError &&
+    warQuery.failureReason.result.kind === 'busy';
 
   // True while the first load is auto-retrying a busy answer: the skeleton
   // stays up and its caption switches to the "one moment" note (06
@@ -267,8 +313,19 @@ export default function ClanScreen() {
                       attacksLeft={attacksLeft}
                       warNote={warNote}
                     />
+                  ) : activeTab === 'war' ? (
+                    <WarSection
+                      clanName={query.data.name}
+                      war={warQuery.data}
+                      isPending={warQuery.isPending}
+                      isFetching={warQuery.isFetching}
+                      busyRetrying={warBusyRetrying}
+                      error={warQuery.error}
+                      onRetry={() => void warQuery.refetch()}
+                      onOpenRoster={() => selectTab('roster')}
+                    />
                   ) : (
-                    <TabPlaceholder tab={activeTab} />
+                    <TabPlaceholder />
                   )}
                 </View>
               ) : null}
@@ -971,29 +1028,387 @@ function parseRatioSide(raw: string): number | null {
   return Number.parseInt(trimmed, 10);
 }
 
-// ---------- tab content placeholder ----------
+// ---------- war tab (T-M3-1, FR-10, SR-09) ----------
 
-interface TabPlaceholderProps {
-  tab: Exclude<ClanTab, 'roster' | 'attention'>;
+interface WarSectionProps {
+  /** The viewed clan's name, from the clan fetch: a warless war payload
+   * carries none of its own, and the banner's copy needs one either way. */
+  clanName: string;
+  /** The parsed current war; undefined while the fetch is pending. */
+  war: CurrentWarResponse | undefined;
+  isPending: boolean;
+  isFetching: boolean;
+  /** True while a busy answer is being auto-retried; the skeleton's
+   * caption switches to the "one moment" note. */
+  busyRetrying: boolean;
+  /** The war fetch's failure, null while it has not failed. */
+  error: Error | null;
+  onRetry: () => void;
+  onOpenRoster: () => void;
 }
 
-function TabPlaceholder({ tab }: TabPlaceholderProps) {
-  // The War and Log views land in M3. The placeholder is designed (06
-  // section 3 "empty"): titled, explained, and pointing at the milestone
-  // that fills it, so the screen reads end to end today and a reviewer
-  // knows what is missing by design rather than by oversight.
-  if (tab === 'war') {
+function WarSection({
+  clanName,
+  war,
+  isPending,
+  isFetching,
+  busyRetrying,
+  error,
+  onRetry,
+  onOpenRoster,
+}: WarSectionProps) {
+  const { theme } = useTheme();
+  const warStyles = useMemo(() => createWarStyles(theme), [theme]);
+  const navigate = useNavigate();
+  // Tap-through goes through the one tag module (SR-13), the same route
+  // builder the roster and attention rows use.
+  const openMember = (tag: string) => {
+    navigate(playerRouteFor(tag));
+  };
+
+  // The presentation switch the roster's own section keeps (NFR-05):
+  // tables at 768 px and up, one card per member below.
+  const { width } = useWindowDimensions();
+  const breakpoint = breakpointFor(width);
+  const isCardPresentation = breakpoint === 'small' || breakpoint === 'mobile';
+
+  // The four-state matrix is per data view (STD-35): the skeleton
+  // mirrors the banner-standings-table layout, the contract branches own
+  // the error state, the no-war reading is the designed empty, and the
+  // war itself is the success state.
+  if (isPending) {
+    return <WarLoading busyRetrying={busyRetrying} />;
+  }
+  if (error !== null) {
+    return <WarError error={error} onRetry={onRetry} isRetrying={isFetching} />;
+  }
+  if (war === undefined) {
+    // The query has resolved without data or error, which the states
+    // above already cover; the guarded render costs less than a crash.
+    return <WarLoading busyRetrying={false} />;
+  }
+
+  const state = war.state;
+  if (state !== 'preparation' && state !== 'inWar' && state !== 'ended') {
     return (
-      <EmptyState
-        title="War view lands in M3"
-        body="The current war view (state banner, both clans, per-member attack table) and the preparation-day scouting view land in milestone M3, alongside the war log."
+      <View style={warStyles.section}>
+        <WarBanner
+          state={state}
+          clanName={clanName}
+          opponentName={null}
+          teamSize={war.teamSize}
+          startTimeMs={war.startTimeMs}
+          endTimeMs={war.endTimeMs}
+          verdict={null}
+        />
+        <EmptyState
+          title="No war to show"
+          body={`When ${clanName} enters its next war, the state banner, both clans' standings, and every member's attacks appear here.`}
+          action={
+            <PillButton
+              label="View the roster"
+              variant="secondary"
+              onPress={onOpenRoster}
+              hint="Switches to the clan's Roster tab."
+            />
+          }
+        />
+      </View>
+    );
+  }
+
+  // Both clans read from the single war response (SR-09's
+  // no-per-member-fetch rule holds for the war view too): the verdict
+  // and the attack allowance are derived at render (STD-32), pure calls
+  // into lib/war-standings.
+  const verdict = leadingSide(war.clan, war.opponent);
+  const attacksAllowed =
+    war.teamSize !== undefined && war.attacksPerMember !== undefined
+      ? war.teamSize * war.attacksPerMember
+      : null;
+
+  return (
+    <View style={warStyles.section}>
+      <WarBanner
+        state={state}
+        clanName={clanName}
+        opponentName={war.opponent.name !== '' ? war.opponent.name : null}
+        teamSize={war.teamSize}
+        startTimeMs={war.startTimeMs}
+        endTimeMs={war.endTimeMs}
+        verdict={verdict}
+      />
+      <WarStandings
+        clan={war.clan}
+        opponent={war.opponent}
+        state={state}
+        attacksAllowed={attacksAllowed}
+      />
+      <WarRosterHeading label="Clan" clan={war.clan} />
+      <WarRoster
+        clan={war.clan}
+        isCardPresentation={isCardPresentation}
+        attacksPerMember={war.attacksPerMember}
+        onPressMember={openMember}
+      />
+      <WarRosterHeading label="Opponent" clan={war.opponent} />
+      <WarRoster
+        clan={war.opponent}
+        isCardPresentation={isCardPresentation}
+        attacksPerMember={war.attacksPerMember}
+        onPressMember={openMember}
+      />
+    </View>
+  );
+}
+
+// ---------- war roster pieces ----------
+
+interface WarRosterProps {
+  clan: WarClan;
+  isCardPresentation: boolean;
+  attacksPerMember: number | undefined;
+  onPressMember: (tag: string) => void;
+}
+
+/** One side's roster in the presentation the viewport picked: the table
+ * at 768 px and up, one card per member below it, the same pieces the
+ * roster's own section renders. */
+function WarRoster({ clan, isCardPresentation, attacksPerMember, onPressMember }: WarRosterProps) {
+  const { theme } = useTheme();
+  const warStyles = useMemo(() => createWarStyles(theme), [theme]);
+  const clanLabel = clan.name !== '' ? clan.name : 'Clan';
+
+  // A war the payload says exists but whose roster did not come back is
+  // a quiet note, not a broken empty table (06 section 3).
+  if (clan.members.length === 0) {
+    return (
+      <Text style={warStyles.rosterNote}>
+        {clanLabel}'s war roster did not come back with the war data.
+      </Text>
+    );
+  }
+
+  if (isCardPresentation) {
+    return (
+      <>
+        {clan.members.map((member, index) => (
+          <WarMemberCard
+            key={member.tag}
+            member={member}
+            position={member.mapPosition > 0 ? member.mapPosition : index + 1}
+            attacksPerMember={attacksPerMember}
+            onPress={onPressMember}
+          />
+        ))}
+      </>
+    );
+  }
+
+  return (
+    <WarMemberTable
+      members={clan.members}
+      attacksPerMember={attacksPerMember}
+      accessibilityLabel={`${clanLabel} war roster`}
+      onPressMember={onPressMember}
+    />
+  );
+}
+
+interface WarRosterHeadingProps {
+  /** Which side this roster is: "Clan" or "Opponent". */
+  label: string;
+  clan: WarClan;
+}
+
+/** The quiet section heading above one side's roster: the side, the
+ * badge, and the clan's name and tag, so two stacked rosters always say
+ * whose attacks the table reads. */
+function WarRosterHeading({ label, clan }: WarRosterHeadingProps) {
+  const { theme } = useTheme();
+  const warStyles = useMemo(() => createWarStyles(theme), [theme]);
+  const name = clan.name !== '' ? clan.name : 'Unknown clan';
+  return (
+    <View style={warStyles.rosterHeading} accessibilityLabel={`${label}: ${name}`}>
+      <Text style={warStyles.rosterHeadingLabel}>{label}</Text>
+      <View style={warStyles.rosterHeadingRow}>
+        {clan.badgeUrl !== null ? (
+          <Image
+            source={{ uri: clan.badgeUrl }}
+            style={warStyles.rosterBadge}
+            accessibilityLabel={`${name} clan badge`}
+          />
+        ) : (
+          <View
+            style={[warStyles.rosterBadge, warStyles.rosterBadgePlaceholder]}
+            accessibilityLabel={`${name} clan badge`}
+          />
+        )}
+        <Text style={warStyles.rosterHeadingName} numberOfLines={1}>
+          {name}
+        </Text>
+        {clan.tag !== '' ? (
+          <Text style={warStyles.rosterHeadingTag} numberOfLines={1}>
+            {clan.tag}
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+// ---------- war loading skeleton (06 section 3) ----------
+
+// Enough roster rows to fill a laptop viewport, the same count the clan
+// loading skeleton keeps.
+const WAR_SKELETON_ROSTER_ROWS = 6;
+
+function WarLoading({ busyRetrying }: { busyRetrying: boolean }) {
+  const { theme } = useTheme();
+  const base = useMemo(() => createBaseStyles(theme), [theme]);
+  const warStyles = useMemo(() => createWarStyles(theme), [theme]);
+  const pulse = useSkeletonPulse();
+  // The same presentation switch the rosters use, so the skeleton holds
+  // the exact shapes the data will fill on this viewport.
+  const { width } = useWindowDimensions();
+  const breakpoint = breakpointFor(width);
+  const isCardPresentation = breakpoint === 'small' || breakpoint === 'mobile';
+  const twoUp = breakpoint === 'tablet' || breakpoint === 'desktop';
+
+  return (
+    <View
+      style={warStyles.section}
+      accessibilityRole="progressbar"
+      accessibilityLabel="Loading the current war"
+    >
+      {/* The banner's own shape: dot, headline, support line. */}
+      <View style={base.panel}>
+        <View style={warStyles.skeletonBannerRow}>
+          <SkeletonBlock width={10} height={10} radiusStep={2} pulse={pulse} />
+          <View style={warStyles.skeletonBannerText}>
+            <SkeletonBlock width={140} height={theme.fontSize.xl} pulse={pulse} />
+            <SkeletonBlock width="60%" height={theme.fontSize.sm} pulse={pulse} />
+          </View>
+        </View>
+      </View>
+
+      {/* The standings cards: two-up from tablet, stacked below. The
+          stacked cells drop the row-sharing flex: a zero basis would
+          collapse their height (the same call the standings cards make). */}
+      <View style={twoUp ? warStyles.skeletonStandingsRow : warStyles.skeletonStandingsColumn}>
+        {Array.from({ length: 2 }, (_, index) => (
+          <View
+            key={index}
+            style={[
+              warStyles.skeletonStandingsCell,
+              twoUp && warStyles.skeletonStandingsCellInRow,
+            ]}
+          >
+            <SkeletonBlock width="100%" height={theme.fontSize.md} pulse={pulse} />
+            <SkeletonBlock width="40%" height={theme.fontSize.xs} pulse={pulse} />
+            <SkeletonBlock width="100%" height={theme.fontSize['2xl']} pulse={pulse} />
+          </View>
+        ))}
+      </View>
+
+      {/* The first table's shape (or the card list's below 768 px). */}
+      {isCardPresentation ? (
+        Array.from({ length: WAR_SKELETON_ROSTER_ROWS }, (_, index) => (
+          <SkeletonCard key={index} />
+        ))
+      ) : (
+        <View style={warStyles.skeletonTablePanel}>
+          <View style={warStyles.skeletonTableHeaderRow}>
+            <SkeletonBlock width="45%" height={theme.fontSize.xs} pulse={pulse} />
+          </View>
+          {Array.from({ length: WAR_SKELETON_ROSTER_ROWS }, (_, index) => (
+            <View key={index} style={warStyles.skeletonTableRow}>
+              <SkeletonBlock width="100%" height={theme.fontSize.sm} pulse={pulse} />
+            </View>
+          ))}
+        </View>
+      )}
+
+      <Text style={[base.caption, warStyles.skeletonCaption]}>
+        {busyRetrying
+          ? 'The game API is busy. One moment, retrying automatically…'
+          : 'Fetching through the tier…'}
+      </Text>
+    </View>
+  );
+}
+
+// ---------- war error ----------
+
+interface WarErrorProps {
+  error: Error;
+  onRetry: () => void;
+  isRetrying: boolean;
+}
+
+function WarError({ error, onRetry, isRetrying }: WarErrorProps) {
+  // The war route rides the same contract the clan route does (04
+  // section 6), so the War tab's error state branches on the same kinds,
+  // each with its own copy and a retry, never a dead end (06 section 3).
+  const retryButton = (
+    <PillButton
+      label={isRetrying ? 'Retrying…' : 'Retry'}
+      onPress={onRetry}
+      disabled={isRetrying}
+    />
+  );
+  if (error instanceof WarFetchError) {
+    if (error.result.kind === 'busy') {
+      return (
+        <ErrorState
+          tone="busy"
+          title="The game API is busy"
+          body={`Upstream answered 429 and automatic retries have not cleared it yet. Trying again now may work, or wait about ${error.result.retryAfter}s and retry.`}
+          action={retryButton}
+        />
+      );
+    }
+    if (error.result.kind === 'unreachable') {
+      return (
+        <ErrorState
+          tone="gone"
+          title="Can't reach the game API"
+          body="The proxy or the game API did not answer. This is usually transient; retry in a moment."
+          action={retryButton}
+        />
+      );
+    }
+    return (
+      <ErrorState
+        tone="gone"
+        title="War data did not load"
+        body="The war lookup came back empty even though the clan itself loaded fine. That is unusual; a retry usually clears it."
+        action={retryButton}
       />
     );
   }
   return (
+    <ErrorState
+      tone="gone"
+      title="Something went wrong"
+      body={error.message || 'An unexpected error happened while fetching the war.'}
+      action={retryButton}
+    />
+  );
+}
+
+// ---------- tab content placeholder ----------
+
+function TabPlaceholder() {
+  // The War view landed with T-M3-1; the Log view is the remaining
+  // placeholder (T-M3-2). It stays designed (06 section 3 "empty"):
+  // titled, explained, and pointing at the card that fills it, so the
+  // screen reads end to end today and a reviewer knows what is missing
+  // by design rather than by oversight.
+  return (
     <EmptyState
       title="War log lands in M3"
-      body="The war log (result chips, efficiency summary, and the designed private-log notice) lands in milestone M3 with the current war view."
+      body="The war log (result chips, efficiency summary, and the designed private-log notice) lands in milestone M3, joining the current war view."
     />
   );
 }
@@ -1103,6 +1518,132 @@ function attentionNoteStyle(t: ReturnType<typeof useTheme>['theme']) {
       marginBottom: t.spacing[3],
     },
   }).note;
+}
+
+// The War tab's own styles (STD-13): the section rhythm and the roster
+// headings, the layout fragments too screen-specific to promote (STD-16).
+// The banner, standings, and tables own theirs.
+function createWarStyles(t: ReturnType<typeof useTheme>['theme']) {
+  const c = t.colors;
+  return StyleSheet.create({
+    // The section's rhythm: one gap step between the banner, the
+    // standings, and each roster block. The roster cards carry their own
+    // marginBottom, the same slack the roster tab's card list keeps.
+    section: {
+      gap: t.spacing[4],
+    },
+
+    // The roster heading: the side's micro label over a badge, name, and
+    // tag row, quiet chrome that says whose attacks the table reads.
+    rosterHeading: {
+      gap: t.spacing[1],
+    },
+    rosterHeadingLabel: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.xs,
+      fontWeight: t.fontWeight.medium,
+      color: c.textMuted,
+      textTransform: 'uppercase',
+      letterSpacing: t.letterSpacing.micro,
+    },
+    rosterHeadingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      columnGap: t.spacing[2],
+    },
+    // The badge slot (07 section 7): 24 px, the compact size the heading
+    // row wants next to body text.
+    rosterBadge: {
+      width: 24,
+      height: 24,
+      borderRadius: t.radius[1],
+      backgroundColor: c.panel,
+    },
+    rosterBadgePlaceholder: {
+      backgroundColor: c.hairline,
+    },
+    rosterHeadingName: {
+      flexShrink: 1,
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.sm,
+      fontWeight: t.fontWeight.semibold,
+      color: c.textPrimary,
+    },
+    rosterHeadingTag: {
+      fontFamily: t.fontFamily.mono,
+      fontSize: t.fontSize.xs,
+      color: c.textMuted,
+    },
+
+    // The quiet note for a roster that did not come back: a caption, not
+    // an error state (06 section 3).
+    rosterNote: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.sm,
+      color: c.textMuted,
+    },
+
+    // The loading skeleton's shapes, each mirroring the success element
+    // it stands in for (the layout-matched rule, 06 section 3): the
+    // banner's dot-and-text row, the standings cards two-up or stacked,
+    // and the table panel's header and rows.
+    skeletonBannerRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: t.spacing[3],
+    },
+    skeletonBannerText: {
+      flex: 1,
+      gap: t.spacing[1],
+    },
+    skeletonStandingsRow: {
+      flexDirection: 'row',
+      columnGap: t.spacing[3],
+    },
+    skeletonStandingsColumn: {
+      gap: t.spacing[3],
+    },
+    skeletonStandingsCell: {
+      gap: t.spacing[2],
+      padding: t.spacing[3],
+      borderRadius: t.radius[2],
+      borderWidth: 1,
+      borderColor: c.panelBorder,
+      borderTopColor: c.panelHighlight,
+      backgroundColor: c.panelRaised,
+    },
+    // The row-sharing flex, two-up only (the stacked cells keep their
+    // content height).
+    skeletonStandingsCellInRow: {
+      flex: 1,
+      flexBasis: 0,
+    },
+    skeletonTablePanel: {
+      backgroundColor: c.panelRaised,
+      borderRadius: t.radius[2],
+      borderWidth: 1,
+      borderColor: c.panelBorder,
+      borderTopColor: c.panelHighlight,
+      overflow: 'hidden',
+    },
+    skeletonTableHeaderRow: {
+      minHeight: t.layout.controlHeight,
+      paddingHorizontal: t.spacing[3],
+      justifyContent: 'center',
+      borderBottomWidth: 1,
+      borderBottomColor: c.panelBorder,
+    },
+    skeletonTableRow: {
+      minHeight: t.layout.controlHeight,
+      paddingHorizontal: t.spacing[3],
+      justifyContent: 'center',
+      borderBottomWidth: 1,
+      borderBottomColor: c.hairline,
+    },
+    skeletonCaption: {
+      marginTop: t.spacing[1],
+    },
+  });
 }
 
 // The loading skeleton's own styles (STD-13, the RosterSection pattern).
