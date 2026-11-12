@@ -94,8 +94,8 @@ FR-18 are the team's original additions beyond the lab's example set.
 | FR-08 | list player achievements with progress rails and stars | F-06 | P0 | Draft |
 | FR-09 | show a hero panel with levels versus maximum, and equipment where the API exposes it | F-06 | P0 | Draft |
 | FR-10 | show the current war: standings and per-member attacks used, stars, and destruction | F-08 | P1 | Done |
-| FR-11 | show the war log for clans with a public log, and a designed notice for private logs | F-09 | P1 | Draft |
-| FR-12 | summarize war efficiency: win rate, stars per attack, and average destruction over recent wars | F-09 | P1 | Draft |
+| FR-11 | show the war log for clans with a public log, and a designed notice for private logs | F-09 | P1 | Done |
+| FR-12 | summarize war efficiency: win rate, stars per attack, and average destruction over recent wars | F-09 | P1 | Done |
 | FR-13 | compare player vs player and clan vs clan side by side, metric by metric | F-10, F-11 | P1 | Draft |
 | FR-14 | give every screen (search, clan, player, compare) a shareable URL | F-12 | P0 | Draft |
 | FR-15 | persist recent searches in the browser's local storage | F-13 | P1 | Done |

@@ -56,3 +56,4 @@ One file per session, copied from [_template.md](_template.md), named
 | 11-10-2026 | 49 | [11-10-2026-session-49](./11-10-2026-session-49.md) |
 | 11-10-2026 | 50 | [11-10-2026-session-50](./11-10-2026-session-50.md) |
 | 11-11-2026 | 51 | [11-11-2026-session-51](./11-11-2026-session-51.md) |
+| 11-12-2026 | 52 | [11-12-2026-session-52](./11-12-2026-session-52.md) |

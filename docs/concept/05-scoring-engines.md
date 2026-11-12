@@ -141,8 +141,12 @@ both zero is *no data*, displayed as a dash, never as a red flag.
   after.
 
 **Edge cases:** wars with zero attacks (fresh roster) are excluded from rates,
-not counted as zeros; the engine labels sample size ("last 10 wars") so nobody
-over-reads a 3-war window.
+not counted as zeros; the engine labels sample size ("last 50 wars") so nobody
+over-reads a short window. Clan War League seasons ride the same log page with
+season-total stars, destruction beyond any percentage, and no verdict, so the
+engine sets them apart from every rate (the parse tags them by the league's
+one-attack-per-member signature) and the summary caption names how many
+("excluding 6 leagues"); they still render as log rows with their own totals.
 
 ## 4. Compare mode
 

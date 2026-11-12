@@ -274,6 +274,31 @@ draw, which is why the ambience layer uses react-native-svg, the chart
   switch to cards the attention table keeps; rows tap through to player
   detail, and a member with zero attacks shows the dash, never a zero
   destruction average (SR-19's rule, applied to the raw view).
+- **Log tab (war log):** the war log view (T-M3-2) stacks two bands under
+  the tab bar. The efficiency summary: a panel titled "War efficiency"
+  with the sample size labeled beside it ("Last 50 wars", the loaded
+  page's real count so nobody over-reads a short window), then the
+  engine's three metrics — win rate, stars per attack, average
+  destruction — plus the record line ("22W · 24L · 4T", an ongoing war
+  named for what it is) as the uniform label-above-value cells the clan
+  card's stat grid established; a rate the loaded wars cannot answer
+  renders the quiet dash, never a zero. The log itself: one row per war,
+  newest first, RESULT | OPPONENT | STARS | DESTRUCTION | ATTACKS | SIZE
+  | ENDED, the result chip carrying the verdict's color (win success,
+  loss danger, ongoing info blue, tie the quiet non-verdict fill), the
+  score cells reading both sides with the viewed clan's figure in primary
+  ink and the opponent's muted, ours first the way the game's own result
+  screen orders it; the same 768 px switch to cards the member tables
+  keep, the score stacked as StatChips. Clan War League seasons ride the
+  same page — the API reports their stars, destruction, and attacks as
+  season totals with no verdict and a degenerate opponent — so the parse
+  tags them by the league's one-attack-per-member signature, the chip
+  reads a quiet `League`, the row shows the season's own totals without
+  opponent figures or an allowance, and the summary sets them apart from
+  every rate ("excluding 6 leagues" in the caption). A private log is
+  the designed notice, never an error state (AC-05): titled, explained,
+  pointing at the current war as the next action, the stat grid's own
+  public/private cell having said so before the tab opened.
 - **Player detail:** two columns from 1024 px up (identity + analysis),
   stacked below — the layout the prototype rework tried to replace and the
   owner put back, with the prototype's two actions kept on the card. The
@@ -389,6 +414,9 @@ draw, which is why the ambience layer uses react-native-svg, the chart
 | `WarBanner` | the current-war view's state banner: tone dot, headline, and support line reading the war's state (preparation, battle day, ended with the verdict, or no war), the team size, and the war clock |
 | `WarStandings` | both clans' standings cards: badge, name, level, stars, destruction, attacks used; the `Leading` / `Winner` verdict chip resolved through `lib/war-standings.ts` (stars, then destruction), two-up from tablet and stacked below |
 | `WarMemberTable` / `WarMemberCard` | the war rosters' per-member attack view, table & card presentations: map position, name, TH, attacks used, stars, average destruction (the dash for zero-attack members, never a zero average) |
+| `ResultChip` | the war log's result pill: `Win` success, `Loss` danger, `Ongoing` info blue, `Tie` and `League` the quiet non-verdict fill (the RatioFlag dash treatment, since neither is anyone's verdict) |
+| `WarlogSummary` | the war log's efficiency band: "War efficiency" title with the sample size labeled ("Last N wars · excluding K leagues"), the engine's win rate / stars per attack / average destruction plus the record line as label-above-value cells, the dash for rates the loaded wars cannot answer |
+| `WarlogTable` / `WarlogCard` | the war log's entry view, table & card presentations: one row per war newest first (result chip, opponent badge and name, both sides' stars and destruction ours-first, attacks over the allowance, team size, end date), league seasons showing their own totals without opponent figures, the 768 px switch the member tables keep |
 | `Glyph` | the UI glyph set (the prototype's own paths on react-native-svg): compare, refresh, home, star, user, shield, search, and code — the marks buttons, nav links, mode pickers, and ratings draw |
 | `ProgressRail` | achievement value/target bar; the star row beside the track by default, or track-only (`showStars={false}`) when the row renders its star trio in the headline the prototype's layout draws |
 | `LevelRail` | the hero panel's level-versus-maximum bar: the fill without star markers, the same 6 px track and gold fill `ProgressRail` draws |
