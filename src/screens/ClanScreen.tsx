@@ -24,6 +24,9 @@ import WarBanner from '../components/WarBanner';
 import WarStandings from '../components/WarStandings';
 import WarMemberTable from '../components/WarMemberTable';
 import WarMemberCard from '../components/WarMemberCard';
+import WarlogSummary from '../components/WarlogSummary';
+import WarlogTable from '../components/WarlogTable';
+import WarlogCard from '../components/WarlogCard';
 import SkeletonCard from '../components/Skeleton';
 import SkeletonBlock, { useSkeletonPulse } from '../components/SkeletonBlock';
 import Dropdown from '../components/Dropdown';
@@ -35,7 +38,9 @@ import {
   type CurrentWarResponse,
   type WarClan,
 } from '../api/war';
+import { fetchWarlog, WarlogFetchError, type WarlogResponse } from '../api/warlog';
 import { leadingSide } from '../lib/war-standings';
+import { summarizeWarEfficiency } from '../lib/war-efficiency';
 import { busyRetryDelayMs, shouldRetryBusy } from '../lib/busy-retry';
 import { warFrequencyLabel } from '../lib/war-frequency';
 import { canonicalTagFromRoute, playerRouteFor } from '../lib/tag';
@@ -83,8 +88,10 @@ import {
 // Roster is the default when the param is absent or holds an unknown value.
 // The War tab renders the current-war view (T-M3-1: state banner, both
 // clans' standings, per-member attack tables for both rosters, all from
-// the single cached war fetch); the Log tab keeps its designed placeholder
-// until T-M3-2; the Roster tab renders the real roster from the same
+// the single cached war fetch); the Log tab renders the war log view
+// (T-M3-2: result chips, the efficiency summary, and the designed
+// private-log notice from the single cached warlog fetch, the private
+// reading included); the Roster tab renders the real roster from the same
 // single clan fetch (SR-09); the Needs Attention tab renders the
 // worst-first donation view with its own table and the war-attacks column
 // (the owner's layout).
@@ -122,6 +129,12 @@ const CLAN_STALE_TIME_MS = 180_000;
 // whole state matrix from it and the attention tab reads the attacks-left
 // column, both through the same cache entry.
 const WAR_STALE_TIME_MS = 120_000;
+
+// The war log fetch mirrors the tier's 600 s warlog TTL (04 section 5).
+// It runs while the Log tab is open; the tab renders its whole state
+// matrix from it, the private reading included — a designed state the
+// client resolves as a success, never an error (AC-05, CON-05).
+const WARLOG_STALE_TIME_MS = 600_000;
 
 export default function ClanScreen() {
   const { theme } = useTheme();
@@ -212,6 +225,48 @@ export default function ClanScreen() {
     warQuery.isPending &&
     warQuery.failureReason instanceof WarFetchError &&
     warQuery.failureReason.result.kind === 'busy';
+
+  // The war log, fetched while the Log tab is open (T-M3-2). The retry
+  // policy mirrors the war fetch's: the clan itself already loaded when
+  // this query runs at all, so a 404 is an anomaly no retry can fix and
+  // a bad_request is our own URL being wrong, while the busy outcome
+  // paces itself through lib/busy-retry and the skeleton keeps its
+  // shape (06 section 3). A private log never lands here as an error:
+  // the tier answers 200 and the client resolves it as a success shape.
+  const warlogQuery = useQuery({
+    queryKey: ['warlog', tag] as const,
+    queryFn: () => fetchWarlog(tag),
+    enabled: query.isSuccess && activeTab === 'log',
+    staleTime: WARLOG_STALE_TIME_MS,
+    retry: (failureCount, error) => {
+      if (error instanceof WarlogFetchError) {
+        if (error.result.kind === 'not_found' || error.result.kind === 'bad_request') {
+          return false;
+        }
+        if (error.result.kind === 'busy') {
+          return shouldRetryBusy(failureCount);
+        }
+      }
+      return failureCount < 1;
+    },
+    retryDelay: (failureCount, error) => {
+      if (error instanceof WarlogFetchError && error.result.kind === 'busy') {
+        return busyRetryDelayMs(error.result.retryAfter, failureCount);
+      }
+      // Only the single default retry ever waits on this: the library's
+      // own first backoff.
+      return 1_000;
+    },
+  });
+
+  // True while the war log fetch is auto-retrying a busy answer: the
+  // Log tab's skeleton keeps its shape and the caption switches to the
+  // "one moment" note, the same slow-fetch read every loading state
+  // keeps.
+  const warlogBusyRetrying =
+    warlogQuery.isPending &&
+    warlogQuery.failureReason instanceof WarlogFetchError &&
+    warlogQuery.failureReason.result.kind === 'busy';
 
   // True while the first load is auto-retrying a busy answer: the skeleton
   // stays up and its caption switches to the "one moment" note (06
@@ -325,7 +380,16 @@ export default function ClanScreen() {
                       onOpenRoster={() => selectTab('roster')}
                     />
                   ) : (
-                    <TabPlaceholder />
+                    <LogSection
+                      clanName={query.data.name}
+                      response={warlogQuery.data}
+                      isPending={warlogQuery.isPending}
+                      isFetching={warlogQuery.isFetching}
+                      busyRetrying={warlogBusyRetrying}
+                      error={warlogQuery.error}
+                      onRetry={() => void warlogQuery.refetch()}
+                      onOpenWar={() => selectTab('war')}
+                    />
                   )}
                 </View>
               ) : null}
@@ -1397,18 +1461,237 @@ function WarError({ error, onRetry, isRetrying }: WarErrorProps) {
   );
 }
 
-// ---------- tab content placeholder ----------
+// ---------- log section (the war log view, T-M3-2) ----------
 
-function TabPlaceholder() {
-  // The War view landed with T-M3-1; the Log view is the remaining
-  // placeholder (T-M3-2). It stays designed (06 section 3 "empty"):
-  // titled, explained, and pointing at the card that fills it, so the
-  // screen reads end to end today and a reviewer knows what is missing
-  // by design rather than by oversight.
+interface LogSectionProps {
+  clanName: string;
+  response: WarlogResponse | undefined;
+  isPending: boolean;
+  isFetching: boolean;
+  busyRetrying: boolean;
+  error: Error | null;
+  onRetry: () => void;
+  onOpenWar: () => void;
+}
+
+function LogSection({
+  clanName,
+  response,
+  isPending,
+  isFetching,
+  busyRetrying,
+  error,
+  onRetry,
+  onOpenWar,
+}: LogSectionProps) {
+  const { theme } = useTheme();
+  const logStyles = useMemo(() => createLogStyles(theme), [theme]);
+
+  // The presentation switch every table-bearing tab keeps (NFR-05):
+  // the table at 768 px and up, one card per war below.
+  const { width } = useWindowDimensions();
+  const breakpoint = breakpointFor(width);
+  const isCardPresentation = breakpoint === 'small' || breakpoint === 'mobile';
+
+  // The four-state matrix is per data view (STD-35): a layout-matched
+  // skeleton, the contract's error branches with a retry, the private
+  // reading as the designed notice (never an error, AC-05), and the log
+  // itself under its efficiency summary.
+  if (isPending) {
+    return <LogLoading busyRetrying={busyRetrying} />;
+  }
+  if (error !== null) {
+    return <LogError error={error} onRetry={onRetry} isRetrying={isFetching} />;
+  }
+  if (response === undefined) {
+    // The query has resolved without data or error, which the states
+    // above already cover; the guarded render costs less than a crash.
+    return <LogLoading busyRetrying={false} />;
+  }
+
+  if (response.private) {
+    // The designed private-log notice (F-09, AC-05): the clan set its
+    // log to private in the game, so there is no history to read. The
+    // stat grid cell above already said Private before the tab opened;
+    // this is the same fact, designed, with the live war as the next
+    // action since the current-war endpoint answers regardless.
+    return (
+      <EmptyState
+        title="This war log is private"
+        body={`${clanName} keeps its war log private in the game, so past results and the efficiency summary are not available to read. The current war still shows live.`}
+        action={
+          <PillButton
+            label="View the current war"
+            variant="secondary"
+            onPress={onOpenWar}
+            hint="Switches to the clan's War tab."
+          />
+        }
+      />
+    );
+  }
+
+  if (response.entries.length === 0) {
+    // A public log with no entries: a clan that has not fought a war
+    // since the log began, designed rather than an empty table.
+    return (
+      <EmptyState
+        title="No wars on record"
+        body={`${clanName} has a public war log, but no wars appear on it yet. When the clan finishes its next war, the result lands here with the efficiency summary.`}
+        action={
+          <PillButton
+            label="View the current war"
+            variant="secondary"
+            onPress={onOpenWar}
+            hint="Switches to the clan's War tab."
+          />
+        }
+      />
+    );
+  }
+
+  const summary = summarizeWarEfficiency(response.entries);
+
   return (
-    <EmptyState
-      title="War log lands in M3"
-      body="The war log (result chips, efficiency summary, and the designed private-log notice) lands in milestone M3, joining the current war view."
+    <View style={logStyles.section}>
+      <WarlogSummary summary={summary} />
+      {isCardPresentation
+        ? response.entries.map((entry, index) => (
+            <WarlogCard key={entry.clan.tag + String(entry.endTimeMs ?? index)} entry={entry} />
+          ))
+        : (
+          <WarlogTable
+            entries={response.entries}
+            accessibilityLabel={`${clanName} war log`}
+          />
+        )}
+    </View>
+  );
+}
+
+// ---------- log loading ----------
+
+// Enough log rows to fill a laptop viewport, the same count the war and
+// clan skeletons keep.
+const LOG_SKELETON_ROWS = 6;
+
+function LogLoading({ busyRetrying }: { busyRetrying: boolean }) {
+  const { theme } = useTheme();
+  const base = useMemo(() => createBaseStyles(theme), [theme]);
+  const logStyles = useMemo(() => createLogStyles(theme), [theme]);
+  const pulse = useSkeletonPulse();
+  // The same presentation switch the log keeps, so the skeleton holds
+  // the exact shapes the data will fill on this viewport.
+  const { width } = useWindowDimensions();
+  const breakpoint = breakpointFor(width);
+  const isCardPresentation = breakpoint === 'small' || breakpoint === 'mobile';
+
+  return (
+    <View
+      style={logStyles.section}
+      accessibilityRole="progressbar"
+      accessibilityLabel="Loading the war log"
+    >
+      {/* The summary band's own shape: title row, then the metric cells. */}
+      <View style={logStyles.skeletonSummaryPanel}>
+        <View style={logStyles.skeletonSummaryTitleRow}>
+          <SkeletonBlock width={130} height={theme.fontSize.md} pulse={pulse} />
+          <SkeletonBlock width={80} height={theme.fontSize.xs} pulse={pulse} />
+        </View>
+        <View style={logStyles.skeletonSummaryRow}>
+          {Array.from({ length: 4 }, (_, index) => (
+            <View key={index} style={logStyles.skeletonSummaryCell}>
+              <SkeletonBlock width={72} height={theme.fontSize.xs} pulse={pulse} />
+              <SkeletonBlock width={56} height={theme.fontSize['2xl']} pulse={pulse} />
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* The log's own shape (or the card list's below 768 px). */}
+      {isCardPresentation ? (
+        Array.from({ length: LOG_SKELETON_ROWS }, (_, index) => (
+          <SkeletonCard key={index} />
+        ))
+      ) : (
+        <View style={logStyles.skeletonTablePanel}>
+          <View style={logStyles.skeletonTableHeaderRow}>
+            <SkeletonBlock width="70%" height={theme.fontSize.xs} pulse={pulse} />
+          </View>
+          {Array.from({ length: LOG_SKELETON_ROWS }, (_, index) => (
+            <View key={index} style={logStyles.skeletonTableRow}>
+              <SkeletonBlock width="100%" height={theme.fontSize.sm} pulse={pulse} />
+            </View>
+          ))}
+        </View>
+      )}
+
+      <Text style={[base.caption, logStyles.skeletonCaption]}>
+        {busyRetrying
+          ? 'The game API is busy. One moment, retrying automatically…'
+          : 'Fetching through the tier…'}
+      </Text>
+    </View>
+  );
+}
+
+// ---------- log error ----------
+
+interface LogErrorProps {
+  error: Error;
+  onRetry: () => void;
+  isRetrying: boolean;
+}
+
+function LogError({ error, onRetry, isRetrying }: LogErrorProps) {
+  // The warlog route rides the same contract the clan and war routes do
+  // (04 section 6), so the Log tab's error state branches on the same
+  // kinds, each with its own copy and a retry, never a dead end (06
+  // section 3). A private log never reaches this component: it resolves
+  // as a success and renders the notice above.
+  const retryButton = (
+    <PillButton
+      label={isRetrying ? 'Retrying…' : 'Retry'}
+      onPress={onRetry}
+      disabled={isRetrying}
+    />
+  );
+  if (error instanceof WarlogFetchError) {
+    if (error.result.kind === 'busy') {
+      return (
+        <ErrorState
+          tone="busy"
+          title="The game API is busy"
+          body={`Upstream answered 429 and automatic retries have not cleared it yet. Trying again now may work, or wait about ${error.result.retryAfter}s and retry.`}
+          action={retryButton}
+        />
+      );
+    }
+    if (error.result.kind === 'unreachable') {
+      return (
+        <ErrorState
+          tone="gone"
+          title="Can't reach the game API"
+          body="The proxy or the game API did not answer. This is usually transient; retry in a moment."
+          action={retryButton}
+        />
+      );
+    }
+    return (
+      <ErrorState
+        tone="gone"
+        title="War log did not load"
+        body="The war log lookup came back empty even though the clan itself loaded fine. That is unusual; a retry usually clears it."
+        action={retryButton}
+      />
+    );
+  }
+  return (
+    <ErrorState
+      tone="gone"
+      title="Something went wrong"
+      body={error.message || 'An unexpected error happened while fetching the war log.'}
+      action={retryButton}
     />
   );
 }
@@ -1617,6 +1900,73 @@ function createWarStyles(t: ReturnType<typeof useTheme>['theme']) {
     skeletonStandingsCellInRow: {
       flex: 1,
       flexBasis: 0,
+    },
+    skeletonTablePanel: {
+      backgroundColor: c.panelRaised,
+      borderRadius: t.radius[2],
+      borderWidth: 1,
+      borderColor: c.panelBorder,
+      borderTopColor: c.panelHighlight,
+      overflow: 'hidden',
+    },
+    skeletonTableHeaderRow: {
+      minHeight: t.layout.controlHeight,
+      paddingHorizontal: t.spacing[3],
+      justifyContent: 'center',
+      borderBottomWidth: 1,
+      borderBottomColor: c.panelBorder,
+    },
+    skeletonTableRow: {
+      minHeight: t.layout.controlHeight,
+      paddingHorizontal: t.spacing[3],
+      justifyContent: 'center',
+      borderBottomWidth: 1,
+      borderBottomColor: c.hairline,
+    },
+    skeletonCaption: {
+      marginTop: t.spacing[1],
+    },
+  });
+}
+
+// The log section's own styles (STD-13): built from the theme like any
+// section, mirroring the shapes the success view renders so the
+// skeleton is layout-matched (06 section 3).
+function createLogStyles(t: ReturnType<typeof useTheme>['theme']) {
+  const c = t.colors;
+  return StyleSheet.create({
+    // The section's rhythm: one gap step between the summary band and
+    // the log (or the loading caption), the war section's own beat.
+    section: {
+      gap: t.spacing[4],
+    },
+
+    // The loading skeleton's shapes, each mirroring the success element
+    // it stands in for (the layout-matched rule, 06 section 3): the
+    // summary band's title row and metric cells, then the table panel's
+    // header and rows (or the card list's below 768 px).
+    skeletonSummaryPanel: {
+      padding: t.spacing[3],
+      borderRadius: t.radius[2],
+      borderWidth: 1,
+      borderColor: c.panelBorder,
+      borderTopColor: c.panelHighlight,
+      backgroundColor: c.panelRaised,
+    },
+    skeletonSummaryTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      justifyContent: 'space-between',
+    },
+    skeletonSummaryRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      columnGap: t.spacing[5],
+      rowGap: t.spacing[2],
+      marginTop: t.spacing[3],
+    },
+    skeletonSummaryCell: {
+      gap: t.spacing[1],
     },
     skeletonTablePanel: {
       backgroundColor: c.panelRaised,
