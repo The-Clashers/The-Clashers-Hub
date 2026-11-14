@@ -171,6 +171,79 @@ const player = {
   achievements: [{ name: 'Keep Your Account Safe', stars: 3, value: 1, target: 1 }],
 };
 
+// The second mock player, the clan roster's own #MOCKTWO, so the player
+// comparison (T-M3-3) has two distinct profiles to face off locally: a
+// lower Town Hall, a higher (worse) rushed percentage, different hero and
+// achievement sets (two heroes the leader lacks, one the leader has that
+// this one does not), and weaker lifetime counters. The key achievements
+// the compare engine curates sit on different sides so both the
+// both-sides and the one-side-dash paths render. Every other player tag
+// still answers the first mock player, unchanged.
+const secondPlayer = {
+  tag: '#MOCKTWO',
+  name: 'Mock Second',
+  townHallLevel: 13,
+  expLevel: 142,
+  trophies: 3911,
+  warStars: 864,
+  attackWins: 41,
+  donations: 51,
+  donationsReceived: 343,
+  league: { name: 'Champion League II' },
+  clan: { tag: '#MOCKCLAN', name: 'Mock Clan', clanLevel: 12 },
+  troops: [
+    { name: 'Barbarian', level: 10, maxLevel: 12, village: 'home' },
+    { name: 'Archer', level: 7, maxLevel: 12, village: 'home' },
+    { name: 'Goblin', level: 5, maxLevel: 10, village: 'home' },
+    { name: 'Giant', level: 9, maxLevel: 12, village: 'home' },
+    { name: 'Wall Breaker', level: 8, maxLevel: 12, village: 'home' },
+    { name: 'Balloon', level: 5, maxLevel: 12, village: 'home' },
+    { name: 'Wizard', level: 6, maxLevel: 12, village: 'home' },
+    { name: 'Healer', level: 4, maxLevel: 8, village: 'home' },
+    { name: 'Dragon', level: 5, maxLevel: 10, village: 'home' },
+    { name: 'P.E.K.K.A', level: 6, maxLevel: 10, village: 'home' },
+    { name: 'Valkyrie', level: 4, maxLevel: 8, village: 'home' },
+    { name: 'Golem', level: 5, maxLevel: 10, village: 'home' },
+    { name: 'Super Archer', level: 1, maxLevel: 8, village: 'home' },
+    { name: 'Wall Wrecker', level: 2, maxLevel: 6, village: 'home' },
+    { name: 'L.A.S.S.I', level: 8, maxLevel: 15, village: 'home' },
+    { name: 'Raged Barbarian', level: 12, maxLevel: 20, village: 'builderBase' },
+  ],
+  spells: [
+    { name: 'Lightning Spell', level: 6, maxLevel: 12, village: 'home' },
+    { name: 'Healing Spell', level: 4, maxLevel: 8, village: 'home' },
+    { name: 'Rage Spell', level: 3, maxLevel: 8, village: 'home' },
+    { name: 'Freeze Spell', level: 2, maxLevel: 8, village: 'home' },
+    { name: 'Poison Spell', level: 2, maxLevel: 6, village: 'home' },
+  ],
+  heroes: [
+    { name: 'Barbarian King', level: 45, maxLevel: 80, village: 'home' },
+    { name: 'Archer Queen', level: 60, maxLevel: 80, village: 'home' },
+    { name: 'Grand Warden', level: 30, maxLevel: 65, village: 'home' },
+    { name: 'Royal Champion', level: 15, maxLevel: 40, village: 'home' },
+    { name: 'Battle Copter', level: 18, maxLevel: 25, village: 'builderBase' },
+  ],
+  heroEquipment: [
+    { name: 'Snake Bracelet', level: 12, maxLevel: 27, village: 'home' },
+    { name: 'Hog Rider Puppet', level: 9, maxLevel: 18, village: 'home' },
+  ],
+  achievements: [
+    { name: 'Gold Grab', stars: 2, value: 812400000, target: 2000000000, village: 'home' },
+    { name: 'Elixir Escapade', stars: 1, value: 310200000, target: 2000000000, village: 'home' },
+    { name: 'Friend in Need', stars: 2, value: 52300, target: 250000, village: 'home' },
+    { name: 'Spoils of War', stars: 1, value: 8450000, target: 100000000, village: 'home' },
+  ],
+};
+
+// The first player's own achievements carry the key achievements the
+// compare engine curates, so the head-to-head rows have both sides to
+// answer; see secondPlayer below for the contrasting profile.
+player.achievements.push(
+  { name: 'Gold Grab', stars: 3, value: 2150000000, target: 2000000000, village: 'home' },
+  { name: 'Friend in Need', stars: 3, value: 260500, target: 250000, village: 'home' },
+  { name: 'Heroic Heist', stars: 1, value: 96300, target: 1000000, village: 'home' },
+);
+
 const war = {
   state: 'inWar',
   teamSize: 15,
@@ -457,7 +530,17 @@ const server = createServer((req, res) => {
 
   const playerMatch = path.match(/^\/v1\/players\/([^/]+)$/);
   if (playerMatch) {
-    sendJson(res, 200, player);
+    // The roster's second member answers her own profile (the compare
+    // view's contrasting side); #NOTFOUND exercises the player 404 path
+    // (the compare's per-side error state); every other tag answers the
+    // first mock player, as before.
+    const tag = decodeURIComponent(playerMatch[1]).toUpperCase();
+    const withHash = tag.startsWith('#') ? tag : `#${tag}`;
+    if (withHash === '#NOTFOUND') {
+      sendJson(res, 404, { reason: 'notFound', message: 'mock player not found' });
+      return;
+    }
+    sendJson(res, 200, withHash === '#MOCKTWO' ? secondPlayer : player);
     return;
   }
 
