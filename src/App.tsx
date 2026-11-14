@@ -9,6 +9,7 @@ import PlayerScreen from './screens/PlayerScreen';
 import PlayersScreen from './screens/PlayersScreen';
 import ContributorsScreen from './screens/ContributorsScreen';
 import CompareScreen from './screens/CompareScreen';
+import PlayerCompareScreen from './screens/PlayerCompareScreen';
 import TokenScreen from './screens/TokenScreen';
 
 // The URL map is a product feature (shareable links), documented in the
@@ -22,8 +23,11 @@ import TokenScreen from './screens/TokenScreen';
 //
 // `/clan/:tag` and `/player/:tag` keep their shareable bare-tag form (the
 // `#` stays hidden, re-attached in exactly one place, lib/tag.ts).
-// Compare gets its landing route here; the player and clan compare
-// sub-routes land with the compare screens themselves. The /tokens route
+// Compare gets its landing route here plus the player sub-route
+// `/compare/players` the landing and the player card's compare button
+// navigate to (T-M3-3): two bare tags in the query string, the same
+// shareable form every entity route keeps. The clan compare sub-route
+// lands with its own screen (T-M3-4). The /tokens route
 // is a review surface for T-M0-2 and stays linked from the contributors
 // page (the owner's call); the /hello M0 smoke screen is gone, the real
 // /clan/:tag screen renders everything it used to render (the owner's
@@ -45,6 +49,7 @@ export default function App() {
         <Route path="/clan/:tag" element={<ClanScreen />} />
         <Route path="/player/:tag" element={<PlayerScreen />} />
         <Route path="/compare" element={<CompareScreen />} />
+        <Route path="/compare/players" element={<PlayerCompareScreen />} />
         <Route path="/tokens" element={<TokenScreen />} />
       </Routes>
       <Footer />
