@@ -220,6 +220,23 @@ draw, which is why the ambience layer uses react-native-svg, the chart
   mode offers two dedicated input boxes (Entity A and Entity B) divided by
   a central VS badge, complete with tag normalization, helper hints, and
   a launch button navigating to `/compare/players` or `/compare/clans`.
+- **Player comparison view:** `/compare/players?a=TAG&b=TAG` (two bare tags
+  in the query string, the shareable form; a missing or malformed side is
+  the designed "two player tags are needed" empty, never an error). The
+  two identity cards face off with the VS badge between them, two-up from
+  tablet and stacked below (the standings' own family): league tier crest
+  in the 24 px slot falling back to the classic league object, name, tag
+  with the clan name, a three-cell context row (Town Hall, XP level,
+  league), and the whole card is the link to the player's full profile.
+  Under the face-off, the metric rows group into panels (Account, Rushed
+  analysis, Heroes, War record, Key achievements): A's value | the label
+  with the delta under it | B's value, the values mirroring around the
+  center at every width the content column keeps. The leading value
+  speaks in success ink, the trailing in danger, a tie keeps primary, an
+  incomparable row stays quiet with the dash; the delta is the leader's
+  unsigned margin in the leader's own green. The no-winner note rides
+  under the subtitle so the absence of an overall banner reads as the
+  decision it is (05 section 4).
 - **Clan detail card:** three stacked bands (the owner's better-layout call
   over the two-column wireframe). The identity row (badge 48, name,
   tag/level/location line), the description at full width clamped to two
@@ -417,6 +434,7 @@ draw, which is why the ambience layer uses react-native-svg, the chart
 | `ResultChip` | the war log's result pill: `Win` success, `Loss` danger, `Ongoing` info blue, `Tie` and `League` the quiet non-verdict fill (the RatioFlag dash treatment, since neither is anyone's verdict) |
 | `WarlogSummary` | the war log's efficiency band: "War efficiency" title with the sample size labeled ("Last N wars · excluding K leagues"), the engine's win rate / stars per attack / average destruction plus the record line as label-above-value cells, the dash for rates the loaded wars cannot answer |
 | `WarlogTable` / `WarlogCard` | the war log's entry view, table & card presentations: one row per war newest first (result chip, opponent badge and name, both sides' stars and destruction ours-first, attacks over the allowance, team size, end date), league seasons showing their own totals without opponent figures, the 768 px switch the member tables keep |
+| `CompareMetricRows` | the player comparison's metric panels: one row per metric (A's value, the label with the delta, B's value, mirrored around the center), the leading value in success ink and the trailing in danger, an incomparable row quiet with the dash, the delta the leader's unsigned margin in the leader's green, grouped under Account / Rushed analysis / Heroes / War record / Key achievements headers |
 | `Glyph` | the UI glyph set (the prototype's own paths on react-native-svg): compare, refresh, home, star, user, shield, search, and code — the marks buttons, nav links, mode pickers, and ratings draw |
 | `ProgressRail` | achievement value/target bar; the star row beside the track by default, or track-only (`showStars={false}`) when the row renders its star trio in the headline the prototype's layout draws |
 | `LevelRail` | the hero panel's level-versus-maximum bar: the fill without star markers, the same 6 px track and gold fill `ProgressRail` draws |

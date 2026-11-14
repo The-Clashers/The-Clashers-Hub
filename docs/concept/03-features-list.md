@@ -17,7 +17,7 @@ cross-reference the tracker in [02](./02-requirements-tracker.md).
 | F-07 | Donation balance: per-member flags + clan-level health summary | P0 | FR-05 | target ratio adjustable client-side |
 | F-08 | Current war view | P1 | FR-10 | standings + per-member table |
 | F-09 | War log view + efficiency summary | P1 | FR-11, FR-12 | designed private-log notice |
-| F-10 | Compare: player vs player | P1 | FR-13 | metric-by-metric, direction-colored |
+| F-10 | Compare: player vs player | P1 | FR-13 | metric-by-metric, direction-colored; lives on `/compare/players?a=TAG&b=TAG` (shareable, two bare tags): identity cards face off with the VS badge, rows group into Account / Rushed analysis / Heroes / War record / Key achievements, the leading value green and the trailing red, the delta the leader's margin; per-metric verdicts only, no overall winner |
 | F-11 | Compare: clan vs clan | P1 | FR-13 | roster stats + war record |
 | F-12 | Shareable URLs everywhere | P0 | FR-14 | free with React Router; tag encoding handled |
 | F-13 | Recent searches (local storage) | P1 | FR-15 | |

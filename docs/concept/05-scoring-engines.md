@@ -162,6 +162,32 @@ war stats. Clan compare: size, level, war record, average TH, donation health.
 "winner" number**, summing unlike units into one score is false precision
 and we will not ship it.
 
+**The player compare's own rules (T-M3-3, shipped):**
+
+- The metric set is the list above read literally: Account (Town Hall, XP
+  level), Rushed analysis (overall then the categories, lower-better), the
+  union of both sides' home-village heroes (a hero one side has not
+  unlocked renders against the dash), War record (lifetime war stars,
+  season attack wins), and the key achievements — the game's lifetime
+  counters curated as data (`Gold Grab`, `Elixir Escapade`, `Heroic
+  Heist`, `Friend in Need`, `Spoils of War`; `War Hero` is absent because
+  its value is the payload's own war stars, which the war record already
+  compares once). A key achievement missing from both profiles renders
+  no row, so the list drifting out of date degrades quietly.
+- A metric one side cannot answer is a verdict, not an error: the dash
+  renders, no direction, no delta — the same honesty the rushed engine's
+  null keeps. A real zero still compares.
+- Direction colors are the semantic pair: the leading value in success
+  ink, the trailing value in danger ink, a tie in primary, an
+  incomparable row quiet. The delta is the leader's margin, unsigned and
+  in the leader's own green ("+12" whoever leads, "Even" on a tie): a
+  signed delta would compete with the value colors on lower-is-better
+  metrics, where a bigger number is a worse side.
+- The engine stays pure and engine-clean: the screen-side adapter trues
+  each player payload plus her rushed verdict into the structural sides,
+  so the compare engine imports neither the rushed engine's internals
+  nor the API client (section 5's boundary, kept honest by the tests).
+
 ## 5. Testing strategy
 
 - Every engine gets **table-driven unit tests** over `fixtures/`, anonymized
