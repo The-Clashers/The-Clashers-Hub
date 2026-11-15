@@ -188,6 +188,35 @@ and we will not ship it.
   so the compare engine imports neither the rushed engine's internals
   nor the API client (section 5's boundary, kept honest by the tests).
 
+**The clan compare's own rules (T-M3-4, shipped):**
+
+- The metric set is the doc's clan list read literally: Roster stats
+  (Members, Average Town Hall, Donation health) then War record (War wins
+  and Win streak from the clan payload; Win rate, Stars per attack, and
+  Average destruction from the war log window). Roster size is a *fact*,
+  not a judgment: a 30-member clan is not a worse 50-member clan, so the
+  row renders both values in primary ink with the unsigned gap in the
+  quiet ink, and no side colors. Every other clan metric reads
+  higher-better.
+- A row compares at the precision it displays. The share rows quantize to
+  whole percents and the decimal rows to one place *before* the verdict,
+  so two win rates that both read 44% render "Even", never "+0 ahead" —
+  a row that compared raw values under rounded displays contradicted
+  itself on live data, and the quantize-then-compare rule (delta formatted
+  through the same precision) is what the tests lock in.
+- A private war log answers no rate: the dash, the same honesty the Log
+  tab keeps, plus the group note naming each side's window (sample size
+  and leagues set apart) so nobody over-reads a short log or mistakes the
+  dash for a failure. A war log that fails to *load* is its own state —
+  the answered side's rates stay, the failed side reads the dash, and a
+  retry panel owns the explanation — so a fetch failure never wears the
+  private log's copy.
+- The engine boundary matches the player half: the screen-side adapter
+  trues each clan payload plus its war log into the structural side, the
+  donation engine answers the health figure, and the war-efficiency
+  engine the rates; the compare engine imports neither, keeping section
+  5's boundary honest by construction.
+
 ## 5. Testing strategy
 
 - Every engine gets **table-driven unit tests** over `fixtures/`, anonymized
