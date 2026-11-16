@@ -18,7 +18,7 @@ cross-reference the tracker in [02](./02-requirements-tracker.md).
 | F-08 | Current war view | P1 | FR-10 | standings + per-member table |
 | F-09 | War log view + efficiency summary | P1 | FR-11, FR-12 | designed private-log notice |
 | F-10 | Compare: player vs player | P1 | FR-13 | metric-by-metric, direction-colored; lives on `/compare/players?a=TAG&b=TAG` (shareable, two bare tags): identity cards face off with the VS badge, rows group into Account / Rushed analysis / Heroes / War record / Key achievements, the leading value green and the trailing red, the delta the leader's margin; per-metric verdicts only, no overall winner |
-| F-11 | Compare: clan vs clan | P1 | FR-13 | roster stats + war record |
+| F-11 | Compare: clan vs clan | P1 | FR-13 | roster stats + war record; lives on `/compare/clans?a=TAG&b=TAG` (shareable, two bare tags): identity cards face off with the VS badge (badge, tag, location, and a war-log status cell so dashes never surprise), rows group into Roster stats (Members as a fact with the gap, Average Town Hall, Donation health) and War record (War wins, Win streak from the payload, Win rate, Stars per attack, Avg destruction from each clan's public log window, a private log reading the dash with the sample note naming both windows); the landing's clan mode resolves names through the clan picker popup before any comparison runs |
 | F-12 | Shareable URLs everywhere | P0 | FR-14 | free with React Router; tag encoding handled |
 | F-13 | Recent searches (local storage) | P1 | FR-15 | |
 | F-14 | Favorites / watchlist (local storage) | P2 | | see [06 §"Storage ladder"](./06-data-flow-and-caching.md) |

@@ -24,7 +24,12 @@
 //   #NOTFOUND                   -> 404 (not_found + negative caching)
 //   #BADREQ                     -> 400 (bad_request with a reason)
 //   #HANG (war route only)      -> never answers (timeout path)
-//   any warlog except #PUBLICLO -> 403 accessDenied (the private-log state)
+//   #MOCKTWO (clan route)       -> 200 with the second clan fixture, whose
+//                                 war log answers private (the clan
+//                                 comparison's dash path, T-M3-4)
+//   warlog of #MOCKCLAN/#PUBLICLO -> 200 with the full-shaped log (the
+//                                 rates and the league-set-apart path)
+//   any other warlog            -> 403 accessDenied (the private-log state)
 //   #DENIED (warlog)            -> 403 with an unknown reason (defensive path)
 //   #BUSY                       -> 429 with Retry-After (the busy path)
 
@@ -47,6 +52,10 @@ const clan = {
   // Surfaced on the clan detail card as the war log status chip; the mock
   // keeps it public so the card and the warlog route agree locally.
   isWarLogPublic: true,
+  // The war counters the clan comparison (T-M3-4) reads beside the log
+  // rates: lifetime wins and the active streak.
+  warWins: 312,
+  warWinStreak: 5,
   memberList: [
     {
       tag: '#MOCKPLAY',
@@ -73,6 +82,55 @@ const clan = {
       donations: 51,
       donationsReceived: 343,
       townHallLevel: 13,
+    },
+  ],
+};
+
+// The second mock clan (T-M3-4), the clan comparison's contrasting side:
+// a lower level, a lighter roster, a private war log, and a different
+// Town Hall mix and donation balance so every compare row has a real
+// difference to read. The roster reuses the player fixture's #MOCKTWO
+// (her donations stay lopsided) plus a healthy donor, so the donation
+// health row reads a real 50% against the first clan's.
+const secondClan = {
+  tag: '#MOCKTWO',
+  name: 'Mock Second Clan',
+  type: 'inviteOnly',
+  description: 'The comparison fixture clan.',
+  clanLevel: 8,
+  clanPoints: 22000,
+  members: 2,
+  warFrequency: 'oncePerWeek',
+  requiredTownhallLevel: 12,
+  isWarLogPublic: false,
+  warWins: 88,
+  warWinStreak: 0,
+  memberList: [
+    {
+      tag: '#MOCKTWO',
+      name: 'Mock Second',
+      role: 'leader',
+      expLevel: 142,
+      leagueTier: { name: 'Witch League 18', iconUrls: { small: 'mock-tier.png', large: 'mock-tier.png' } },
+      trophies: 3911,
+      versusTrophies: 2901,
+      clanRank: 1,
+      donations: 51,
+      donationsReceived: 343,
+      townHallLevel: 13,
+    },
+    {
+      tag: '#MOCKDONOR',
+      name: 'Mock Donor',
+      role: 'coLeader',
+      expLevel: 201,
+      leagueTier: { name: 'Titan League I', iconUrls: { small: 'mock-tier.png', large: 'mock-tier.png' } },
+      trophies: 5102,
+      versusTrophies: 3305,
+      clanRank: 2,
+      donations: 428,
+      donationsReceived: 371,
+      townHallLevel: 12,
     },
   ],
 };
@@ -244,6 +302,61 @@ player.achievements.push(
   { name: 'Heroic Heist', stars: 1, value: 96300, target: 1000000, village: 'home' },
 );
 
+// The public war log, rebuilt in the live payload's shape (T-M3-2's parse
+// reads both sides' full standings; the old flat fixture carried no clan
+// side object at all, so every entry dropped at the parse). Two regular
+// wars with stars, destruction, and attacks per side, plus one Clan War
+// League season (the one-attack-per-member signature, no verdict, season
+// totals) so the efficiency engine's league-set-apart path renders too.
+const warBadgeUrls = { small: 'mock-badge.png', medium: 'mock-badge.png', large: 'mock-badge.png' };
+
+const warlogFor = (clanIdentity) => ({
+  items: [
+    {
+      result: 'win',
+      endTime: '2026-10-18T00:00:00Z',
+      teamSize: 15,
+      attacksPerMember: 2,
+      clan: { ...clanIdentity, badgeUrls: warBadgeUrls, stars: 41, destructionPercentage: 92.3, attacks: 28 },
+      opponent: {
+        tag: '#MOCKFOE',
+        name: 'Mock Foe',
+        clanLevel: 11,
+        badgeUrls: warBadgeUrls,
+        stars: 33,
+        destructionPercentage: 81.7,
+        attacks: 27,
+      },
+    },
+    {
+      result: 'lose',
+      endTime: '2026-10-11T00:00:00Z',
+      teamSize: 15,
+      attacksPerMember: 2,
+      clan: { ...clanIdentity, badgeUrls: warBadgeUrls, stars: 21, destructionPercentage: 71.2, attacks: 26 },
+      opponent: {
+        tag: '#MOCKRIV',
+        name: 'Mock Rival',
+        clanLevel: 13,
+        badgeUrls: warBadgeUrls,
+        stars: 27,
+        destructionPercentage: 78.9,
+        attacks: 29,
+      },
+    },
+    {
+      // A Clan War League season: no result field ever, one attack per
+      // member per day, season-total stars and destruction (the 962.4%
+      // "destruction" is seven rounds' worth), and a degenerate opponent.
+      endTime: '2026-10-04T00:00:00Z',
+      teamSize: 15,
+      attacksPerMember: 1,
+      clan: { ...clanIdentity, badgeUrls: warBadgeUrls, stars: 240, destructionPercentage: 962.4, attacks: 105 },
+      opponent: { tag: '#0', name: '', clanLevel: 0, badgeUrls: warBadgeUrls, stars: 0, destructionPercentage: 0, attacks: 0 },
+    },
+  ],
+});
+
 const war = {
   state: 'inWar',
   teamSize: 15,
@@ -279,13 +392,6 @@ const war = {
     ],
   },
   opponent: { tag: '#MOCKFOE', name: 'Mock Foe', attacks: 11, stars: 22, destructionPercentage: 75.1 },
-};
-
-const warlog = {
-  items: [
-    { result: 'win', endTime: '2026-10-18T00:00:00Z', teamSize: 15, stars: 28, opponent: { tag: '#MOCKFOE', name: 'Mock Foe' } },
-    { result: 'lose', endTime: '2026-10-11T00:00:00Z', teamSize: 15, stars: 21, opponent: { tag: '#MOCKRIV', name: 'Mock Rival' } },
-  ],
 };
 
 // The clans the search endpoint pages through: eight fixture clans whose
@@ -524,6 +630,12 @@ const server = createServer((req, res) => {
       sendJson(res, 429, { reason: 'tooManyRequests' }, { 'retry-after': '2' });
       return;
     }
+    // The comparison's second clan answers her own payload (T-M3-4);
+    // every other tag still answers the first clan, as before.
+    if (tag === '#MOCKTWO') {
+      sendJson(res, 200, secondClan);
+      return;
+    }
     sendJson(res, 200, clan);
     return;
   }
@@ -562,12 +674,27 @@ const server = createServer((req, res) => {
       sendJson(res, 403, { reason: 'keyIpBlocked' });
       return;
     }
-    if (tag !== '#PUBLICLO') {
-      // The live API answers a private war log with reason accessDenied.
+    // The mock clan's own log went public (the clan payload always said
+    // isWarLogPublic: true; the route used to disagree, which left the
+    // detail card and the Log tab telling two stories). #PUBLICLO keeps
+    // its public answer for the Log tab's own fixture path.
+    if (tag === '#MOCKCLAN' || tag === '#PUBLICLO') {
+      sendJson(
+        res,
+        200,
+        warlogFor({ tag: '#MOCKCLAN', name: 'Mock Clan', clanLevel: 12 }),
+      );
+      return;
+    }
+    if (tag === '#MOCKTWO') {
+      // The comparison's private-log side: the second clan's payload
+      // says isWarLogPublic: false and the route agrees, so the compare
+      // renders the designed dash path end to end locally.
       sendJson(res, 403, { reason: 'accessDenied' });
       return;
     }
-    sendJson(res, 200, warlog);
+    // The live API answers a private war log with reason accessDenied.
+    sendJson(res, 403, { reason: 'accessDenied' });
     return;
   }
 

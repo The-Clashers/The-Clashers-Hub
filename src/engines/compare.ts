@@ -16,6 +16,15 @@
 // engine never sees payload shapes and never imports the rushed engine
 // (05 section 5: engines may not import each other's internals).
 //
+// The clan half (T-M3-4) reads the same doc's clan list literally — size,
+// level, war record, average TH, donation health — through a sibling
+// {@link ClanCompareSide} and {@link computeClanCompare}. One metric in
+// that list, roster size, carries no better/worse reading (a 30-member
+// clan is not a worse 50-member clan), so the engine's metric kinds grow a
+// 'fact': both values render, the delta is the gap, and neither side
+// colors. The adapter that feeds the clan side imports the donation
+// engine for the health figure; this engine still imports nobody.
+//
 // Missing data is a verdict, not an error: a metric one side cannot answer
 // renders the dash and carries no direction, so a clanless or fresh account
 // never fakes a zero into the comparison (the same honesty the rushed
@@ -41,6 +50,49 @@ export interface CompareAchievement {
    * compares; stars are the same on both sides too often to separate
    * maxed accounts). */
   value: number;
+}
+
+/**
+ * One side of the clan comparison: everything the clan metric rows read,
+ * already normalized by the screen-side adapter (05 section 4's clan list:
+ * size, level, war record, average TH, donation health). Numbers are
+ * nullable where the source cannot answer them, so "no data" stays
+ * distinguishable from a real zero — a private war log answers no rate,
+ * and a roster nobody donated on answers no health.
+ */
+export interface ClanCompareSide {
+  name: string;
+  tag: string;
+  /** Roster size, the clan payload's own members count. */
+  members: number | null;
+  /** Clan level; higher unlocks more clan perks. */
+  clanLevel: number | null;
+  /** Mean Town Hall across the roster, one decimal; null when the member
+   * list is missing or empty (the clan payload always carries one, but a
+   * degraded answer must not fake a zero). */
+  averageTownHall: number | null;
+  /** Share of members-with-data at or above the donation target, 0 to 1;
+   * null when no member has donation data (the donation engine's own
+   * no-data rule, computed by the adapter). */
+  donationHealth: number | null;
+  /** Lifetime war wins, the clan payload's own counter. */
+  warWins: number | null;
+  /** Active war win streak. */
+  warWinStreak: number | null;
+  // ---- the war log rates (null when the log is private or answers
+  // nothing; computed by the adapter through lib/war-efficiency) ----
+  /** Wins over decided wars in the loaded log window; null when nothing
+   * is decided. */
+  winRate: number | null;
+  /** Total stars over total attacks in the window; null when no attacks. */
+  starsPerAttack: number | null;
+  /** Attack-weighted mean destruction per attack; null when no attacks. */
+  averageDestruction: number | null;
+  /** Regular wars the rates cover (the sample-size honesty, 05 section 3);
+   * null when the log is private. */
+  warLogWars: number | null;
+  /** Clan War League seasons set apart from the rates; null when private. */
+  warLogLeagues: number | null;
 }
 
 /**
@@ -91,8 +143,17 @@ export const KEY_ACHIEVEMENTS: readonly string[] = [
 
 // ---------- verdicts ----------
 
-/** The metric groups the rows organize into, in display order. */
-export type CompareGroupId = 'account' | 'rushed' | 'heroes' | 'war' | 'achievements';
+/** The metric groups the rows organize into, in display order. The player
+ * groups cover Account through Key achievements; 'roster' is the clan
+ * compare's own group (size, average TH, donation health), and 'war' is
+ * shared by both compares with the same label. */
+export type CompareGroupId =
+  | 'account'
+  | 'rushed'
+  | 'heroes'
+  | 'war'
+  | 'achievements'
+  | 'roster';
 
 /** Display labels for the groups. */
 export const COMPARE_GROUP_LABELS: Record<CompareGroupId, string> = {
@@ -101,15 +162,18 @@ export const COMPARE_GROUP_LABELS: Record<CompareGroupId, string> = {
   heroes: 'Heroes',
   war: 'War record',
   achievements: 'Key achievements',
+  roster: 'Roster stats',
 };
 
-/** Which way a metric reads: more is better, or less is better (the
- * rushed percentages invert the direction). */
-export type CompareMetric = 'higher' | 'lower';
+/** Which way a metric reads: more is better, less is better (the rushed
+ * percentages invert the direction), or a fact with no better/worse
+ * reading (roster size: the row shows the gap, not a verdict). */
+export type CompareMetric = 'higher' | 'lower' | 'fact';
 
-/** One row's verdict: which side leads ('a' or 'b'), an exact tie, or
- * no verdict because a side cannot answer the metric. */
-export type CompareDirection = 'a' | 'b' | 'even' | 'none';
+/** One row's verdict: which side leads ('a' or 'b'), an exact tie, no
+ * verdict because a side cannot answer the metric, or a comparable fact
+ * whose values differ (no side colors; the delta is the gap). */
+export type CompareDirection = 'a' | 'b' | 'even' | 'fact' | 'none';
 
 /** One side-by-side metric row, ready to render as data. */
 export interface CompareRow {
@@ -134,11 +198,14 @@ export interface CompareRow {
   metric: CompareMetric;
 }
 
-/** One group of rows under its label. */
+/** One group of rows under its label. The optional note is a quiet line
+ * under the rows (the war record's sample-size honesty, 05 section 3);
+ * the player compare sets none. */
 export interface CompareGroup {
   id: CompareGroupId;
   label: string;
   rows: CompareRow[];
+  note?: string;
 }
 
 // ---------- formatting ----------
@@ -215,6 +282,7 @@ export function compareNumbers(
     return { direction: 'none', delta: null };
   }
   if (a === b) return { direction: 'even', delta: 0 };
+  if (metric === 'fact') return { direction: 'fact', delta: a - b };
   const aLeads = metric === 'higher' ? a > b : a < b;
   return { direction: aLeads ? 'a' : 'b', delta: a - b };
 }
@@ -309,6 +377,207 @@ export function computePlayerCompare(a: PlayerCompareSide, b: PlayerCompareSide)
 
 function orderGroups(): CompareGroupId[] {
   return ['account', 'rushed', 'heroes', 'war', 'achievements'];
+}
+
+// ---------- the clan half (T-M3-4) ----------
+
+/**
+ * Builds the comparison groups for two clans (05 section 4's clan list,
+ * read literally): Roster stats (Members as a fact with the gap, Average
+ * Town Hall, Donation health) then War record (War wins and Win streak
+ * from the clan payload, Win rate, Stars per attack, and Average
+ * destruction from the war log window). Pure: the same two sides always
+ * yield the same rows, and a rate one side cannot answer (a private war
+ * log) renders the dash, never a fake zero.
+ *
+ * The war record group carries the sample-size note the engine doc
+ * demands (05 section 3): the rates read each clan's own log window, and
+ * a private log keeps no rate. The note is data the view renders quiet;
+ * it is not a row and carries no verdict.
+ */
+export function computeClanCompare(a: ClanCompareSide, b: ClanCompareSide): CompareGroup[] {
+  const rows: CompareRow[] = [];
+
+  // Roster stats: size is a fact (the gap, no verdict), the other two
+  // are higher-better judgments.
+  pushNumberRow(rows, 'roster', 'Members', a.members, b.members, 'fact');
+  rows.push(oneDecimalRow('roster', 'Average Town Hall', a.averageTownHall, b.averageTownHall));
+  rows.push(percentShareRow('roster', 'Donation health', a.donationHealth, b.donationHealth));
+
+  // War record: the payload's own counters first, then the log rates.
+  pushCounterRow(rows, 'war', 'War wins', a.warWins, b.warWins);
+  pushNumberRow(rows, 'war', 'Win streak', a.warWinStreak, b.warWinStreak, 'higher');
+  rows.push(percentShareRow('war', 'Win rate', a.winRate, b.winRate));
+  rows.push(starsPerAttackRow('war', a, b));
+  rows.push(destructionRow('war', a, b));
+
+  return [
+    {
+      id: 'roster',
+      label: COMPARE_GROUP_LABELS.roster,
+      rows: rows.filter((row) => row.group === 'roster'),
+    },
+    {
+      id: 'war',
+      label: COMPARE_GROUP_LABELS.war,
+      rows: rows.filter((row) => row.group === 'war'),
+      note: warRecordNote(a, b),
+    },
+  ];
+}
+
+/** One one-decimal number row (average Town Hall): the mean carries real
+ * decimals, so the value and the delta both render at the rushed engine's
+ * own precision (round1), the one the percents keep everywhere else. */
+function oneDecimalRow(
+  group: CompareGroupId,
+  label: string,
+  a: number | null | undefined,
+  b: number | null | undefined,
+): CompareRow {
+  return quantizedRow(group, label, a, b, (value) => round1(value));
+}
+
+/** One 0-to-1 share row (donation health, win rate): the value renders a
+ * whole percent and the delta is percentage points, the precision a
+ * share of members supports (the roster header's own health chip and the
+ * war log's win rate keep it: a 7-of-10 window does not read finer). */
+function percentShareRow(
+  group: CompareGroupId,
+  label: string,
+  a: number | null | undefined,
+  b: number | null | undefined,
+): CompareRow {
+  const row = quantizedRow(
+    group,
+    label,
+    a,
+    b,
+    (value) => Math.round(value * 100),
+    // The delta is already percentage points once the shares quantize.
+    (value) => Math.round(value),
+  );
+  return {
+    ...row,
+    aDisplay: row.aDisplay === DASH ? DASH : `${row.aDisplay}%`,
+    bDisplay: row.bDisplay === DASH ? DASH : `${row.bDisplay}%`,
+  };
+}
+
+/** Stars per attack keeps the war log's own one-decimal precision (the
+ * trailing-zero trim formatStarsPerAttack keeps, mirrored here so the
+ * compare cell and the Log tab never disagree about the same number). */
+function starsPerAttackRow(group: CompareGroupId, a: ClanCompareSide, b: ClanCompareSide): CompareRow {
+  return quantizedRow(
+    group,
+    'Stars per attack',
+    a.starsPerAttack,
+    b.starsPerAttack,
+    (value) => Math.round(value * 10) / 10,
+  );
+}
+
+/** Average destruction keeps formatWarPercent's one decimal; the delta
+ * is percentage points at the same precision. */
+function destructionRow(group: CompareGroupId, a: ClanCompareSide, b: ClanCompareSide): CompareRow {
+  const row = quantizedRow(
+    group,
+    'Avg destruction',
+    a.averageDestruction,
+    b.averageDestruction,
+    (value) => Math.round(value * 10) / 10,
+  );
+  return {
+    ...row,
+    aDisplay: row.aDisplay === DASH ? DASH : `${row.aDisplay}%`,
+    bDisplay: row.bDisplay === DASH ? DASH : `${row.bDisplay}%`,
+  };
+}
+
+/** The shared body of every decimal-carrying clan row: quantize both
+ * sides through one formatter, then compare the quantized values so the
+ * verdict, the two displays, and the delta all agree at the precision
+ * the visitor actually reads. A row that compares at finer precision
+ * than it displays can render "+0 ahead" under two identical values,
+ * which contradicts itself (the live browser pass caught exactly that on
+ * two win rates that both read 44%). */
+function quantizedRow(
+  group: CompareGroupId,
+  label: string,
+  a: number | null | undefined,
+  b: number | null | undefined,
+  quantize: (value: number) => number,
+  formatDelta: (value: number) => number = quantize,
+): CompareRow {
+  const qa = a === null || a === undefined ? null : quantize(a);
+  const qb = b === null || b === undefined ? null : quantize(b);
+  const verdict = compareNumbers(qa, qb, 'higher');
+  // The delta formats through its own formatter: the quantized values can
+  // still carry float dust (a quantized 15.5 minus a quantized 13.9 is
+  // 1.5999...), and a share row's delta already lives in points while its
+  // quantizer reads 0-to-1 shares.
+  const text = (value: number) => String(formatDelta(value));
+  return {
+    id: `${group}:${label}`,
+    group,
+    label,
+    aDisplay: qa === null ? DASH : text(qa),
+    bDisplay: qb === null ? DASH : text(qb),
+    delta: verdict.delta,
+    deltaDisplay: deltaText(verdict, text),
+    direction: verdict.direction,
+    metric: 'higher',
+  };
+}
+
+/**
+ * The war record group's quiet note: the sample-size honesty (05 section
+ * 3) applied to a comparison. Both windows public: the sizes, and the
+ * league seasons set apart. One private: the dash's own explanation, so a
+ * missing rate reads as the designed state it is, not a failure.
+ */
+function warRecordNote(a: ClanCompareSide, b: ClanCompareSide): string {
+  const parts: string[] = [];
+  if (a.warLogWars !== null && a.warLogWars !== undefined) {
+    parts.push(warWindowLabel(a));
+  }
+  if (b.warLogWars !== null && b.warLogWars !== undefined) {
+    parts.push(warWindowLabel(b));
+  }
+  const privateSides = [a, b].filter(
+    (side) => side.warLogWars === null || side.warLogWars === undefined,
+  );
+  if (privateSides.length > 0) {
+    const names = privateSides.map((side) => side.name).join(' and ');
+    parts.push(
+      `${names} keep${privateSides.length === 1 ? 's' : ''} a private war log: no rate, just the dash`,
+    );
+  }
+  if (parts.length === 0) {
+    // Both sides answered no window without being private (an empty log
+    // page): the note stays honest instead of naming windows that do not
+    // exist.
+    return 'War log rates read each clan\u2019s most recent wars; neither log answered one yet.';
+  }
+  return `War log rates read ${parts.join('; ')}.`;
+}
+
+/** "Umbra Lunaria's last 51 wars (3 leagues set apart)" — the window one
+ * side's rates read, in the Log tab's own vocabulary. A public log that
+ * answered no wars reads as what it is: none yet, not a zero-war
+ * "window" nobody can read. */
+function warWindowLabel(side: ClanCompareSide): string {
+  const wars = side.warLogWars ?? 0;
+  if (wars === 0) {
+    return `${side.name}\u2019s log answered no wars yet`;
+  }
+  const warWord = wars === 1 ? 'war' : 'wars';
+  let label = `${side.name}\u2019s last ${wars} ${warWord}`;
+  const leagues = side.warLogLeagues ?? 0;
+  if (leagues > 0) {
+    label += ` (${leagues} league${leagues === 1 ? '' : 's'} set apart)`;
+  }
+  return label;
 }
 
 /** One plain-integer row (levels): the delta renders as a bare integer. */

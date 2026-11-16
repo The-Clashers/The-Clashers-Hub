@@ -22,7 +22,9 @@ import type { CompareGroup, CompareRow } from '../engines/compare';
 // one meaning, the margin the leader leads by ("+12" green whoever
 // leads, "Even" quiet on a tie), unsigned because the sign would
 // compete with the value colors on lower-is-better metrics where a
-// bigger number is a worse side.
+// bigger number is a worse side. A fact row (the clan compare's roster
+// size) keeps both values in primary ink and its delta in the quiet ink:
+// the gap is information, not a verdict, so no side colors.
 //
 // The deliberate limitation is visible in the component's own shape:
 // there is no winner row, no aggregate, no overall banner to render
@@ -79,6 +81,9 @@ function CompareGroupPanel({ group, aName, bName }: CompareGroupPanelProps) {
       {group.rows.map((row) => (
         <CompareRowView key={row.id} row={row} aName={aName} bName={bName} styles={styles} />
       ))}
+      {group.note ? (
+        <Text style={styles.groupNote}>{group.note}</Text>
+      ) : null}
     </View>
   );
 }
@@ -95,8 +100,9 @@ interface CompareRowViewProps {
 function CompareRowView({ row, aName, bName, styles }: CompareRowViewProps) {
   const { theme } = useTheme();
 
-  // The row's verdict read as words: who leads, an exact tie, or a
-  // metric one side cannot answer (the dash keeps its honesty).
+  // The row's verdict read as words: who leads, an exact tie, a fact
+  // whose values differ (the gap, no verdict), or a metric one side
+  // cannot answer (the dash keeps its honesty).
   const verdictText =
     row.direction === 'a'
       ? `${aName} ahead`
@@ -104,7 +110,9 @@ function CompareRowView({ row, aName, bName, styles }: CompareRowViewProps) {
         ? `${bName} ahead`
         : row.direction === 'even'
           ? 'even'
-          : 'not comparable';
+          : row.direction === 'fact'
+            ? 'a gap, no verdict'
+            : 'not comparable';
 
   return (
     <View
@@ -125,7 +133,9 @@ function CompareRowView({ row, aName, bName, styles }: CompareRowViewProps) {
           <Text
             style={[
               styles.deltaText,
-              row.direction === 'even' ? styles.deltaEven : styles.deltaLeading,
+              row.direction === 'even' || row.direction === 'fact'
+                ? styles.deltaEven
+                : styles.deltaLeading,
             ]}
           >
             {row.deltaDisplay}
@@ -142,8 +152,8 @@ function CompareRowView({ row, aName, bName, styles }: CompareRowViewProps) {
 }
 
 /** One value cell's ink: the leader speaks in success, the trailer in
- * danger, a tie in primary, an incomparable metric in secondary (both
- * values real, no verdict to color them by). */
+ * danger, a tie in primary, a fact in primary (both values real, no
+ * verdict to color them by), an incomparable metric in secondary. */
 function valueInk(
   theme: ReturnType<typeof useTheme>['theme'],
   direction: CompareRow['direction'],
@@ -153,7 +163,7 @@ function valueInk(
   if (direction === 'none') {
     return { color: c.textSecondary };
   }
-  if (direction === 'even') {
+  if (direction === 'even' || direction === 'fact') {
     return { color: c.textPrimary };
   }
   const leads = direction === side;
@@ -194,6 +204,17 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       color: c.textMuted,
       textTransform: 'uppercase',
       letterSpacing: t.letterSpacing.micro,
+    },
+    // The group's quiet note under its rows (the clan compare's war
+    // record sample-size honesty): the caption voice, kept inside the
+    // panel's padding, above the last row's hairline by the row gap.
+    groupNote: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.xs,
+      color: c.textMuted,
+      lineHeight: t.lineHeight.normal * t.fontSize.xs,
+      paddingHorizontal: t.spacing[3],
+      paddingVertical: t.spacing[2],
     },
 
     // The face-off row: both values mirror around the center label, so

@@ -237,6 +237,27 @@ draw, which is why the ambience layer uses react-native-svg, the chart
   unsigned margin in the leader's own green. The no-winner note rides
   under the subtitle so the absence of an overall banner reads as the
   decision it is (05 section 4).
+- **Clan comparison view:** `/compare/clans?a=TAG&b=TAG` (the player
+  compare's own shareable form, designed empty, error panels, and VS
+  face-off family). The identity cards carry the clan badge in the 24 px
+  slot, name, tag with the location, a three-cell context row (Members,
+  Average TH, War log public/private), and the whole card links to the
+  clan's full page. The rows group into Roster stats and War record:
+  Members renders as a fact (both values primary, the unsigned gap in
+  quiet ink, no side colors — roster size is not a verdict), and the War
+  record panel carries the sample-size note naming each side's log window
+  so the private-log dash reads as the designed state it is. A war log
+  that fails to load swaps the note for its own retry panel with the
+  answered side's rates kept on screen.
+- **Clan picker popup:** the compare landing's clan mode opens a dialog
+  over the page (portaled to the body at the overlay z-index, the
+  Dropdown's own mechanics) whenever a side needs a name resolved: submit
+  with a name, or the search affordance seated inside each input box.
+  One page of the search listing's own rows (badge, name, tag, level,
+  members, location), three-character floor taught inline, Escape and
+  outside-press close with focus returned to the opener; picking fills
+  the side's input with the clan's #TAG, and the flow hands the picker to
+  the other side when it still holds a name.
 - **Clan detail card:** three stacked bands (the owner's better-layout call
   over the two-column wireframe). The identity row (badge 48, name,
   tag/level/location line), the description at full width clamped to two
@@ -423,6 +444,7 @@ draw, which is why the ambience layer uses react-native-svg, the chart
 | `RecentSearchesStrip` | compact chip strip for recent player and clan lookups persisted in localStorage (`F-13`, `FR-15`), with remove and clear controls |
 | `PillButton` | the one pill button: search, retry, and footer-link actions all render it; primary gold, secondary raised panel, ghost (transparent with the strong border, the prototype's quiet action), optional leading `Glyph` (compare, refresh), link role with the trailing arrow for footer-style links |
 | `ClanCard` | search result row: badge, level, members, location, and the family-friendly tag on the title row (a property, not a stat, so no chip) |
+| `ClanSearchPopup` | the compare landing's clan picker dialog: portaled to the body over the canvas veil at the overlay z-index, the search input with the three-character floor taught inline, one page of the search listing's own pickable rows, the loading/error/empty states the state matrix keeps, Escape and outside-press close with focus returned to the opener |
 | `StatChip` | label + value pair used on headers and cards |
 | `RatioFlag` | donation-balance chip: shows the member's `ratio : 1` (one decimal), good/warn/dash states |
 | `LeagueRank` | the rank cell the roster and attention tables share: tier icon plus the rank number parsed from the tier name, dash when unranked |
@@ -434,7 +456,7 @@ draw, which is why the ambience layer uses react-native-svg, the chart
 | `ResultChip` | the war log's result pill: `Win` success, `Loss` danger, `Ongoing` info blue, `Tie` and `League` the quiet non-verdict fill (the RatioFlag dash treatment, since neither is anyone's verdict) |
 | `WarlogSummary` | the war log's efficiency band: "War efficiency" title with the sample size labeled ("Last N wars · excluding K leagues"), the engine's win rate / stars per attack / average destruction plus the record line as label-above-value cells, the dash for rates the loaded wars cannot answer |
 | `WarlogTable` / `WarlogCard` | the war log's entry view, table & card presentations: one row per war newest first (result chip, opponent badge and name, both sides' stars and destruction ours-first, attacks over the allowance, team size, end date), league seasons showing their own totals without opponent figures, the 768 px switch the member tables keep |
-| `CompareMetricRows` | the player comparison's metric panels: one row per metric (A's value, the label with the delta, B's value, mirrored around the center), the leading value in success ink and the trailing in danger, an incomparable row quiet with the dash, the delta the leader's unsigned margin in the leader's green, grouped under Account / Rushed analysis / Heroes / War record / Key achievements headers |
+| `CompareMetricRows` | both comparisons' metric panels: one row per metric (A's value, the label with the delta, B's value, mirrored around the center), the leading value in success ink and the trailing in danger, an incomparable row quiet with the dash, a fact row both-primary with the quiet gap (the clan compare's Members), the delta the leader's unsigned margin in the leader's green, grouped under panel headers (the player's five groups, the clan's Roster stats and War record), with the group's optional quiet note under its rows (the clan war record's sample-size line) |
 | `Glyph` | the UI glyph set (the prototype's own paths on react-native-svg): compare, refresh, home, star, user, shield, search, and code — the marks buttons, nav links, mode pickers, and ratings draw |
 | `ProgressRail` | achievement value/target bar; the star row beside the track by default, or track-only (`showStars={false}`) when the row renders its star trio in the headline the prototype's layout draws |
 | `LevelRail` | the hero panel's level-versus-maximum bar: the fill without star markers, the same 6 px track and gold fill `ProgressRail` draws |

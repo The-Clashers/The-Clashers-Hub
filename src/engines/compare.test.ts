@@ -10,11 +10,14 @@ import { describe, expect, it } from 'vitest';
 import {
   COMPARE_GROUP_LABELS,
   compareNumbers,
+  computeClanCompare,
   computePlayerCompare,
   formatCompactCount,
   formatHeroLevel,
   KEY_ACHIEVEMENTS,
+  type ClanCompareSide,
   type CompareGroup,
+  type CompareMetric,
   type CompareRow,
   type PlayerCompareSide,
 } from './compare';
@@ -315,5 +318,202 @@ describe('computePlayerCompare', () => {
   it('curates the key list to the lifetime counters', () => {
     expect(KEY_ACHIEVEMENTS).not.toContain('War Hero');
     expect(KEY_ACHIEVEMENTS).toContain('Gold Grab');
+  });
+});
+
+// ---------- the clan half (T-M3-4) ----------
+
+/** A well-filled clan side: the roster stats and a public war log window. */
+function clanA(): ClanCompareSide {
+  return {
+    name: 'Alpha Clan',
+    tag: '#ALPHACL',
+    members: 46,
+    clanLevel: 14,
+    averageTownHall: 15.533333,
+    donationHealth: 0.86956521,
+    warWins: 312,
+    warWinStreak: 5,
+    winRate: 0.64705882,
+    starsPerAttack: 2.74509803,
+    averageDestruction: 82.173913,
+    warLogWars: 51,
+    warLogLeagues: 3,
+  };
+}
+
+/** The contrasting clan side: a private war log answers no rate at all. */
+function clanB(): ClanCompareSide {
+  return {
+    name: 'Beta Clan',
+    tag: '#BETACL',
+    members: 30,
+    clanLevel: 9,
+    averageTownHall: 13.9,
+    donationHealth: null,
+    warWins: 88,
+    warWinStreak: 0,
+    winRate: null,
+    starsPerAttack: null,
+    averageDestruction: null,
+    warLogWars: null,
+    warLogLeagues: null,
+  };
+}
+
+describe('compareNumbers with facts', () => {
+  it.each([
+    [50, 30, 'fact', 'fact'],
+    [30, 50, 'fact', 'fact'],
+    [50, 50, 'fact', 'even'],
+    [null, 50, 'fact', 'none'],
+  ])('compares %p and %p as %p to %p', (a, b, metric, direction) => {
+    expect(compareNumbers(a, b, metric as CompareMetric).direction).toBe(direction);
+  });
+
+  it('carries the gap as the delta, sign intact for the display to take the absolute of', () => {
+    expect(compareNumbers(50, 30, 'fact').delta).toBe(20);
+    expect(compareNumbers(30, 50, 'fact').delta).toBe(-20);
+  });
+});
+
+describe('computeClanCompare', () => {
+  const groups = computeClanCompare(clanA(), clanB());
+
+  it('renders the two groups in display order with the house labels', () => {
+    expect(groups.map((group) => group.id)).toEqual(['roster', 'war']);
+    expect(groups.map((group) => group.label)).toEqual(['Roster stats', 'War record']);
+  });
+
+  it('renders roster size as a fact: both values primary, the gap not a verdict', () => {
+    const members = row(groups, 'roster:Members');
+    expect(members.aDisplay).toBe('46');
+    expect(members.bDisplay).toBe('30');
+    expect(members.direction).toBe('fact');
+    expect(members.metric).toBe('fact');
+    expect(members.deltaDisplay).toBe('+16');
+  });
+
+  it('keeps the average Town Hall at one decimal, value and delta alike', () => {
+    const th = row(groups, 'roster:Average Town Hall');
+    expect(th.aDisplay).toBe('15.5');
+    expect(th.bDisplay).toBe('13.9');
+    expect(th.direction).toBe('a');
+    expect(th.deltaDisplay).toBe('+1.6');
+  });
+
+  it('renders the donation health as a whole percent, the delta in points', () => {
+    const health = row(groups, 'roster:Donation health');
+    expect(health.aDisplay).toBe('87%');
+    expect(health.bDisplay).toBe('\u2014');
+    expect(health.direction).toBe('none');
+    expect(health.deltaDisplay).toBe('');
+  });
+
+  it('compares the war counters, compact counters and integers', () => {
+    const wins = row(groups, 'war:War wins');
+    expect(wins.aDisplay).toBe('312');
+    expect(wins.bDisplay).toBe('88');
+    expect(wins.direction).toBe('a');
+    expect(wins.deltaDisplay).toBe('+224');
+
+    const streak = row(groups, 'war:Win streak');
+    expect(streak.aDisplay).toBe('5');
+    expect(streak.bDisplay).toBe('0');
+    expect(streak.direction).toBe('a');
+    // A real zero still compares (the no-fake-zero rule cuts both ways).
+    expect(streak.bDisplay).not.toBe('\u2014');
+  });
+
+  it('answers every rate the private log cannot with the dash, never a zero', () => {
+    for (const id of ['war:Win rate', 'war:Stars per attack', 'war:Avg destruction']) {
+      const rate = row(groups, id);
+      expect(rate.bDisplay).toBe('\u2014');
+      expect(rate.direction).toBe('none');
+      expect(rate.deltaDisplay).toBe('');
+    }
+  });
+
+  it('keeps the log rates at the Log tab\u2019s own precision', () => {
+    const both = computeClanCompare(clanA(), {
+      ...clanA(),
+      name: 'Gamma Clan',
+      tag: '#GAMMACL',
+      winRate: 0.5,
+      starsPerAttack: 2.5,
+      averageDestruction: 75.06,
+    });
+    expect(row(both, 'war:Win rate').aDisplay).toBe('65%');
+    expect(row(both, 'war:Win rate').bDisplay).toBe('50%');
+    expect(row(both, 'war:Win rate').deltaDisplay).toBe('+15');
+    expect(row(both, 'war:Stars per attack').aDisplay).toBe('2.7');
+    expect(row(both, 'war:Stars per attack').bDisplay).toBe('2.5');
+    expect(row(both, 'war:Avg destruction').aDisplay).toBe('82.2%');
+    expect(row(both, 'war:Avg destruction').bDisplay).toBe('75.1%');
+    expect(row(both, 'war:Avg destruction').deltaDisplay).toBe('+7.1');
+  });
+
+  it('compares at the precision it displays, never "+0 ahead" on equal reads', () => {
+    // The live browser pass caught this: two win rates a fraction apart
+    // both rendered 44% while the raw delta declared a leader. The rows
+    // now quantize before the verdict, so equal displays read even.
+    const nearlyTied = computeClanCompare(
+      { ...clanA(), winRate: 0.444, starsPerAttack: 1.84, averageDestruction: 82.16 },
+      { ...clanA(), name: 'Gamma Clan', tag: '#GAMMACL', winRate: 0.438, starsPerAttack: 1.78, averageDestruction: 82.11 },
+    );
+    const rate = row(nearlyTied, 'war:Win rate');
+    expect(rate.aDisplay).toBe('44%');
+    expect(rate.bDisplay).toBe('44%');
+    expect(rate.direction).toBe('even');
+    expect(rate.deltaDisplay).toBe('Even');
+
+    const stars = row(nearlyTied, 'war:Stars per attack');
+    expect(stars.aDisplay).toBe('1.8');
+    expect(stars.bDisplay).toBe('1.8');
+    expect(stars.direction).toBe('even');
+
+    const destruction = row(nearlyTied, 'war:Avg destruction');
+    expect(destruction.aDisplay).toBe('82.2%');
+    expect(destruction.bDisplay).toBe('82.1%');
+    expect(destruction.direction).toBe('a');
+    expect(destruction.deltaDisplay).toBe('+0.1');
+  });
+
+  it('labels each side\u2019s window in the war record note, private logs named', () => {
+    const note = groups.find((group) => group.id === 'war')!.note;
+    expect(note).toContain("Alpha Clan\u2019s last 51 wars (3 leagues set apart)");
+    expect(note).toContain('Beta Clan keeps a private war log: no rate, just the dash');
+    // The roster group carries no note.
+    expect(groups.find((group) => group.id === 'roster')!.note).toBeUndefined();
+  });
+
+  it('says when both logs answered no window at all', () => {
+    const empty = computeClanCompare(
+      { ...clanA(), warLogWars: 0, warLogLeagues: 0 },
+      { ...clanB(), warLogWars: 0, warLogLeagues: 0 },
+    );
+    const note = empty.find((group) => group.id === 'war')!.note;
+    expect(note).toContain('Alpha Clan\u2019s log answered no wars yet');
+    expect(note).toContain('Beta Clan\u2019s log answered no wars yet');
+  });
+
+  it('never carries anything that could be read as one overall winner', () => {
+    for (const group of groups) {
+      for (const entry of group.rows) {
+        expect(Object.keys(entry).sort()).toEqual(
+          [
+            'aDisplay',
+            'bDisplay',
+            'delta',
+            'deltaDisplay',
+            'direction',
+            'group',
+            'id',
+            'label',
+            'metric',
+          ].sort(),
+        );
+      }
+    }
   });
 });

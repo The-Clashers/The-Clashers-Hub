@@ -8,11 +8,11 @@ for the planned layout.
 
 | File | Calls | Used by |
 |---|---|---|
-| `clan.ts` | `GET /api/clan/:tag` | `screens/ClanScreen.tsx` |
+| `clan.ts` | `GET /api/clan/:tag` | `screens/ClanScreen.tsx`, `screens/ClanCompareScreen.tsx` |
 | `player.ts` | `GET /api/player/:tag` | `screens/PlayerScreen.tsx` |
 | `war.ts` | `GET /api/clan/:tag/war` | `screens/ClanScreen.tsx` |
-| `warlog.ts` | `GET /api/clan/:tag/warlog` (the private body resolves as a success shape) | `screens/ClanScreen.tsx` |
-| `search.ts` | `GET /api/search?name=…` (+ server-side filters, cursor) | `screens/SearchScreen.tsx`, `components/LookupSearch.tsx` (the three-character floor constants) |
+| `warlog.ts` | `GET /api/clan/:tag/warlog` (the private body resolves as a success shape) | `screens/ClanScreen.tsx`, `screens/ClanCompareScreen.tsx` |
+| `search.ts` | `GET /api/search?name=…` (+ server-side filters, cursor) | `screens/SearchScreen.tsx`, `components/LookupSearch.tsx` (the three-character floor constants), `components/ClanSearchPopup.tsx` (the compare landing's clan picker) |
 | `locations.ts` | nothing (bundled filter constants, ids verified live) | `screens/SearchScreen.tsx` |
 | `labels.ts` | nothing (bundled clan-label filter constants, ids verified from live captures) | `screens/SearchScreen.tsx` |
 | `chat-languages.ts` | nothing (bundled chat-language filter constants, codes matched client-side) | `screens/SearchScreen.tsx` |
