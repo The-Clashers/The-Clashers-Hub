@@ -217,9 +217,13 @@ draw, which is why the ambience layer uses react-native-svg, the chart
   scrolling page, on the resting shadow.
 - **Compare landing screen:** `/compare` provides a head-to-head comparison
   hub with an active mode toggle (`Compare Players` or `Compare Clans`). Each
-  mode offers two dedicated input boxes (Entity A and Entity B) divided by
-  a central VS badge, complete with tag normalization, helper hints, and
-  a launch button navigating to `/compare/players` or `/compare/clans`.
+  mode offers two dedicated input boxes (Entity A and Entity B) with tag
+  normalization and helper hints, both modes sharing the identical box chrome;
+  the launch action is the compact `Compare` pill seated between the two
+  boxes where a VS badge used to sit, level with the input line from tablet
+  up and on its own centered row below it. One press runs the mode's submit
+  (tags navigate to `/compare/players` or `/compare/clans`; a clan name opens
+  the picker) — the card carries no second launch button.
 - **Player comparison view:** `/compare/players?a=TAG&b=TAG` (two bare tags
   in the query string, the shareable form; a missing or malformed side is
   the designed "two player tags are needed" empty, never an error). The
@@ -251,13 +255,14 @@ draw, which is why the ambience layer uses react-native-svg, the chart
   answered side's rates kept on screen.
 - **Clan picker popup:** the compare landing's clan mode opens a dialog
   over the page (portaled to the body at the overlay z-index, the
-  Dropdown's own mechanics) whenever a side needs a name resolved: submit
-  with a name, or the search affordance seated inside each input box.
-  One page of the search listing's own rows (badge, name, tag, level,
-  members, location), three-character floor taught inline, Escape and
-  outside-press close with focus returned to the opener; picking fills
-  the side's input with the clan's #TAG, and the flow hands the picker to
-  the other side when it still holds a name.
+  Dropdown's own mechanics) whenever a side needs a name resolved: the
+  Compare press with a name in a box opens the picker seeded with it
+  (the input boxes carry no inline affordance, so both modes keep the
+  same box chrome). One page of the search listing's own rows (badge,
+  name, tag, level, members, location), three-character floor taught
+  inline, Escape and outside-press close with focus returned to the
+  opener; picking fills the side's input with the clan's #TAG, and the
+  flow hands the picker to the other side when it still holds a name.
 - **Clan detail card:** three stacked bands (the owner's better-layout call
   over the two-column wireframe). The identity row (badge 48, name,
   tag/level/location line), the description at full width clamped to two
@@ -434,7 +439,7 @@ draw, which is why the ambience layer uses react-native-svg, the chart
 | Component | Purpose |
 |---|---|
 | `NavBar` | the thin fixed row every page renders: the shield brand lockup, `LookupSearch`, the page links (Home with its home glyph), the theme toggle, plus the in-flow spacer that reserves its height; frosted glass since the rework (canvas veil + shared blur) |
-| `Footer` | the global site footer: brand lockup, explore navigation, external resources, Supercell Fan Content Policy disclaimer, and MIT license notice |
+| `Footer` | the global site footer: brand lockup, explore navigation, external resources, Supercell Fan Content Policy disclaimer, and MIT license notice; pinned to the page bottom through the app shell — `#root` (index.html) is a min-height flex column and every screen's root grows inside it, so the footer lands on the viewport's bottom edge on short pages and rides below the content on long ones |
 | `GlassAmbience` | the canvas's two glow fields: one fixed, pointer-transparent SVG behind every screen, the radial gradients Views cannot draw |
 | `LookupSearch` + `LookupModePicker` | the one search box (nav-thin and hero-sized): the mode picker is the small icon dropdown that says player or clan; player mode is tag-only, clan mode takes a name or `#tag` |
 | `Breadcrumbs` | the location line detail screens render instead of a header: `Home › Clans › <name>`, WAI-ARIA breadcrumb pattern |
@@ -442,7 +447,7 @@ draw, which is why the ambience layer uses react-native-svg, the chart
 | `Dropdown` | select-style control built on RN primitives: button trigger, portaled `listbox`, keyboard-complete (arrows, Enter, Escape, Home/End); the open list sizes its height to its options and only scrolls when it genuinely overflows |
 | `TagInput` | the player tag box: /player/:tag routing, through the one tag module ([03 §2](./03-features-list.md)) |
 | `RecentSearchesStrip` | compact chip strip for recent player and clan lookups persisted in localStorage (`F-13`, `FR-15`), with remove and clear controls |
-| `PillButton` | the one pill button: search, retry, and footer-link actions all render it; primary gold, secondary raised panel, ghost (transparent with the strong border, the prototype's quiet action), optional leading `Glyph` (compare, refresh), link role with the trailing arrow for footer-style links |
+| `PillButton` | the one pill button: search, retry, and footer-link actions all render it; primary gold, secondary raised panel, ghost (transparent with the strong border, the prototype's quiet action), optional leading `Glyph` (compare, refresh), link role with the trailing arrow for footer-style links, compact (tighter padding and gap, control-height floor kept) for inline seating (the compare landing's middle button) |
 | `ClanCard` | search result row: badge, level, members, location, and the family-friendly tag on the title row (a property, not a stat, so no chip) |
 | `ClanSearchPopup` | the compare landing's clan picker dialog: portaled to the body over the canvas veil at the overlay z-index, the search input with the three-character floor taught inline, one page of the search listing's own pickable rows, the loading/error/empty states the state matrix keeps, Escape and outside-press close with focus returned to the opener |
 | `StatChip` | label + value pair used on headers and cards |
