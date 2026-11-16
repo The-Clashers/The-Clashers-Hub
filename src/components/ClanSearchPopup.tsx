@@ -104,7 +104,13 @@ export default function ClanSearchPopup({
     node?.focus();
   }, [visible, initialQuery]);
 
-  // Escape closes, wherever focus sits inside the dialog.
+  // Escape closes, wherever focus sits inside the dialog. The listener
+  // registers in the capture phase: the dialog's own TextInput stops
+  // keydown propagation at the target (react-native-web's input
+  // handling), so a bubble-phase document listener never sees Escape
+  // while focus rests in the search box, which is the dialog's own
+  // opening state (the effect below focuses it on open). Capture runs
+  // before the target's handlers, so the close fires either way.
   useEffect(() => {
     if (!visible) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -113,8 +119,8 @@ export default function ClanSearchPopup({
         onClose();
       }
     };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => document.removeEventListener('keydown', onKeyDown, true);
   }, [visible, onClose]);
 
   // An outside press closes. mousedown, not click: the dialog should be
