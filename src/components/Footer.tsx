@@ -165,7 +165,13 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       backgroundColor: c.panel,
       width: '100%',
       flexShrink: 0,
-      marginTop: 'auto',
+      // The pin to the page bottom is the app shell's, not this style's:
+      // #root (index.html) is a min-height flex column and every screen's
+      // root grows inside it, so the footer lands on the viewport's bottom
+      // edge on short pages and rides below the content on long ones. A
+      // marginTop: 'auto' here reads like the mechanism but computes to 0:
+      // react-native-web drops the 'auto' keyword, which the browser pass
+      // caught on the compare landing's dead strip below the footer.
       paddingTop: t.spacing[6],
       paddingBottom: t.spacing[6],
     },

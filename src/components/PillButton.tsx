@@ -23,6 +23,11 @@ import Glyph, { type GlyphName } from './Glyph';
 // react-native-web's responder assumes role=link elements are real anchors
 // and never calls onPress for them (lib/link-activation.ts owns the why).
 // Button-role instances need nothing; the responder serves them natively.
+//
+// The compact variant tightens the pill's padding and gap for inline
+// seating (the compare landing's middle button): the same pill, the same
+// control-height floor the inputs keep, drawn narrower so it fits between
+// two input boxes without becoming the loudest thing on the card.
 
 export interface PillButtonProps {
   /** Button text; doubles as the accessibility label. */
@@ -44,6 +49,9 @@ export interface PillButtonProps {
   /** Lets the button fill its row's cross axis, the way the Search button
    * stretches to match the name input's height. */
   stretch?: boolean;
+  /** Tightens the padding and gap for inline seating (the compare landing's
+   * middle button) while keeping the control-height floor. */
+  compact?: boolean;
   disabled?: boolean;
 }
 
@@ -56,6 +64,7 @@ export default function PillButton({
   icon,
   arrow = false,
   stretch = false,
+  compact = false,
   disabled = false,
 }: PillButtonProps) {
   const { theme } = useTheme();
@@ -76,6 +85,7 @@ export default function PillButton({
       disabled={disabled}
       style={({ pressed }) => [
         styles.button,
+        compact && styles.buttonCompact,
         stretch && styles.buttonStretch,
         secondary && styles.buttonSecondary,
         ghost && styles.buttonGhost,
@@ -118,6 +128,15 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     },
     buttonStretch: {
       alignSelf: 'stretch',
+    },
+    // The compact seating: one step in on the padding scale and the tight
+    // gap, so the pill reads as the same button at a smaller commitment.
+    // Height is untouched: minHeight still follows the control-height
+    // token, which keeps the pill level with the input boxes it sits
+    // between on the compare landing.
+    buttonCompact: {
+      paddingHorizontal: t.spacing[3],
+      gap: t.spacing[1],
     },
     buttonSecondary: {
       backgroundColor: c.panelRaised,

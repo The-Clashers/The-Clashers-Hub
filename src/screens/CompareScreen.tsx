@@ -5,9 +5,10 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { useNavigate, useSearchParams } from 'react-router';
-import { useTheme, createBaseStyles } from '../theme';
+import { useTheme, createBaseStyles, breakpointFor } from '../theme';
 import Glyph from '../components/Glyph';
 import PillButton from '../components/PillButton';
 import ClanSearchPopup from '../components/ClanSearchPopup';
@@ -42,11 +43,20 @@ export default function CompareScreen() {
   // when closed. A name cannot be compared until it resolves to one
   // exact clan, so submitting a name opens the picker seeded with it
   // instead of navigating; the picked clan's #TAG lands in that side's
-  // input. The search affordance inside each box opens the picker
-  // directly, names or not.
+  // input. The Compare press is the one opener now: the input boxes
+  // carry no inline affordance, so both modes share the identical box
+  // chrome and the helper copy teaches the name flow.
   const [pickerSide, setPickerSide] = useState<'first' | 'second' | null>(null);
 
   const isPlayer = mode === 'players';
+
+  // The middle button seats between the boxes from tablet up; below that
+  // the boxes stack and the button takes its own centered row, the same
+  // breakpoint family the compare face-off band keeps (07 section 3),
+  // read through useWindowDimensions, never CSS media queries.
+  const { width } = useWindowDimensions();
+  const sideBySide =
+    breakpointFor(width) === 'tablet' || breakpointFor(width) === 'desktop';
 
   // Player mode is tag-only (the game has no player search by name), so
   // every side validates through the one tag module.
@@ -231,7 +241,7 @@ export default function CompareScreen() {
                 <Text style={styles.inputLabel}>
                   {isPlayer ? 'First Player Tag' : 'First Clan Name or Tag'}
                 </Text>
-                <View style={isPlayer ? styles.inputWrap : styles.inputWrapRow}>
+                <View style={styles.inputWrap}>
                   <TextInput
                     value={firstInput}
                     onChangeText={(text) => {
@@ -247,24 +257,6 @@ export default function CompareScreen() {
                     style={styles.textInput}
                     accessibilityLabel={isPlayer ? 'First player tag' : 'First clan name or tag'}
                   />
-                  {isPlayer ? null : (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="Find the first clan by name"
-                      accessibilityHint="Opens the clan search picker."
-                      onPress={() => setPickerSide('first')}
-                      style={({ pressed }) => [
-                        styles.searchAffordance,
-                        pressed && styles.searchAffordancePressed,
-                      ]}
-                    >
-                      <Glyph
-                        name="search"
-                        size={15}
-                        color={theme.colors.accentInk}
-                      />
-                    </Pressable>
-                  )}
                 </View>
                 {firstHint ? (
                   <Text style={styles.inputHint} accessibilityRole="alert">
@@ -279,11 +271,26 @@ export default function CompareScreen() {
                 )}
               </View>
 
-              {/* VS Divider */}
-              <View style={styles.vsContainer} aria-hidden>
-                <View style={styles.vsCircle}>
-                  <Text style={styles.vsText}>VS</Text>
-                </View>
+              {/* The launch action, seated where the VS badge sat: one
+                  compact gold pill between the two boxes, level with the
+                  input line at tablet up (the pill keeps the control
+                  height, so it centers on the same band the boxes' inputs
+                  occupy) and on its own centered row below, where the
+                  boxes stack. Both modes press the same button; the mode's
+                  own submit logic (tags compare, names pick) stays in
+                  handleCompare. */}
+              <View style={[styles.compareSlot, !sideBySide && styles.compareSlotStacked]}>
+                <PillButton
+                  label="Compare"
+                  icon="compare"
+                  compact
+                  onPress={handleCompare}
+                  hint={
+                    isPlayer
+                      ? 'Compares the two player tags.'
+                      : 'Compares the two clans. A name opens the clan picker.'
+                  }
+                />
               </View>
 
               {/* Box B */}
@@ -291,7 +298,7 @@ export default function CompareScreen() {
                 <Text style={styles.inputLabel}>
                   {isPlayer ? 'Second Player Tag' : 'Second Clan Name or Tag'}
                 </Text>
-                <View style={isPlayer ? styles.inputWrap : styles.inputWrapRow}>
+                <View style={styles.inputWrap}>
                   <TextInput
                     value={secondInput}
                     onChangeText={(text) => {
@@ -307,24 +314,6 @@ export default function CompareScreen() {
                     style={styles.textInput}
                     accessibilityLabel={isPlayer ? 'Second player tag' : 'Second clan name or tag'}
                   />
-                  {isPlayer ? null : (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="Find the second clan by name"
-                      accessibilityHint="Opens the clan search picker."
-                      onPress={() => setPickerSide('second')}
-                      style={({ pressed }) => [
-                        styles.searchAffordance,
-                        pressed && styles.searchAffordancePressed,
-                      ]}
-                    >
-                      <Glyph
-                        name="search"
-                        size={15}
-                        color={theme.colors.accentInk}
-                      />
-                    </Pressable>
-                  )}
                 </View>
                 {secondHint ? (
                   <Text style={styles.inputHint} accessibilityRole="alert">
@@ -338,14 +327,6 @@ export default function CompareScreen() {
                   </Text>
                 )}
               </View>
-            </View>
-
-            <View style={styles.actionRow}>
-              <PillButton
-                label={isPlayer ? 'Compare Players' : 'Compare Clans'}
-                icon="compare"
-                onPress={handleCompare}
-              />
             </View>
           </View>
 
@@ -448,34 +429,6 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       borderTopColor: c.panelHighlight,
       backgroundColor: c.panel,
     },
-    // Clan mode: the input shares its box with the search affordance,
-    // the same chrome with the button seated on the right inside the
-    // border, so the box stays one control.
-    inputWrapRow: {
-      borderRadius: t.radius[2],
-      borderWidth: 1,
-      borderColor: c.panelBorderStrong,
-      borderTopColor: c.panelHighlight,
-      backgroundColor: c.panel,
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    searchAffordance: {
-      width: 44,
-      minHeight: t.layout.controlHeight,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderLeftWidth: 1,
-      borderLeftColor: c.panelBorder,
-      backgroundColor: c.accentSoft,
-      borderTopRightRadius: t.radius[2],
-      borderBottomRightRadius: t.radius[2],
-      outlineColor: c.focusRing,
-      outlineOffset: t.layout.focusRingOffset,
-    },
-    searchAffordancePressed: {
-      backgroundColor: c.accent,
-    },
     textInput: {
       minHeight: t.layout.controlHeight,
       paddingHorizontal: t.spacing[3],
@@ -495,29 +448,25 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       fontSize: t.fontSize.xs,
       color: c.warning,
     },
-    vsContainer: {
+    // The launch action's seat between the two boxes: centered on the
+    // row's cross axis, which lands the control-height pill level with
+    // the input boxes (their labels sit above, their helpers below, so
+    // the row's midpoint is the inputs' band).
+    compareSlot: {
       alignSelf: 'center',
-      paddingVertical: t.spacing[2],
+      paddingVertical: t.spacing[1],
     },
-    vsCircle: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      backgroundColor: c.accentSoft,
-      borderWidth: 1,
-      borderColor: c.accent,
-      alignItems: 'center',
+    // Below tablet the boxes stack, so the seat takes its own full-width
+    // row and centers the pill on it; the wrap already forces the boxes
+    // onto their own lines at these widths. The centering is the row's
+    // own justifyContent, not alignItems: the pill's base style carries
+    // alignSelf 'flex-start', which would win against a column's
+    // alignItems and pin the button to the seat's left edge.
+    compareSlotStacked: {
+      alignSelf: 'auto',
+      width: '100%',
+      flexDirection: 'row',
       justifyContent: 'center',
-    },
-    vsText: {
-      fontFamily: t.fontFamily.sans,
-      fontSize: t.fontSize.xs,
-      fontWeight: t.fontWeight.bold,
-      color: c.accentInk,
-    },
-    actionRow: {
-      alignItems: 'flex-end',
-      paddingTop: t.spacing[2],
     },
   });
 }
