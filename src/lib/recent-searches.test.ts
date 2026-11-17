@@ -133,4 +133,33 @@ describe('recent-searches', () => {
     removeRecentSearch('player', '#P1');
     clearRecentSearches();
   });
+
+  it('never evicts the other kind when one kind floods the cap', () => {
+    // The clans screen records name searches and #tags in the same clan
+    // kind while the player kind sits untouched (FR-15): flooding one
+    // kind must never push the other kind's entries out of the list.
+    recordRecentSearch({ kind: 'player', query: '#KEEPME', timestamp: 500 });
+    for (let i = 0; i < RECENT_SEARCHES_MAX_ITEMS + 5; i++) {
+      recordRecentSearch({ kind: 'clan', query: `Clan ${i}`, timestamp: 1000 + i });
+    }
+    expect(readRecentSearches('clan')).toHaveLength(RECENT_SEARCHES_MAX_ITEMS);
+    expect(readRecentSearches('player')).toEqual([
+      expect.objectContaining({ query: '#KEEPME' }),
+    ]);
+  });
+
+  it('records a clan name and its tag as two separate lookups', () => {
+    // The clans screen's two paths: a name search records the name, the
+    // clan detail records the tag with the clan's name as the label. The
+    // keys differ, so both live in the list; the detail's tag entry is
+    // the one that re-runs the direct open.
+    recordRecentSearch({ kind: 'clan', query: 'Reddit Kings', timestamp: 1000 });
+    recordRecentSearch({ kind: 'clan', query: '#2JPCYP98L', label: 'Reddit Kings', timestamp: 2000 });
+    const items = readRecentSearches('clan');
+    expect(items).toHaveLength(2);
+    expect(items[0]).toEqual(
+      expect.objectContaining({ query: '#2JPCYP98L', label: 'Reddit Kings' }),
+    );
+    expect(items[1]).toEqual(expect.objectContaining({ query: 'Reddit Kings', label: undefined }));
+  });
 });
