@@ -11,6 +11,8 @@ import ErrorState from '../components/ErrorState';
 import PillButton from '../components/PillButton';
 import RefreshControl from '../components/RefreshControl';
 import { clanRouteFor, normalizeTagInput, TAG_REJECT_COPY } from '../lib/tag';
+import { recordRecentSearch, type RecentSearchItem } from '../lib/recent-searches';
+import RecentSearchesStrip from '../components/RecentSearchesStrip';
 import { WAR_FREQUENCY_LABELS } from '../lib/war-frequency';
 import { busyRetryDelayMs, shouldRetryBusy } from '../lib/busy-retry';
 import {
@@ -357,6 +359,12 @@ export default function SearchScreen() {
       const tag = normalizeTagInput(raw);
       if (tag.ok) {
         setSearchHint(null);
+        // The lookup is recorded here the way every other entry point
+        // records it (FR-15): the tag path leaves the screen for the clan
+        // detail, so this is the only moment the strip's evidence exists.
+        // The detail screen records again with the clan's name as the
+        // label, which moves the entry to the front and upgrades it.
+        recordRecentSearch({ kind: 'clan', query: tag.tag });
         navigate(clanRouteFor(tag.tag));
       } else {
         setSearchHint(tag.reason === 'empty' ? 'Type a clan name or tag first.' : TAG_REJECT_COPY[tag.reason]);
@@ -369,6 +377,29 @@ export default function SearchScreen() {
       setSearchHint(SEARCH_NAME_MIN_COPY);
       return;
     }
+    setSearchHint(null);
+    // A name search is a lookup too (FR-15): the strip's chip carries the
+    // name back to this screen with the query pre-filled, the same round
+    // trip the tag chips give the detail screens.
+    recordRecentSearch({ kind: 'clan', query: raw });
+    setSubmitted({ name: raw, ...filterDraft });
+  };
+
+  // A recent-searches chip on this screen means "run that lookup again"
+  // (FR-15): a #tag opens the clan detail the way the search bar does, a
+  // name re-runs the search with the query pre-filled. The submitted state
+  // takes the current filter draft, the same shape a fresh submit builds,
+  // so the chip's search agrees with what the filters row shows.
+  const handleRecentSelect = (item: RecentSearchItem) => {
+    const raw = item.query.trim();
+    if (raw.startsWith('#')) {
+      const tag = normalizeTagInput(raw);
+      if (tag.ok) {
+        navigate(clanRouteFor(tag.tag));
+        return;
+      }
+    }
+    setNameDraft(raw);
     setSearchHint(null);
     setSubmitted({ name: raw, ...filterDraft });
   };
@@ -739,6 +770,11 @@ export default function SearchScreen() {
                 Changed since the last search. Press Search to apply.
               </Text>
             ) : null}
+            <RecentSearchesStrip
+              kind="clan"
+              title="Recent Clan Lookups"
+              onSelect={handleRecentSelect}
+            />
           </View>
 
           <View style={styles.resultsArea}>
