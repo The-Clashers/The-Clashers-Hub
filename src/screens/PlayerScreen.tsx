@@ -40,6 +40,12 @@ import { groupByVillage } from '../lib/village';
 import { recordRecentSearch } from '../lib/recent-searches';
 import { playerToProgressionTiles } from '../lib/progression-grid';
 import {
+  referenceFrameInput,
+  resolveFrameMax,
+  type ReferenceFrame,
+  type ReferenceFrameInput,
+} from '../lib/reference-frame';
+import {
   bandFor,
   computeRushed,
   playerToUnitEntries,
@@ -207,6 +213,20 @@ function PlayerSuccess({ player, onRefresh, isRefreshing }: PlayerSuccessProps) 
   const styles = useMemo(() => createStyles(theme), [theme]);
   const navigate = useNavigate();
 
+  // The reference frame (the owner's ask, 11-19): which maximum every
+  // level pair and verdict on this screen names. "latest" (the default,
+  // the reading the screen has always carried) judges against the game's
+  // newest max levels; "townHall" judges against the cap tables at the
+  // player's own halls, the maxed-for-my-Town-Hall reading. View-local
+  // state, not a URL param: it is a lens on the data, not a shareable
+  // fact about the player (the compare screens keep the global frame on
+  // purpose: two players face off against one yardstick).
+  const [frame, setFrame] = useState<ReferenceFrame>('latest');
+  const frameInput = useMemo(
+    () => referenceFrameInput(frame, player.townHallLevel, player.builderHallLevel),
+    [frame, player.townHallLevel, player.builderHallLevel],
+  );
+
   useEffect(() => {
     if (player.tag) {
       recordRecentSearch({ kind: 'player', query: player.tag, label: player.name });
@@ -221,15 +241,26 @@ function PlayerSuccess({ player, onRefresh, isRefreshing }: PlayerSuccessProps) 
 
   // The rushed verdict (the flagship engine, T-M2-2): computed here once
   // from the same single response the shell fetched, then handed to the
-  // analysis cards as data. Pure engine call, no second fetch (SR-14).
+  // analysis cards as data. Pure engine call, no second fetch (SR-14). The
+  // frame rides along so the verdict names the maximum the toggle chose.
   const verdict = useMemo(
     () => computeRushed(playerToUnitEntries(
       player.troops,
       player.spells,
       player.heroes,
       player.heroEquipment,
+      frame === 'townHall'
+        ? { kind: 'townHall', townHallLevel: player.townHallLevel }
+        : { kind: 'latest' },
     )),
-    [player.troops, player.spells, player.heroes, player.heroEquipment],
+    [
+      player.troops,
+      player.spells,
+      player.heroes,
+      player.heroEquipment,
+      frame,
+      player.townHallLevel,
+    ],
   );
 
   // The header reads the ranked-ladder tier (the same field the roster's
@@ -313,9 +344,11 @@ function PlayerSuccess({ player, onRefresh, isRefreshing }: PlayerSuccessProps) 
   );
 
   const rushedCard = (
-    <RushedAnalysisCard verdict={verdict} townHallLevel={player.townHallLevel} />
+    <RushedAnalysisCard verdict={verdict} frame={frame} townHallLevel={player.townHallLevel} />
   );
-  const upgradeNextCard = <UpgradeNextCard verdict={verdict} />;
+  const upgradeNextCard = (
+    <UpgradeNextCard verdict={verdict} frame={frame} townHallLevel={player.townHallLevel} />
+  );
   const refreshCard = (
     <View style={[base.panelRaised, styles.refreshCard]}>
       <RefreshControl
@@ -326,35 +359,130 @@ function PlayerSuccess({ player, onRefresh, isRefreshing }: PlayerSuccessProps) 
       />
     </View>
   );
-  const heroCard = <HeroCard heroes={player.heroes} />;
-  const progressionCard = <ProgressionCard player={player} />;
+  const heroCard = (
+    <HeroCard
+      heroes={player.heroes}
+      frameInput={frameInput}
+      townHallLevel={player.townHallLevel}
+    />
+  );
+  const progressionCard = <ProgressionCard player={player} frame={frame} />;
   const achievementsCard = <AchievementsCard achievements={player.achievements} />;
 
-  return twoColumns ? (
-    <View style={styles.columns}>
-      <View style={styles.identityColumn}>
-        {identityCard}
-        {rushedCard}
-        {upgradeNextCard}
-        {refreshCard}
-      </View>
-      <View style={styles.analysisColumn}>
-        {heroCard}
-        {progressionCard}
-        {achievementsCard}
-      </View>
+  return (
+    <View style={styles.successRoot}>
+      <ReferenceFrameToggle
+        frame={frame}
+        townHallLevel={player.townHallLevel}
+        onSelect={setFrame}
+      />
+      {twoColumns ? (
+        <View style={styles.columns}>
+          <View style={styles.identityColumn}>
+            {identityCard}
+            {rushedCard}
+            {upgradeNextCard}
+            {refreshCard}
+          </View>
+          <View style={styles.analysisColumn}>
+            {heroCard}
+            {progressionCard}
+            {achievementsCard}
+          </View>
+        </View>
+      ) : (
+        <View style={styles.stackedColumn}>
+          {identityCard}
+          <View style={styles.sectionStack}>
+            {rushedCard}
+            {upgradeNextCard}
+            {refreshCard}
+            {heroCard}
+            {progressionCard}
+            {achievementsCard}
+          </View>
+        </View>
+      )}
     </View>
-  ) : (
-    <View style={styles.stackedColumn}>
-      {identityCard}
-      <View style={styles.sectionStack}>
-        {rushedCard}
-        {upgradeNextCard}
-        {refreshCard}
-        {heroCard}
-        {progressionCard}
-        {achievementsCard}
-      </View>
+  );
+}
+
+// ---------- the reference frame toggle (the owner's ask, 11-19) ----------
+
+interface ReferenceFrameToggleProps {
+  /** The active frame; drives the selected pill. */
+  frame: ReferenceFrame;
+  /** The player's own Town Hall, the townHall pill's label. */
+  townHallLevel: number;
+  /** Fires with the picked frame. */
+  onSelect: (frame: ReferenceFrame) => void;
+}
+
+// The one control that decides which maximum every reading on the screen
+// names. It sits above both columns (the reading it changes lives in the
+// left column's verdict cards and the right column's ledgers alike, so a
+// control inside either card would read as that card's own), directly
+// under the breadcrumb where the analysis begins. The chrome is the
+// achievements filter pills' (quiet pill, gold-washed when selected), the
+// established segmented vocabulary, with a micro label naming what the
+// pills choose between: the max levels each pair is read against.
+function ReferenceFrameToggle({ frame, townHallLevel, onSelect }: ReferenceFrameToggleProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
+  // The townHall pill names the player's own hall ("TH14"); a malformed
+  // payload without a hall level falls back to the plain phrase rather
+  // than a nonsensical "TH0".
+  const townHallLabel = townHallLevel >= 1 ? `TH${townHallLevel}` : 'My TH';
+
+  const options: ReadonlyArray<{
+    value: ReferenceFrame;
+    label: string;
+    accessibilityLabel: string;
+  }> = [
+    {
+      value: 'latest',
+      label: 'Latest',
+      accessibilityLabel: 'Latest max levels, the newest Town Hall caps',
+    },
+    {
+      value: 'townHall',
+      label: townHallLabel,
+      accessibilityLabel:
+        townHallLevel >= 1
+          ? `Town Hall ${townHallLevel} max levels, this player's own hall caps`
+          : "This player's own Town Hall caps",
+    },
+  ];
+
+  return (
+    <View
+      style={styles.frameRow}
+      accessibilityRole="toolbar"
+      accessibilityLabel="Maximum levels reference"
+    >
+      <Text style={styles.frameLabel}>Max levels</Text>
+      {options.map((option) => {
+        const active = frame === option.value;
+        return (
+          <Pressable
+            key={option.value}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+            accessibilityLabel={option.accessibilityLabel}
+            onPress={() => onSelect(option.value)}
+            style={({ pressed }) => [
+              styles.framePill,
+              active && styles.framePillActive,
+              pressed && !active && styles.framePillPressed,
+            ]}
+          >
+            <Text style={active ? styles.framePillTextActive : styles.framePillText}>
+              {option.label}
+            </Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -371,6 +499,9 @@ interface HeaderStat {
 
 interface RushedAnalysisCardProps {
   verdict: RushedVerdict;
+  /** The frame the verdict was computed in; names the dial's caption and
+   * the scale note's yardstick. */
+  frame: ReferenceFrame;
   townHallLevel: number;
 }
 
@@ -379,8 +510,10 @@ interface RushedAnalysisCardProps {
 // dial fills with the deficit percentage (gold, the verdict reserve); the
 // bars carry each category's band color so the neglected category reads at
 // a glance. The verdict itself is the engine's (src/engines/rushed.ts);
-// this card only displays it (STD-09).
-function RushedAnalysisCard({ verdict, townHallLevel }: RushedAnalysisCardProps) {
+// this card only displays it (STD-09). The captions name the frame the
+// verdict measured against, so the dial never claims a ceiling it did not
+// read: the latest frame says so, the Town Hall frame names the hall.
+function RushedAnalysisCard({ verdict, frame, townHallLevel }: RushedAnalysisCardProps) {
   const { theme } = useTheme();
   const base = useMemo(() => createBaseStyles(theme), [theme]);
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -416,7 +549,7 @@ function RushedAnalysisCard({ verdict, townHallLevel }: RushedAnalysisCardProps)
       <View style={styles.gaugeWrap}>
         <Gauge
           percent={percent}
-          caption="DEFICIT VS TH CEILING"
+          caption={frame === 'townHall' ? `DEFICIT VS TH${townHallLevel} CEILING` : 'DEFICIT VS LATEST MAX'}
           accessibilityLabel={
             percent === null
               ? 'Rushed percentage dial, not available'
@@ -431,7 +564,9 @@ function RushedAnalysisCard({ verdict, townHallLevel }: RushedAnalysisCardProps)
         <Text style={styles.gaugeSub}>
           {percent === null
             ? 'The game API returned no units with a known maximum for this player.'
-            : `${verdict.unitsCounted} units measured against the TH${townHallLevel} ceiling \u00B7 ${verdict.unitsMaxed} already maxed \u00B7 band scale 0 / 5 / 15 / 30%`}
+            : frame === 'townHall'
+              ? `${verdict.unitsCounted} units measured against the TH${townHallLevel} ceiling \u00B7 ${verdict.unitsMaxed} maxed for TH${townHallLevel} \u00B7 band scale 0 / 5 / 15 / 30%`
+              : `${verdict.unitsCounted} units measured against the latest Town Hall's max levels \u00B7 ${verdict.unitsMaxed} already maxed \u00B7 band scale 0 / 5 / 15 / 30%`}
         </Text>
       </View>
 
@@ -503,13 +638,19 @@ function bandChipTextStyle(styles: ReturnType<typeof createStyles>, band: Rushed
 
 interface UpgradeNextCardProps {
   verdict: RushedVerdict;
+  /** The frame the verdict was computed in; the footnote names the
+   * yardstick the list measured against. */
+  frame: ReferenceFrame;
+  townHallLevel: number;
 }
 
 // The engine's "what to upgrade next" list (UR-03's literal answer): the
 // largest deficits first, each with its rank circle, its level/maximum
 // pair, and the gap behind as a warning chip. A maxed account gets the
-// designed empty reading (AC-04), never a fabricated todo list.
-function UpgradeNextCard({ verdict }: UpgradeNextCardProps) {
+// designed empty reading (AC-04), never a fabricated todo list. The pairs
+// and gaps name the active frame's maximum, the same lens the rushed dial
+// above reads through.
+function UpgradeNextCard({ verdict, frame, townHallLevel }: UpgradeNextCardProps) {
   const { theme } = useTheme();
   const base = useMemo(() => createBaseStyles(theme), [theme]);
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -557,7 +698,9 @@ function UpgradeNextCard({ verdict }: UpgradeNextCardProps) {
       )}
 
       <Text style={styles.footnote}>
-        The rushed score weights every unit equally and measures against the cap table for this Town Hall, so a maxed-for-TH account reads 0% no matter its level.
+        {frame === 'townHall'
+          ? `The rushed score weights every unit equally and measures against the cap table for this Town Hall, so a maxed-for-TH${townHallLevel} account reads 0% no matter its level.`
+          : 'The rushed score weights every unit equally and measures against the max levels the game API reports (the newest Town Hall caps), the long view past this account\u2019s own hall.'}
       </Text>
     </View>
   );
@@ -571,6 +714,12 @@ interface HeroCardProps {
    * notice then, the same within-success degradation the achievements
    * card keeps. */
   heroes: PlayerResponse['heroes'];
+  /** The active reference frame plus the player's hall levels: every
+   * maximum on the card (hero rows, equipment rows, the header's total
+   * ceiling) resolves through it (lib/reference-frame.ts). */
+  frameInput: ReferenceFrameInput;
+  /** The player's Town Hall, the count line's "maxed for THn" phrase. */
+  townHallLevel: number;
 }
 
 // The hero panel: levels versus maximum, and equipment where the game API
@@ -602,7 +751,11 @@ interface HeroCardProps {
 // the picture is identity, and dimming either would read as broken, not
 // quiet. A hero with a null maxLevel (brand-new content the API has not
 // caught up to, SR-14's shape) renders its level alone with no rail, and
-// the card footnotes the count instead of inventing a maximum.
+// the card footnotes the count instead of inventing a maximum. In the
+// Town Hall frame the maximum is the cap table's at the player's own hall
+// (the builder heroes' own Builder Hall), so the MAX chip names the
+// maxed-for-my-hall verdict, and the footnote's reason shifts from the
+// API lagging to the cap tables not having met the hero.
 //
 // Cards key on village-name-index, the same stable identity the
 // achievement rows key on (STD-18): the payload could carry duplicate
@@ -611,7 +764,7 @@ interface HeroCardProps {
 // The hero grid's gap between cards.
 const HERO_CARD_GAP = 8;
 
-function HeroCard({ heroes }: HeroCardProps) {
+function HeroCard({ heroes, frameInput, townHallLevel }: HeroCardProps) {
   const { theme } = useTheme();
   const base = useMemo(() => createBaseStyles(theme), [theme]);
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -625,14 +778,24 @@ function HeroCard({ heroes }: HeroCardProps) {
     );
   }
 
+  // Every maximum on the card resolves through the active frame, so the
+  // pairs, the MAX chips, and the header's ceiling all name the same
+  // yardstick the rest of the screen reads (lib/reference-frame.ts).
+  const maxFor = (unit: { name: string; village: string; maxLevel: number | null }) =>
+    resolveFrameMax(unit, frameInput);
+
   const groups = groupByVillage(heroes);
-  const maxedCount = heroes.filter((hero) => heroProgress(hero).isMaxed).length;
-  const withoutMaxCount = heroes.filter((hero) => hero.maxLevel === null).length;
+  const maxedCount = heroes.filter((hero) =>
+    heroProgress({ level: hero.level, maxLevel: maxFor(hero) }).isMaxed,
+  ).length;
+  const withoutMaxCount = heroes.filter((hero) => maxFor(hero) === null).length;
 
   // The header's count line, the prototype's reading: total levels banked
-  // against the total ceiling, with the maxed count beside it.
+  // against the total ceiling, with the maxed count beside it. In the Town
+  // Hall frame the maxed count says what it now names: maxed for the
+  // player's own hall, not for the game's newest one.
   const totalLevels = heroes.reduce((sum, hero) => sum + hero.level, 0);
-  const totalCeiling = heroes.reduce((sum, hero) => sum + (hero.maxLevel ?? 0), 0);
+  const totalCeiling = heroes.reduce((sum, hero) => sum + (maxFor(hero) ?? 0), 0);
 
   return (
     <View
@@ -642,7 +805,7 @@ function HeroCard({ heroes }: HeroCardProps) {
       <View style={styles.heroHeader}>
         <Text style={base.title}>Heroes</Text>
         <Text style={styles.heroCount}>
-          {`${totalLevels} of ${totalCeiling} total levels \u00B7 ${formatProgressPair(maxedCount, heroes.length)} maxed`}
+          {`${totalLevels} of ${totalCeiling} total levels \u00B7 ${formatProgressPair(maxedCount, heroes.length)} maxed${frameInput.frame === 'townHall' && townHallLevel >= 1 ? ` for TH${townHallLevel}` : ''}`}
         </Text>
       </View>
 
@@ -650,15 +813,19 @@ function HeroCard({ heroes }: HeroCardProps) {
         <View key={group.village} style={styles.heroGroup}>
           {groupIndex > 0 ? <View style={styles.heroDivider} aria-hidden /> : null}
           <Text style={styles.heroGroupLabel}>{group.label}</Text>
-          <HeroGrid heroes={group.rows} village={group.village} />
+          <HeroGrid heroes={group.rows} village={group.village} frameInput={frameInput} />
         </View>
       ))}
 
       {withoutMaxCount > 0 ? (
         <Text style={styles.heroFootnote}>
-          {withoutMaxCount === 1
-            ? '1 hero is shown without a maximum: the game API has not caught up to it yet.'
-            : `${withoutMaxCount} heroes are shown without a maximum: the game API has not caught up to them yet.`}
+          {frameInput.frame === 'townHall'
+            ? withoutMaxCount === 1
+              ? '1 hero is shown without a maximum: the reference cap tables have not met it yet.'
+              : `${withoutMaxCount} heroes are shown without a maximum: the reference cap tables have not met them yet.`
+            : withoutMaxCount === 1
+              ? '1 hero is shown without a maximum: the game API has not caught up to it yet.'
+              : `${withoutMaxCount} heroes are shown without a maximum: the game API has not caught up to them yet.`}
         </Text>
       ) : null}
     </View>
@@ -670,9 +837,11 @@ function HeroCard({ heroes }: HeroCardProps) {
 function HeroGrid({
   heroes,
   village,
+  frameInput,
 }: {
   heroes: NonNullable<PlayerResponse['heroes']>;
   village: string;
+  frameInput: ReferenceFrameInput;
 }) {
   const [width, setWidth] = useState(0);
 
@@ -693,6 +862,7 @@ function HeroGrid({
           key={`${village}-${hero.name}-${index}`}
           hero={hero}
           basis={basis}
+          frameInput={frameInput}
         />
       ))}
     </View>
@@ -714,13 +884,22 @@ interface HeroUnitProps {
   /** The measured column width the card takes, or null before the grid
    * has measured itself. */
   basis: number | null;
+  /** The active reference frame: the hero's and its equipment's maxima
+   * resolve through it. */
+  frameInput: ReferenceFrameInput;
 }
 
-function HeroUnit({ hero, basis }: HeroUnitProps) {
+function HeroUnit({ hero, basis, frameInput }: HeroUnitProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const progress = heroProgress(hero);
+  // The frame decides the maximum the rail and the pair name: the API's
+  // global maximum in the latest frame, the cap table's maximum at the
+  // player's own hall in the Town Hall frame.
+  const progress = heroProgress({
+    level: hero.level,
+    maxLevel: resolveFrameMax(hero, frameInput),
+  });
 
   // The card's own label: the name with the level/maximum pair (and the
   // maxed verdict when it holds). The rail adds its fill percent; the
@@ -758,27 +937,33 @@ function HeroUnit({ hero, basis }: HeroUnitProps) {
         </Text>
         {hero.equipment ? (
           <View style={styles.heroEquipment}>
-            {hero.equipment.map((item, index) => (
-              <View
-                key={`${item.name}-${index}`}
-                style={styles.equipmentRow}
-                accessibilityLabel={
-                  item.maxLevel !== null
-                    ? `${item.name}, level ${item.level} of ${item.maxLevel}`
-                    : `${item.name}, level ${item.level}`
-                }
-              >
-                <UnitIcon kind="equipment" name={item.name} size="sm" />
-                <Text style={styles.equipmentName} numberOfLines={1}>
-                  {item.name}
-                </Text>
-                <Text style={styles.equipmentPair} numberOfLines={1}>
-                  {item.maxLevel !== null
-                    ? formatLevelPair(item.level, item.maxLevel)
-                    : `Lv ${item.level}`}
-                </Text>
-              </View>
-            ))}
+            {hero.equipment.map((item, index) => {
+              // Equipment maxima resolve through the same frame the hero's
+              // own maximum does, so the rows and the rail never name two
+              // different yardsticks on one card.
+              const itemMax = resolveFrameMax(item, frameInput);
+              return (
+                <View
+                  key={`${item.name}-${index}`}
+                  style={styles.equipmentRow}
+                  accessibilityLabel={
+                    itemMax !== null
+                      ? `${item.name}, level ${item.level} of ${itemMax}`
+                      : `${item.name}, level ${item.level}`
+                  }
+                >
+                  <UnitIcon kind="equipment" name={item.name} size="sm" />
+                  <Text style={styles.equipmentName} numberOfLines={1}>
+                    {item.name}
+                  </Text>
+                  <Text style={styles.equipmentPair} numberOfLines={1}>
+                    {itemMax !== null
+                      ? formatLevelPair(item.level, itemMax)
+                      : `Lv ${item.level}`}
+                  </Text>
+                </View>
+              );
+            })}
           </View>
         ) : null}
       </View>
@@ -802,6 +987,9 @@ function HeroUnit({ hero, basis }: HeroUnitProps) {
 
 interface ProgressionCardProps {
   player: PlayerResponse;
+  /** The active reference frame: every tile's maximum (its pair and its
+   * MAX chip) resolves through it (lib/reference-frame.ts). */
+  frame: ReferenceFrame;
 }
 
 // The progression grid card. Every non-hero unit of both villages with its
@@ -814,16 +1002,21 @@ interface ProgressionCardProps {
 // virtualized because a real account carries ~100 unit tiles across both
 // villages (07 section 3).
 //
+// The frame decides what each tile's maximum names: the API's global
+// maximum (latest) or the cap table's at the player's own halls
+// (townHall), the maxed-for-my-Town-Hall reading the chip was designed
+// for (FR-16, SR-16).
+//
 // The card wraps the ProgressionGrid in the same panelRaised chrome the
 // hero and achievements cards use, so the three analysis surfaces read as
 // one family. A payload with no units renders the quiet empty notice, the
 // same within-success degradation the other cards keep.
-function ProgressionCard({ player }: ProgressionCardProps) {
+function ProgressionCard({ player, frame }: ProgressionCardProps) {
   const { theme } = useTheme();
   const base = useMemo(() => createBaseStyles(theme), [theme]);
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const groups = useMemo(() => playerToProgressionTiles(player), [player]);
+  const groups = useMemo(() => playerToProgressionTiles(player, frame), [player, frame]);
   const tileCount = useMemo(
     () => groups.reduce((sum, g) => sum + g.categories.reduce((s, b) => s + b.tiles.length, 0), 0),
     [groups],
@@ -1305,6 +1498,11 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     column: {
       flex: 1,
     },
+    // The success layout's own root: the frame toggle above, the columns or
+    // the stacked column below, one gap rhythm.
+    successRoot: {
+      gap: t.spacing[4],
+    },
     // The crumbs sit a full step above the content, the same clearance the
     // clan detail card keeps (the owner's spacing note), so the loading and
     // error states keep it too.
@@ -1314,6 +1512,63 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     // The error panel's own gap, mirroring the clan screen's detail panel.
     detailPanel: {
       gap: t.spacing[5],
+    },
+
+    // ---------- the reference frame toggle ----------
+    // The row seats the micro label beside the pills so the pair reads as
+    // one sentence ("Max levels: Latest / TH14"), wrapping under itself on
+    // narrow viewports. The pills are the achievements filter pills' chrome
+    // (quiet pill, gold wash when selected), the established segmented
+    // vocabulary, with the 44 px touch floor kept.
+    frameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      columnGap: t.spacing[2],
+      rowGap: t.spacing[2],
+    },
+    frameLabel: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.xs,
+      fontWeight: t.fontWeight.medium,
+      color: c.textMuted,
+      textTransform: 'uppercase',
+      letterSpacing: t.letterSpacing.micro,
+    },
+    framePill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      minHeight: t.layout.controlHeight,
+      paddingHorizontal: t.spacing[3],
+      paddingVertical: t.spacing[1],
+      borderRadius: t.radius.pill,
+      backgroundColor: c.fillQuiet,
+      borderWidth: 1,
+      borderColor: c.panelBorder,
+      borderTopColor: c.panelHighlight,
+      outlineColor: c.focusRing,
+      outlineOffset: t.layout.focusRingOffset,
+    },
+    framePillActive: {
+      backgroundColor: c.accentSoft,
+      borderColor: c.accent,
+    },
+    framePillPressed: {
+      backgroundColor: c.panel,
+    },
+    framePillText: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.xs,
+      fontWeight: t.fontWeight.medium,
+      color: c.textSecondary,
+      fontVariant: ['tabular-nums'],
+    },
+    framePillTextActive: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.xs,
+      fontWeight: t.fontWeight.semibold,
+      color: c.accentInk,
+      fontVariant: ['tabular-nums'],
     },
 
     // The two-column rule (07 section 3): identity + analysis from 1024 px

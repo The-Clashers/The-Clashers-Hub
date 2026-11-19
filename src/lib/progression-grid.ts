@@ -30,6 +30,12 @@ import {
   SIEGE_MACHINE_NAMES,
   PET_NAMES,
 } from '../engines/rushed';
+import {
+  referenceFrameInput,
+  resolveFrameMax,
+  type ReferenceFrame,
+  type ReferenceFrameInput,
+} from './reference-frame';
 
 /** The five categories the progression grid groups by (heroes live in their
  * own dedicated HeroCard section). */
@@ -56,16 +62,16 @@ const CATEGORY_ORDER: ReadonlyArray<ProgressionCategory> = [
 /**
  * One tile in the progression grid. Carries everything the tile needs to
  * render: the unit name (for the icon lookup and the accessibility label),
- * the current level, the maxLevel (null when the API has not caught up to
- * brand-new content), the category, and the village.
+ * the current level, the maxLevel the active reference frame resolves
+ * (null when the frame has no honest maximum for the unit: brand-new
+ * content the API has not caught up to in the latest frame, or a unit the
+ * cap tables have not met in the Town Hall frame), the category, and the
+ * village.
  *
- * The maxed-for-Town-Hall chip is not on the tile: that indicator comes
- * from the bundled Town Hall cap tables (T-M2-6), which are not bundled yet.
- * Until T-M2-6 ships, the tile renders the level/maxLevel pair (the global
- * maximum the API reports) and a "maxed" chip when level >= maxLevel. When
- * T-M2-6 lands, the tile gains a `maxedForTownHall` boolean the reference
- * table computes, and the chip switches to read it. The tile's shape is
- * designed so that change is a new field, not a rewrite.
+ * The maxed chip reads the tile's maxLevel, so it names a
+ * maxed-for-the-active-frame verdict: globally maxed in the latest frame,
+ * maxed for the player's own Town Hall in the townHall frame (the FR-16 /
+ * SR-16 reading, which is what the bundled cap tables were built for).
  */
 export interface ProgressionTile {
   name: string;
@@ -101,23 +107,34 @@ export interface ProgressionCategoryBlock {
  * category-blocked tiles the progression grid renders. Pure: the input
  * arrays are untouched, a fresh group array comes back.
  *
+ * The frame decides each tile's maximum (lib/reference-frame.ts): "latest"
+ * (the default) keeps the API's global maximum, "townHall" reads the cap
+ * tables at the player's own halls, so the grid's pairs and MAX chips name
+ * the maxed-for-my-Town-Hall reading the concept intends (FR-16, SR-16).
+ *
  * Super troops are kept (the grid is an inventory view), unlike the rushed
  * engine which drops them. Siege machines and pets are routed into their own
  * siege and pets categories using the rushed engine's reference lists, so the
  * two views agree on unit identities. Builder-base troops are kept (the grid
- * shows both villages, unlike the rushed analysis which is home-village only).
+ * shows both villages, unlike the rushed analysis which is home-village only);
+ * in the townHall frame they cap at the player's Builder Hall when the
+ * payload carries one, and keep the global maximum when it does not.
  * Hero equipment from the flat `heroEquipment` array is routed into the
  * equipments category, while heroes themselves are omitted because the
  * HeroCard section already displays them.
  */
-export function playerToProgressionTiles(player: PlayerResponse): ProgressionVillageGroup[] {
-  const tiles = collectTiles(player);
+export function playerToProgressionTiles(
+  player: PlayerResponse,
+  frame: ReferenceFrame = 'latest',
+): ProgressionVillageGroup[] {
+  const input = referenceFrameInput(frame, player.townHallLevel, player.builderHallLevel);
+  const tiles = collectTiles(player, input);
   return groupTilesByVillage(tiles);
 }
 
 // ---------- internal: collect tiles from the three non-hero arrays ----------
 
-function collectTiles(player: PlayerResponse): ProgressionTile[] {
+function collectTiles(player: PlayerResponse, input: ReferenceFrameInput): ProgressionTile[] {
   const tiles: ProgressionTile[] = [];
 
   const troops = player.troops ?? [];
@@ -126,15 +143,15 @@ function collectTiles(player: PlayerResponse): ProgressionTile[] {
 
   for (const unit of troops) {
     const category = categorizeTroop(unit.name);
-    tiles.push(toTile(unit, category));
+    tiles.push(toTile(unit, category, input));
   }
 
   for (const unit of spells) {
-    tiles.push(toTile(unit, 'spells'));
+    tiles.push(toTile(unit, 'spells', input));
   }
 
   for (const unit of heroEquipment) {
-    tiles.push(toTile(unit, 'equipments'));
+    tiles.push(toTile(unit, 'equipments', input));
   }
 
   return tiles;
@@ -152,11 +169,15 @@ function categorizeTroop(name: string): ProgressionCategory {
   return 'troops';
 }
 
-function toTile(unit: PlayerUnit, category: ProgressionCategory): ProgressionTile {
+function toTile(
+  unit: PlayerUnit,
+  category: ProgressionCategory,
+  input: ReferenceFrameInput,
+): ProgressionTile {
   return {
     name: unit.name,
     level: unit.level,
-    maxLevel: unit.maxLevel,
+    maxLevel: resolveFrameMax(unit, input),
     category,
     village: unit.village,
   };
