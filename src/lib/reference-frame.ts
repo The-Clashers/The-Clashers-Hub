@@ -3,13 +3,15 @@
 //
 // - "latest": the unit's global maximum as the game API reports it (the
 //   furthest Town Hall's cap, whatever the game ships today). This is the
-//   reading every screen carried before the frame existed, and it stays
-//   the default: the API's own number is always current, even when the
+//   reading every screen carried before the frame existed; the player
+//   screen's toggle names it Max and offers it beside the player's own
+//   hall, and the API's own number stays always current, even when the
 //   bundled cap tables lag a new Town Hall.
 // - "townHall": the maximum at the player's own hall, read from the
 //   bundled cap tables (lib/town-hall-caps.ts). This is the "maxed for my
 //   Town Hall" reading the concept always intended for the progression
-//   grid's chips (FR-16, SR-16): a global maximum cannot tell a TH14
+//   grid's chips (FR-16, SR-16), and the player screen's default (the
+//   owner's same-day follow-up): a global maximum cannot tell a TH14
 //   player whether their lab is done for TH14.
 //
 // Pure TypeScript (STD-09): a unit plus the frame's inputs go in, the

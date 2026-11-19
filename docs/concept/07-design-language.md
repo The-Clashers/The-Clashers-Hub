@@ -351,29 +351,33 @@ draw, which is why the ambience layer uses react-native-svg, the chart
   object, XP level, clan role), two cells per row inside the column and
   four when the card runs full width, then a second hairline and the
   actions block: the compare button (primary gold pill with the compare
-  glyph) above the manual refresh control (the ghost pill with the
-  refresh glyph and the last-refresh text riding in the cached pill —
-  the owner's placement call: freshness lives on the card whose data it
-  describes; the clan screen keeps its footer row until its own pass).
-  Breadcrumbs `Home › Players › <name>` sit above with the clan card's
-  clearance. Under the breadcrumb, above both columns, sits the reference
-  frame toggle (the owner's ask, 11-19): a micro label (`MAX LEVELS`)
-  beside two segmented pills in the achievements filter chrome (`Latest`,
-  gold-washed when active, and `TH<n>` naming the player's own hall),
-  deciding which maximum every level pair and verdict on the screen names
-  (`lib/reference-frame.ts`). It is screen-level, not a card control,
-  because the reading it changes lives in both columns: the verdict cards'
+  glyph). Breadcrumbs `Home › Players › <name>` sit above with the clan
+  card's clearance. The manual refresh control (the ghost pill with the
+  refresh glyph and the last-refresh text riding in the cached pill — the
+  owner's placement call: freshness lives on the card whose data it
+  describes; the clan screen keeps its footer row until its own pass)
+  lives in its own controls card at the foot of the identity column, and
+  that card also carries the reference frame toggle (the owner's ask,
+  11-19, seated there by the same-day follow-up): the toggle's row — a
+  micro label (`MAX LEVELS`) beside two segmented pills in the
+  achievements filter chrome (`Max`, gold-washed when active, naming the
+  game's newest caps, and `TH<n>` naming the player's own hall) — rides
+  above a hairline and the refresh control, deciding which maximum every
+  level pair and verdict on the screen names (`lib/reference-frame.ts`).
+  The toggle is screen-level state, not a card-local control, because the
+  reading it changes lives in both columns: the verdict cards'
   percentages and deficit pairs, the hero card's pairs, MAX chips, and
-  total-levels ceiling, and the progression grid's tile pairs, MAX badges,
-  and category maxed counts all follow it. The default is `Latest` (the
-  reading the screen has always carried); view-local state, not a URL
-  param, and the compare screens stay on the global frame on purpose (two
-  players face off against one yardstick).
+  total-levels ceiling, and the progression grid's tile pairs, MAX
+  badges, and category maxed counts all follow it. The default is the
+  player's own hall (`TH<n>`, the maxed-for-my-Town-Hall reading; the
+  follow-up's call) with `Max` as the option; view-local state, not a
+  URL param, and the compare screens stay on the global frame on purpose
+  (two players face off against one yardstick).
   The left column holds the identity card and the two verdict cards: the
   rushed analysis card and the upgrade-next list. The rushed analysis card
   (T-M2-2's card half) centers the `Gauge` dial (the overall deficit
   percentage as a gold arc on a semicircle, the number in its throat, a
-  caption under it that names the active frame: "DEFICIT VS LATEST MAX" in
+  caption under it that names the active frame: "DEFICIT VS MAX" in
   the latest frame, "DEFICIT VS TH<n> CEILING" in the Town Hall frame),
   the band chip under the dial, the reading's own scale note (units
   measured, the frame's own maxed phrase, the band scale), the

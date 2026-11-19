@@ -60,19 +60,21 @@ reference data supplies the fallback (below).
 
 - *Two reference frames (the owner's ask, 11-19).* Every maximum a reading
   names comes through one frame resolver (`lib/reference-frame.ts`), and the
-  player screen exposes the choice as a toggle so a player can read their
-  account against their own hall instead of the game's newest one:
-  - **latest** (the default, the formula's original denominator): the unit's
-    global maximum as the API reports it, whatever the game ships today. The
-    engine keeps the SR-17 split here (API value primary, reference table
-    resolving nulls).
-  - **townHall**: the cap tables' maximum at the player's own halls — the
-    Town Hall for home units, the Builder Hall for builder units when the
-    payload carries one (a payload without it keeps those rows on the global
-    maximum: an unknown hall is not hall 1). The cap table is the only voice
-    in this frame: a unit the tables have not met reads as skipped and
-    footnoted (SR-14's shape) rather than borrowed from the global maximum,
-    because "done for this hall" has exactly one honest source.
+  player screen exposes the choice as a toggle that defaults to the player's
+  own hall (the owner's same-day follow-up) with the game's newest caps as
+  the option:
+  - **latest** (the toggle's `Max` pill; the formula's original denominator):
+    the unit's global maximum as the API reports it, whatever the game ships
+    today. The engine keeps the SR-17 split here (API value primary,
+    reference table resolving nulls).
+  - **townHall** (the toggle's default, the `TH<n>` pill): the cap tables'
+    maximum at the player's own halls — the Town Hall for home units, the
+    Builder Hall for builder units when the payload carries one (a payload
+    without it keeps those rows on the global maximum: an unknown hall is
+    not hall 1). The cap table is the only voice in this frame: a unit the
+    tables have not met reads as skipped and footnoted (SR-14's shape)
+    rather than borrowed from the global maximum, because "done for this
+    hall" has exactly one honest source.
 
 - *Villages are separate.* Units carry a `village` marker (home vs builder
   base). The default analysis is home-village only; builder-base gets its own

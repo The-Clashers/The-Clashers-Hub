@@ -214,14 +214,15 @@ function PlayerSuccess({ player, onRefresh, isRefreshing }: PlayerSuccessProps) 
   const navigate = useNavigate();
 
   // The reference frame (the owner's ask, 11-19): which maximum every
-  // level pair and verdict on this screen names. "latest" (the default,
-  // the reading the screen has always carried) judges against the game's
-  // newest max levels; "townHall" judges against the cap tables at the
-  // player's own halls, the maxed-for-my-Town-Hall reading. View-local
-  // state, not a URL param: it is a lens on the data, not a shareable
-  // fact about the player (the compare screens keep the global frame on
-  // purpose: two players face off against one yardstick).
-  const [frame, setFrame] = useState<ReferenceFrame>('latest');
+  // level pair and verdict on this screen names. "townHall" (the default,
+  // the owner's same-day follow-up) judges against the cap tables at the
+  // player's own halls, the maxed-for-my-Town-Hall reading a player lands
+  // on; "latest" (the Max pill) judges against the game's newest max
+  // levels, the reading the screen carried before the frame existed.
+  // View-local state, not a URL param: it is a lens on the data, not a
+  // shareable fact about the player (the compare screens keep the global
+  // frame on purpose: two players face off against one yardstick).
+  const [frame, setFrame] = useState<ReferenceFrame>('townHall');
   const frameInput = useMemo(
     () => referenceFrameInput(frame, player.townHallLevel, player.builderHallLevel),
     [frame, player.townHallLevel, player.builderHallLevel],
@@ -349,8 +350,18 @@ function PlayerSuccess({ player, onRefresh, isRefreshing }: PlayerSuccessProps) 
   const upgradeNextCard = (
     <UpgradeNextCard verdict={verdict} frame={frame} townHallLevel={player.townHallLevel} />
   );
+  // The controls card (the owner's same-day follow-up): the frame toggle
+  // and the manual refresh share one panel, the reading's lens and the
+  // reading's freshness in the same place, at the foot of the identity
+  // column.
   const refreshCard = (
     <View style={[base.panelRaised, styles.refreshCard]}>
+      <ReferenceFrameToggle
+        frame={frame}
+        townHallLevel={player.townHallLevel}
+        onSelect={setFrame}
+      />
+      <View style={styles.refreshDivider} aria-hidden />
       <RefreshControl
         onRefresh={onRefresh}
         ageSeconds={player.age}
@@ -371,11 +382,6 @@ function PlayerSuccess({ player, onRefresh, isRefreshing }: PlayerSuccessProps) 
 
   return (
     <View style={styles.successRoot}>
-      <ReferenceFrameToggle
-        frame={frame}
-        townHallLevel={player.townHallLevel}
-        onSelect={setFrame}
-      />
       {twoColumns ? (
         <View style={styles.columns}>
           <View style={styles.identityColumn}>
@@ -419,10 +425,12 @@ interface ReferenceFrameToggleProps {
 }
 
 // The one control that decides which maximum every reading on the screen
-// names. It sits above both columns (the reading it changes lives in the
-// left column's verdict cards and the right column's ledgers alike, so a
-// control inside either card would read as that card's own), directly
-// under the breadcrumb where the analysis begins. The chrome is the
+// names. It rides in the refresh card above the refresh control itself
+// (the owner's same-day follow-up: the two screen-level controls read as
+// one panel), and it stays screen-level state rather than a card-local
+// control because the reading it changes lives in the left column's
+// verdict cards and the right column's ledgers alike; seating it inside
+// any one card would read as that card's own. The chrome is the
 // achievements filter pills' (quiet pill, gold-washed when selected), the
 // established segmented vocabulary, with a micro label naming what the
 // pills choose between: the max levels each pair is read against.
@@ -442,8 +450,8 @@ function ReferenceFrameToggle({ frame, townHallLevel, onSelect }: ReferenceFrame
   }> = [
     {
       value: 'latest',
-      label: 'Latest',
-      accessibilityLabel: 'Latest max levels, the newest Town Hall caps',
+      label: 'Max',
+      accessibilityLabel: 'Max levels, the newest Town Hall caps',
     },
     {
       value: 'townHall',
@@ -549,7 +557,7 @@ function RushedAnalysisCard({ verdict, frame, townHallLevel }: RushedAnalysisCar
       <View style={styles.gaugeWrap}>
         <Gauge
           percent={percent}
-          caption={frame === 'townHall' ? `DEFICIT VS TH${townHallLevel} CEILING` : 'DEFICIT VS LATEST MAX'}
+          caption={frame === 'townHall' ? `DEFICIT VS TH${townHallLevel} CEILING` : 'DEFICIT VS MAX'}
           accessibilityLabel={
             percent === null
               ? 'Rushed percentage dial, not available'
@@ -566,7 +574,7 @@ function RushedAnalysisCard({ verdict, frame, townHallLevel }: RushedAnalysisCar
             ? 'The game API returned no units with a known maximum for this player.'
             : frame === 'townHall'
               ? `${verdict.unitsCounted} units measured against the TH${townHallLevel} ceiling \u00B7 ${verdict.unitsMaxed} maxed for TH${townHallLevel} \u00B7 band scale 0 / 5 / 15 / 30%`
-              : `${verdict.unitsCounted} units measured against the latest Town Hall's max levels \u00B7 ${verdict.unitsMaxed} already maxed \u00B7 band scale 0 / 5 / 15 / 30%`}
+              : `${verdict.unitsCounted} units measured against the game's max levels \u00B7 ${verdict.unitsMaxed} already maxed \u00B7 band scale 0 / 5 / 15 / 30%`}
         </Text>
       </View>
 
@@ -1364,6 +1372,15 @@ function PlayerLoading({ busyRetrying }: PlayerLoadingProps) {
   const upgradeBlock = sectionBlock('sk-upgrade');
   const refreshBlock = (
     <View style={[base.panelRaised, styles.refreshCard]}>
+      {/* The skeleton mirrors the seated controls card: the frame toggle
+          row (micro label + two pills), the divider, then the refresh
+          button and its age pill. */}
+      <View style={styles.frameRow}>
+        <SkeletonBlock width={80} height={12} pulse={pulse} />
+        <SkeletonBlock width={52} height={30} radiusStep="pill" pulse={pulse} />
+        <SkeletonBlock width={52} height={30} radiusStep="pill" pulse={pulse} />
+      </View>
+      <View style={styles.refreshDivider} aria-hidden />
       <SkeletonBlock width={100} height={36} radiusStep="pill" pulse={pulse} />
       <SkeletonBlock width={120} height={22} radiusStep="pill" pulse={pulse} />
     </View>
@@ -1498,8 +1515,9 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     column: {
       flex: 1,
     },
-    // The success layout's own root: the frame toggle above, the columns or
-    // the stacked column below, one gap rhythm.
+    // The success layout's own root: the columns or the stacked column
+    // below, one gap rhythm (the frame toggle rides inside the controls
+    // card, so nothing sits above the columns anymore).
     successRoot: {
       gap: t.spacing[4],
     },
@@ -1516,7 +1534,7 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
 
     // ---------- the reference frame toggle ----------
     // The row seats the micro label beside the pills so the pair reads as
-    // one sentence ("Max levels: Latest / TH14"), wrapping under itself on
+    // one sentence ("Max levels: Max / TH14"), wrapping under itself on
     // narrow viewports. The pills are the achievements filter pills' chrome
     // (quiet pill, gold wash when selected), the established segmented
     // vocabulary, with the 44 px touch floor kept.
@@ -1608,9 +1626,18 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
     refreshCard: {
       alignItems: 'center',
       justifyContent: 'center',
-      gap: t.spacing[2],
+      gap: t.spacing[3],
       paddingVertical: t.spacing[4],
       paddingHorizontal: t.spacing[4],
+    },
+    // The hairline between the frame toggle and the refresh control, the
+    // same divider vocabulary the hero card's village groups keep. The
+    // card centers its children, so the divider stretches itself back to
+    // the panel's full width.
+    refreshDivider: {
+      height: 1,
+      backgroundColor: c.hairline,
+      alignSelf: 'stretch',
     },
     identityIdentity: {
       flexDirection: 'row',
