@@ -356,18 +356,33 @@ draw, which is why the ambience layer uses react-native-svg, the chart
   the owner's placement call: freshness lives on the card whose data it
   describes; the clan screen keeps its footer row until its own pass).
   Breadcrumbs `Home › Players › <name>` sit above with the clan card's
-  clearance.
+  clearance. Under the breadcrumb, above both columns, sits the reference
+  frame toggle (the owner's ask, 11-19): a micro label (`MAX LEVELS`)
+  beside two segmented pills in the achievements filter chrome (`Latest`,
+  gold-washed when active, and `TH<n>` naming the player's own hall),
+  deciding which maximum every level pair and verdict on the screen names
+  (`lib/reference-frame.ts`). It is screen-level, not a card control,
+  because the reading it changes lives in both columns: the verdict cards'
+  percentages and deficit pairs, the hero card's pairs, MAX chips, and
+  total-levels ceiling, and the progression grid's tile pairs, MAX badges,
+  and category maxed counts all follow it. The default is `Latest` (the
+  reading the screen has always carried); view-local state, not a URL
+  param, and the compare screens stay on the global frame on purpose (two
+  players face off against one yardstick).
   The left column holds the identity card and the two verdict cards: the
   rushed analysis card and the upgrade-next list. The rushed analysis card
   (T-M2-2's card half) centers the `Gauge` dial (the overall deficit
-  percentage as a gold arc on a semicircle, the number in its throat,
-  "DEFICIT VS TH CEILING" under it), the band chip under the dial, the
-  reading's own scale note (units measured, already maxed, the band
-  scale), the per-category `CategoryBars` (each bar colored by the band
-  that category's own percentage falls into), and the skipped-units
+  percentage as a gold arc on a semicircle, the number in its throat, a
+  caption under it that names the active frame: "DEFICIT VS LATEST MAX" in
+  the latest frame, "DEFICIT VS TH<n> CEILING" in the Town Hall frame),
+  the band chip under the dial, the reading's own scale note (units
+  measured, the frame's own maxed phrase, the band scale), the
+  per-category `CategoryBars` (each bar colored by the band that
+  category's own percentage falls into), and the skipped-units
   footnote when the engine counts any (SR-14). The upgrade-next list
   renders the engine's top deficits worst-first: rank circle, name,
-  level/maximum pair, and the gap as a warning chip; a maxed account gets
+  level/maximum pair, and the gap as a warning chip (all three naming the
+  active frame's maximum); a maxed account gets
   the designed "nothing to catch up" reading (AC-04), never a fabricated
   todo list.
   The right column stacks the three ledger cards: heroes, the progression
