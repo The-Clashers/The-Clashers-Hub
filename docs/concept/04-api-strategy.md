@@ -47,6 +47,7 @@ of the semester touches nothing but this app.
 | `GET /clans/{tag}/currentwar` | live war state, both clans' stars/destruction, per-member attacks | works for every clan |
 | `GET /clans/{tag}/warlog` | war history with results | **only for clans with a public log**, 403 otherwise |
 | `GET /locations` | the location list for the search filter | near-static data, cache long |
+| `POST /players/{tag}/verifytoken` | verify that a signed-in user owns `playerTag` using their rolling in-game API token | M5 account binding (`POST /api/account/bind-coc`); token discarded immediately after `200 { "status": "ok" }` ([10 §6](./10-database-and-isr-architecture.md)) |
 | `GET /clans/{tag}/capitalraidseasons` | capital raid history | P2, only if F-16 survives the cut line |
 
 ## 4. Facts that shaped the UX (and one trap we avoid)
@@ -98,24 +99,24 @@ of the semester touches nothing but this app.
 The serverless tier exposes five routes. Each one: validate input → check the
 TTL cache → maybe call upstream through the proxy → return JSON.
 
-| Route | Upstream | TTL |
-|---|---|---|
-| `GET /api/search?name=&minMembers=&maxMembers=&minClanLevel=&minClanPoints=&warFrequency=&locationId=&labelId=&limit=&after=` | `/clans` | 60 s |
-| `GET /api/clan/:tag` | `/clans/{tag}` | 180 s |
-| `GET /api/player/:tag` | `/players/{tag}` | 300 s |
-| `GET /api/clan/:tag/war` | `/clans/{tag}/currentwar` | 120 s (attacks land in bursts) |
-| `GET /api/clan/:tag/warlog` | `/clans/{tag}/warlog` | 600 s |
+| Route | Upstream | Fresh TTL (`s-maxage`) | Edge ISR (`swr`) |
+|---|---|---|---|
+| `GET /api/search?name=&minMembers=&maxMembers=&minClanLevel=&minClanPoints=&warFrequency=&locationId=&labelId=&limit=&after=` | `/clans` | `60 s` | `300 s` |
+| `GET /api/clan/:tag` | `/clans/{tag}` | `180 s` | `1,800 s` |
+| `GET /api/player/:tag` | `/players/{tag}` | `300 s` | `3,600 s` |
+| `GET /api/clan/:tag/war` | `/clans/{tag}/currentwar` | `120 s` (attacks land in bursts) | `600 s` |
+| `GET /api/clan/:tag/warlog` | `/clans/{tag}/warlog` | `600 s` | `7,200 s` |
+| `GET /api/stats` | Supabase aggregates (`entity_stats`, `platform_stats_daily`) | `300 s` | `1,800 s` |
+| `POST/DELETE /api/account/bind-coc`, `GET /api/account/export`, `DELETE /api/account/me` | `POST /players/{tag}/verifytoken` & Supabase Admin/Auth | `private, no-store` | `—` |
 
-The cache is an in-memory `Map` per function instance with a small LRU
-wrapper ([06 §"Cache layers"](./06-data-flow-and-caching.md)). Every response
-carries an `age` field (seconds since the upstream fetch) so the client can
-show how fresh its data is, honestly, next to the manual refresh control
-([06 §"Manual refresh"](./06-data-flow-and-caching.md)). Serverless
-cold starts reset the cache; that is acceptable: a
-cold start costs exactly one upstream call, which is the same call a cache
-miss would have made anyway. A shared Redis tier would make the cache sticky
-across instances, but it is deliberately out of scope; see the storage ladder
-in [06](./06-data-flow-and-caching.md).
+The v1 cache started as an in-memory `Map` per function instance
+([server/cache.ts](../../server/cache.ts)). Under M5 ([10 §2](./10-database-and-isr-architecture.md)),
+public read routes add **Vercel Edge ISR** (`Cache-Control: public, max-age=0, s-maxage=<TTL>, stale-while-revalidate=<SWR>`)
+above the in-memory `TtlCache` and back it with a **Supabase Postgres shared SWR
+store (`public.api_cache`)** with `waitUntil` background revalidation and
+`stale-if-error` fallback. Every `200` response injects `"fetchedAt": <epoch_ms>`
+alongside `"age"` so [src/lib/refresh.ts](../../src/lib/refresh.ts) computes live
+data age accurately even when served from Edge ISR.
 
 ## 6. Error contract
 
@@ -127,7 +128,9 @@ JSON contract:
 | 404 / invalid tag | `404 { "error": "not_found", "tag": "..." }` | "No clan/player with this tag" + tag-correction hint |
 | 429 | `503 { "error": "upstream_busy", "retryAfter": 30 }` | auto-retry with backoff + "trying again" toast |
 | 403 on warlog (private) | `200 { "private": true, "age": N }` | designed private-log notice |
-| 5xx / network | `502 { "error": "upstream_unreachable" }` | error state with manual retry |
+| 5xx / network | `502 { "error": "upstream_unreachable" }` | error state with manual retry (or `stale-if-error` cached body when `api_cache` has an unexpired entry) |
+| bad/expired CoC verifytoken | `422 { "error": "invalid_coc_token", "tag": "..." }` | inline guide showing how to generate a fresh token in CoC Settings -> More Settings -> API Token |
+| missing/invalid Supabase JWT | `401 { "error": "unauthorized" }` | prompt re-authentication on `/auth` |
 | our own validation | `400 { "error": "bad_request", "detail": ... }` | developer-facing; should never surface in normal use |
 
 `upstream_busy` is the one the client handles gracefully by design, a class
@@ -136,9 +139,13 @@ a red screen.
 
 ## 7. Key hygiene
 
-- `COC_API_TOKEN` and `COC_API_BASE_URL` live **only** in the Vercel project's
-  environment settings. Never in code, never in a committed `.env`, never in a
-  client `import.meta.env` variable (client env is bundle-visible by definition).
+- `COC_API_TOKEN`, `COC_API_BASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and
+  `CRON_SECRET` live **only** in the Vercel project's environment settings.
+  Never in code, never in a committed `.env`, never in a client
+  `import.meta.env` variable (`VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
+  are the only client env vars and rely strictly on Supabase Postgres RLS).
+  `scripts/scan-bundle-secrets.mjs` scans `dist/` for both `COC_API_TOKEN` and
+  `SUPABASE_SERVICE_ROLE_KEY`.
 - `.env*` is gitignored from the first commit; CI never needs the key because
   tests run on fixtures ([01 §"Development workflow"](./01-tech-stack.md)).
 - The key is generated from the team's designated account, used only here, and

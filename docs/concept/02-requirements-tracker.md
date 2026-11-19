@@ -102,6 +102,12 @@ FR-18 are the team's original additions beyond the lab's example set.
 | FR-16 | display a progression grid on the player screen: every unit of both villages (troops, spells, heroes, pets, siege machines, and hero equipment where exposed) with its icon, current level, and a maxed-for-Town-Hall indicator | F-17 | P1 | Draft |
 | FR-17 | display a preparation-day scouting view when the clan is in preparation: own and opponent rosters side by side with Town Hall levels and pairwise mismatch highlighting | F-18 | P1 | Draft |
 | FR-18 | provide a manual refresh control on live-data screens, guarded by a cooldown that serves cached data with a cached-data hint instead of calling the game API again | F-19 | P1 | Draft |
+| FR-19 | cache public game-API responses across Vercel Edge ISR (`s-maxage` + `stale-while-revalidate`) and a shared Supabase SWR cache (`api_cache`) with stripped payloads and stale-if-error fallback | F-20 | P1 | Draft |
+| FR-20 | provide user account creation and login (`/auth`) backed by Supabase Auth with mandatory Terms & Data Privacy consent (`/terms`) | F-21 | P1 | Draft |
+| FR-21 | allow each signed-in user account to bind a Clash of Clans player account (1:1 per user account) by verifying ownership via the official `POST /players/{tag}/verifytoken` in-game API token handshake without persisting the token | F-22 | P1 | Draft |
+| FR-22 | persist compact scalar progression snapshots on-visit for bound villages (max 1/day on change, 90-row ring buffer), cloud-synced watchlists/compare pairs, and audit preferences | F-23 | P1 | Draft |
+| FR-23 | expose `GET /api/stats` and display live database-driven platform totals, trending entities, community showcase benchmarks, and Town Hall peer percentiles on Home and detail screens | F-24 | P1 | Draft |
+| FR-24 | provide `/profile` (bound villages, progression trend, saved watchlist) and `/settings` (audit preferences, community-stats opt-in, JSON export, cloud history clear, and instant account deletion) screens | F-25 | P1 | Draft |
 
 ## 5. Non-functional requirements
 
@@ -121,6 +127,7 @@ or a verification method; vague terms are excluded.
 | NFR-07 | Maintainability | Pure TypeScript engines with table-driven unit tests and at least 90% line coverage | Draft |
 | NFR-08 | Maintainability | CI gate: typecheck, lint, unit tests, and a production build must pass before merge | Draft |
 | NFR-09 | Maintainability | A new developer clones and runs the app in under 10 minutes without the API key (fixtures mode) | Draft |
+| NFR-10 | Capacity / Storage | Supabase free-tier Postgres usage stays under the 500 MB ceiling (`<= 303.5 MB` budgeted cap, `< 350 MB` Green watermark, automated eviction above `350 MB` and `425 MB`) and never pauses from 7-day inactivity ([10 §3](./10-database-and-isr-architecture.md)) | Draft |
 
 ## 6. System requirements for the expanded user stories
 
@@ -171,6 +178,17 @@ SR-08 to SR-19.
 | SR-18 | The preparation-day scouting view renders from the single current-war response: own and opponent rosters side by side with Town Hall levels, and a pairing where the own member's Town Hall is lower than the opponent's is highlighted as a mismatch | Draft |
 | SR-19 | The current-war view computes per-member impact client-side from the single war response: attacks used versus allowed, stars, average destruction, stars per attack, and a best-attack quality value; members with zero attacks are listed after participants and never averaged in as zeros | Draft |
 
+### 6.4 M5: Supabase database, Edge ISR cache, and CoC-bound accounts
+
+| ID | System requirement | Status |
+|---|---|---|
+| SR-20 | Public GET routes emit `Cache-Control: public, max-age=0, s-maxage=<TTL>, stale-while-revalidate=<SWR>` plus `fetchedAt` epoch ms in every `200` body, backed by a projected `public.api_cache` L3 SWR store (`server/cache-projector.ts`) with `waitUntil` background revalidation and stale-if-error fallback | Draft |
+| SR-21 | Supabase Postgres schema enforces RLS (`auth.uid() = user_id`), 1:1 CoC account constraints (`user_id` PK and `player_tag` unique on `linked_coc_accounts`), per-user row-cap triggers (25 bookmarks, 10 compare pairs, 10 recent searches, 90 scalar snapshots per tag), `run_storage_maintenance()` 3-tier watermark pruning, and a 3-day keepalive schedule | Draft |
+| SR-22 | Proxy fetches atomically upsert in-place summary counters in `public.entity_stats` and `public.platform_stats_daily` (zero raw event logs) and feed `GET /api/stats` (`s-maxage=300, stale-while-revalidate=1800`) for Home, `/clans`, `/player/:tag`, and `/compare` | Draft |
+| SR-23 | Browser Supabase Auth (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) implements login and session state across `/auth`, `/profile`, and `/settings` while recording `terms_accepted_at` and `terms_version` from `/terms`; `SUPABASE_SERVICE_ROLE_KEY` stays server-only and is scanned in CI (`scripts/scan-bundle-secrets.mjs`) | Draft |
+| SR-24 | `POST /api/account/bind-coc` verifies a caller's Supabase JWT, calls `POST /players/{tag}/verifytoken` through the proxy, upserts the 1:1 binding in `public.linked_coc_accounts`, seeds an initial progression snapshot, and discards the in-game token immediately; invalid tokens return `422 { "error": "invalid_coc_token" }` | Draft |
+| SR-25 | `public.player_progression_snapshots` records at most one 250-byte scalar row per day per bound tag when metrics change, and `src/lib/watchlist.ts` syncs `localStorage` and `user_saved_entities` cleanly across login/logout | Draft |
+
 ## 7. Acceptance criteria
 
 The lab asks for at least two criteria for one user requirement; nine are
@@ -188,6 +206,11 @@ riskiest behaviors (private war logs, key hygiene).
 | AC-07 | Given the player screen for any player, when the progression grid renders, then every unit of both villages shows its icon, level, and maxed-for-Town-Hall indicator, and no network request occurs beyond the single player fetch | UR-03, FR-16 |
 | AC-08 | Given a clan in preparation day, when the War tab opens, then both rosters render side by side with Town Hall levels and every own member facing a higher-Town-Hall opponent is highlighted | UR-04, FR-17 |
 | AC-09 | Given a screen whose cached data is younger than the route TTL, when the visitor clicks refresh, then the cached response is served with a cached-data hint and no upstream call is made | UR-05, FR-18, NFR-03 |
+| AC-10 | Given a cold serverless instance and a warm row in `public.api_cache` within its SWR window, when a visitor requests `/api/clan/:tag`, then the cached snapshot returns immediately with `fetchedAt` and background revalidation refreshes Supabase without blocking | FR-19, SR-20, NFR-02 |
+| AC-11 | Given audited entities in `entity_stats`, when a visitor opens `/` or `/player/:tag`, then live platform counters and the Town Hall peer benchmark render, and fall back gracefully when offline | FR-23, SR-22 |
+| AC-12 | Given a user on `/auth`, when they register with valid credentials and accept `/terms`, then `profiles` records `terms_accepted_at` and `terms_version` and they are signed into their session | FR-20, SR-23 |
+| AC-13 | Given a signed-in user submitting a player tag and valid in-game API token to `POST /api/account/bind-coc`, when `verifytoken` returns `status: "ok"`, then `linked_coc_accounts` binds that Clash of Clans account 1:1 to their user account, seeds a snapshot, and never persists the token | FR-21, SR-24 |
+| AC-14 | Given a signed-in user on `/settings`, when they trigger Export My Data or Delete Account & Purge All Data, then all user-owned rows are exported as JSON or permanently cascade-deleted | FR-24, NFR-10, SR-21 |
 
 ## 8. Constraints
 
@@ -201,7 +224,7 @@ that could turn out false (those are the assumptions in section 9).
 | CON-03 | The game API is key-gated and throttled with an unpublished per-key ceiling, and keys are locked to registered static IPs; all upstream calls route through the RoyaleAPI community proxy (whose IP is allowlisted on the key) and the server-side TTL cache |
 | CON-04 | The UI is built with React Native for Web components only; DOM-only UI libraries are excluded, and there is no Expo toolchain |
 | CON-05 | The product is read-only over public game data; no write path to the game, and private war logs are a designed state, not an error |
-| CON-06 | No database in v1; the live API behind the cache is the data source, and browser storage holds only tags the user typed or starred |
+| CON-06 | v1 (`M0`–`M4`) shipped without a database; `M5` introduces a free-tier Supabase Postgres + Auth instance capped strictly at 500 MB (`<= 303.5 MB` budgeted ceiling) with user login and 1:1 CoC account binding ([10](./10-database-and-isr-architecture.md)) |
 
 ## 9. Assumptions
 
@@ -345,7 +368,23 @@ current.
 | T-P-2 | Weekly review: rotate review pairs, check the two-owners-per-area rule, update estimates | All | 1 weekly | CON-02 |
 | T-P-3 | Keep the concept docs in the same PR as the matching code change | All | included | Definition of done |
 
-### 11.10 Capacity check
+### 11.10 M5: Supabase database, ISR cache, login, and 1:1 CoC account binding (Red cards)
+
+M5 activates Rung 2 of the storage ladder ([10-database-and-isr-architecture.md](./10-database-and-isr-architecture.md)) with user login, 1:1 Clash of Clans account binding per user, and total storage safely within the 500 MB free tier. Note: KanbanFlow tracks card estimates in hours (`pomodoros / 2`).
+
+| ID | Task | Owner | Estimate (Pomodoros / Hours) | Covers |
+|---|---|---|---|---|
+| T-M5-0 | Plan Supabase database, ISR cache, login, and CoC account binding (`docs/concept/10` PR + KanbanFlow setup) | All | 4 / 2h | FR-19..FR-24, NFR-10, SR-20..SR-25 |
+| T-M5-1 | Provision Supabase schema, RLS policies, and 500 MB retention engine (`run_storage_maintenance()` + 3-day keepalive + bundle key scan) | Platform | 10 / 5h | FR-19, NFR-10, SR-20, SR-21 |
+| T-M5-2 | Implement Edge ISR headers (`s-maxage` + `stale-while-revalidate`), payload projector (`~75%` strip), `fetchedAt` freshness, and Supabase SWR cache tier | Platform | 12 / 6h | FR-19, NFR-02, NFR-03, NFR-10, SR-20, AC-10 |
+| T-M5-3 | Build stats aggregation upserts, `GET /api/stats` route, and database-powered statistics on Home, `/clans`, `/player/:tag`, and `/clan/:tag` | Engines | 10 / 5h | FR-23, SR-22, AC-11 |
+| T-M5-4 | Implement Supabase Auth login, `AuthProvider`, `/auth` Sign In & Create Account screen with `/terms` consent, and `NavBar` account controls | Screens | 10 / 5h | FR-20, SR-23, AC-12 |
+| T-M5-5 | Build 1:1 Clash of Clans in-game API token verification (`POST /api/account/bind-coc` -> `verifytoken`), `Verified Owner` badge, and bound village shortcuts | Platform | 10 / 5h | FR-21, SR-24, AC-13 |
+| T-M5-6 | Add compact scalar progression snapshots (`player_progression_snapshots`, 90-row ring buffer), `progression-delta.ts`, and cloud-synced watchlist (`watchlist.ts`) | Engines | 10 / 5h | FR-22, NFR-10, SR-25 |
+| T-M5-7 | Build `/profile` (CoC binding manager, progression trend, watchlist) and `/settings` (preferences, JSON data export, history clear, account purge) | Screens | 12 / 6h | FR-24, SR-23, SR-24, AC-14 |
+| T-M5-8 | Build `/terms` (Terms & Data Privacy disclosure) and link `/terms`, `/profile`, and `/settings` from `Footer`, `/auth`, and `/settings` | Screens | 6 / 3h | FR-20, FR-24, AC-12 |
+
+### 11.11 Capacity check
 
 The milestone tasks sum to about 270 pomodoros, roughly 34 focused
 developer days. A conservative capacity estimate for three developers
