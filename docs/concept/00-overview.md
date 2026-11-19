@@ -12,8 +12,11 @@ Type a clan name, any clan in the game, and get its live roster with donation
 flags. Open any member and get a full account read: how rushed the profile is,
 unit-by-unit progression with icons, hero and achievement progress, war
 reliability. Put two players or two clans side by side and compare them
-metric by metric. No login, no setup, nothing to install: everything runs on
-live public game data in the browser.
+metric by metric. Core search and detail routes open directly on live public
+game data, while Milestone 5 implements Supabase user accounts and login
+(`/auth`) with 1:1 Clash of Clans profile binding, compact progression
+snapshots, cloud watchlists, and live community benchmark statistics
+([10](./10-database-and-isr-architecture.md)).
 
 ## 2. The problem we solve
 
@@ -56,34 +59,44 @@ We build for ourselves first: every teammate plays the game and is user #1.
    missed opportunity in this product category.
 3. **Compare anything.** Any two players, any two clans, side by side, metric
    by metric. Comparison is the demo moment.
-4. **Zero-friction web.** No accounts, no onboarding, no install. Every screen
-   has a shareable URL you can paste in a chat.
+4. **Shareable web with integrated accounts.** Every public lookup and compare
+   screen has a clean shareable URL, and user accounts (`/auth`, `/profile`,
+   `/settings`) integrate directly into the navigation chrome for verified 1:1
+   CoC binding, progression history, and synced watchlists.
 
 ## 5. Scope and non-goals
 
 **In scope:** live, read-only, public game data for any clan or player:
-search, clan detail, player detail, war views, compare. Analysis engines that
-run in the browser. Bundled reference data (Town Hall cap tables, the
-super-troop map, the unit icon set) ships with the app; beyond the game API
-proxy, nothing third-party is requested at runtime.
+search, clan detail, player detail, war views, compare, plus Milestone 5's
+shared Edge ISR + Supabase SWR cache, Supabase user login and 1:1 CoC-bound
+accounts (`/auth`, `/profile`, `/settings`, `/terms`), compact on-visit
+progression snapshots for bound villages, and aggregated database statistics.
+Bundled reference data (Town Hall cap tables, the super-troop map, the unit
+icon set) ships with the app.
 
 **Non-goals:**
 
-- **Not a tracker.** We do not accumulate history over time, so there is no
-  scheduled polling, no snapshot database, and no ops burden. The live API is
-  our database.
-- **No accounts.** No sign-up, no auth, no user data. Saved tags live in the
-  browser's local storage only (see [06 "Storage"](./06-data-flow-and-caching.md)).
+- **No background polling / auto-scraper.** We do not run scheduled jobs that
+  continuously poll Clash of Clans endpoints; progression snapshots and stats
+  update strictly on-visit within the free-tier 500 MB Supabase ceiling
+  ([10 §3](./10-database-and-isr-architecture.md)).
+- **No Supercell ID credentials or persisted in-game tokens.** Account binding
+  uses Supercell's official `POST /players/{tag}/verifytoken` handshake and
+  discards the rolling in-game API token immediately after verification.
 - **No write access to the game.** The official API is read-only anyway; we
   never pretend otherwise.
 
 ## 6. Constraints we treat as design principles
 
-- **Free tiers only.** Hosting, CI, and the game API cost nothing. Anything
-  that would require a paid plan is out of scope by design.
+- **Free tiers only.** Hosting (Vercel Hobby), database/auth (Supabase Free Tier
+  500 MB), CI (GitHub Actions), and the game API cost nothing. Anything that
+  would require a paid plan is out of scope by design, and database tables
+  enforce strict projection, caps, and watermark pruning ([10 §3](./10-database-and-isr-architecture.md)).
 - **The game API is throttled and key-gated.** Every upstream request we make
-  goes through a server-side cache with a TTL ([04](./04-api-strategy.md), [06](./06-data-flow-and-caching.md)). The app never talks to
-  the game API directly, and the key never ships to the browser.
+  goes through a multi-layer cache (TanStack Query, Vercel Edge ISR, in-memory
+  LRU, and Supabase Postgres SWR; [04](./04-api-strategy.md), [06](./06-data-flow-and-caching.md),
+  [10](./10-database-and-isr-architecture.md)). The app never talks to the game
+  API directly, and server secrets never ship to the browser.
 
 ## 7. What success looks like
 

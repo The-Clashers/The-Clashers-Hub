@@ -15,10 +15,11 @@ doc here is incomplete ([08 §"Definition of done" #5](./08-roadmap.md)).
 | 03 | [Features list](./03-features-list.md) | Prioritized features, screens, URL map, the two golden paths |
 | 04 | [API strategy](./04-api-strategy.md) | Talking to the game API safely: proxy, caching, throttling, key hygiene |
 | 05 | [Scoring engines](./05-scoring-engines.md) | The math: rushed analysis, donation balance, war efficiency, compare |
-| 06 | [Data flow & caching](./06-data-flow-and-caching.md) | Request lifecycle, cache layers, state matrix, the no-database decision |
+| 06 | [Data flow & caching](./06-data-flow-and-caching.md) | Request lifecycle, cache layers, state matrix, and the storage ladder leading to [10](./10-database-and-isr-architecture.md) |
 | 07 | [Design language](./07-design-language.md) | Tokens, layout rules, component kit, accessibility |
 | 08 | [Roadmap](./08-roadmap.md) | Milestones, team split, risk register, definition of done |
 | 09 | [Coding standards](./09-coding-standards.md) | The STD rules: naming, file placement, components, styles, state, errors, and the review checklist |
+| 10 | [Database, ISR & accounts](./10-database-and-isr-architecture.md) | Supabase 500 MB free-tier schema, 4-layer Edge ISR + Supabase SWR cache, CoC in-game token binding, live stats, and /auth /profile /settings /terms |
 
 ## Conventions
 

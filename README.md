@@ -1,6 +1,6 @@
 # The Clashers Hub
 
-Clan and player analytics for Clash of Clans, live and login-free.
+Clan and player analytics for Clash of Clans, powered by live game data, Edge ISR caching, and CoC-bound accounts.
 
 The in-game profile shows raw counters, and stat trackers show walls of numbers. Neither directly answers whether an account is rushed, who fails to donate back on a clan roster, or who is ready for war. The Clashers Hub turns raw public game data into computed verdicts directly in the browser.
 
@@ -20,8 +20,8 @@ The in-game profile shows raw counters, and stat trackers show walls of numbers.
 
 ## Architecture and Design Principles
 
-1. **Zero Database:** The live Clash of Clans API acts as the data store. The application stores no user accounts, runs no snapshot jobs, and requires no external database.
-2. **Key Isolation Boundary:** The `COC_API_TOKEN` exists strictly on the serverless proxy tier (`/api/*` and `server/`). The client bundle contains zero credentials.
+1. **Supabase 500 MB Free-Tier Persistence & CoC-Bound Accounts (M5):** Milestone 5 ([Concept Doc 10](docs/concept/10-database-and-isr-architecture.md)) adds a **4-layer Edge ISR + Supabase Postgres SWR cache**, **user login and account creation (`/auth`)**, **1:1 Clash of Clans account binding** per user (via `POST /players/{tag}/verifytoken`), **compact scalar progression history**, and **live community statistics** engineered under a strict `303.5 MB` operational cap inside Supabase's 500 MB free tier.
+2. **Key Isolation Boundary:** `COC_API_TOKEN` and `SUPABASE_SERVICE_ROLE_KEY` exist strictly on the serverless proxy tier (`/api/*` and `server/`). The client bundle contains zero server credentials.
 3. **Client-Side Analysis Engines:** All progression audits, rushed calculations, and donation ratio verdicts execute in the browser as pure TypeScript modules with unit tests.
 4. **Locally Bundled Reference Data:** Upgrade cap tables, super-troop normalizations, and game unit assets are bundled locally, eliminating unnecessary runtime API calls.
 5. **React Native for Web:** The entire UI is built with React Native components (`View`, `Text`, `StyleSheet`, `Pressable`, `react-native-svg`) rendered cleanly to the browser DOM.
@@ -39,7 +39,8 @@ The in-game profile shows raw counters, and stat trackers show walls of numbers.
 | Server State | TanStack Query |
 | Graphics | `react-native-svg` |
 | Font | `@fontsource-variable/inter` |
-| API Tier | Vercel Serverless Functions (Node.js) |
+| API Tier | Vercel Serverless Functions (Node.js) + Edge ISR |
+| Database & Auth | Supabase Free Tier (Postgres 500 MB + Auth, M5) |
 | Game Data Proxy | RoyaleAPI Proxy (`cocproxy.royaleapi.dev`) |
 | Test Runner | Vitest |
 
@@ -144,6 +145,7 @@ Comprehensive project documentation is maintained in the `docs/` directory:
   - [07 - Design Language](docs/concept/07-design-language.md)
   - [08 - Roadmap](docs/concept/08-roadmap.md)
   - [09 - Coding Standards](docs/concept/09-coding-standards.md)
+  - [10 - Database, ISR, and Accounts Architecture](docs/concept/10-database-and-isr-architecture.md)
 - [Session Logs](docs/session/README.md)
 
 ---

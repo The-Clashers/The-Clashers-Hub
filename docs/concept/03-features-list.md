@@ -26,7 +26,13 @@ cross-reference the tracker in [02](./02-requirements-tracker.md).
 | F-16 | Clan capital raids view | P2 | | extra endpoint, low analytic value |
 | F-17 | Player progression grid: every unit of both villages with icon, current level, and maxed-for-Town-Hall chip | P1 | FR-16 | renders from the single player response; icons from the bundled map |
 | F-18 | Preparation-day scouting: own and opponent rosters side by side with Town Hall levels and mismatch highlighting | P1 | FR-17 | a state of the War tab, not a separate route |
-| F-19 | Manual refresh with cooldown on live-data screens | P1 | FR-18 | the server cache decides freshness; the screen shows a cached-data hint |
+| F-19 | Manual refresh with cooldown on live-data screens | P1 | FR-18 | the server cache decides freshness; the screen shows a cached-data hint derived from `fetchedAt` |
+| F-20 | Edge ISR + Supabase SWR shared cache (`public.api_cache`) with stripped payloads and stale-if-error fallback | P1 | FR-19 | 500 MB free-tier storage management via `server/cache-projector.ts` and `run_storage_maintenance()` ([10](./10-database-and-isr-architecture.md)) |
+| F-21 | User login & account creation (`/auth`) with mandatory `/terms` data consent | P1 | FR-20 | Supabase Auth (`Email + Password`) with persistent session and NavBar account controls |
+| F-22 | Official 1:1 Clash of Clans account binding via `POST /players/{tag}/verifytoken` | P1 | FR-21 | binds 1 Clash of Clans player tag per user account using the in-game API token (Settings -> More Settings -> API Token) and discards the token immediately |
+| F-23 | Bound progression history snapshots, synced watchlist, and persistent audit preferences | P1 | FR-22 | 250-byte scalar rows (`player_progression_snapshots`, max 90/tag) + `user_saved_entities` (25 bookmarks, 10 compares) |
+| F-24 | Live database statistics & Town Hall peer benchmarks (`GET /api/stats`) | P1 | FR-23 | Platform Pulse + live showcase benchmarks on `/`, Trending clans/players, and TH peer percentile on `/player/:tag` |
+| F-25 | Profile (`/profile`), Settings (`/settings`), and Terms & Data Privacy (`/terms`) pages | P1 | FR-24 | CoC village manager, progression trend, audit prefs, self-service JSON data export, history clear, and instant account deletion |
 
 **Cut line for a compressed semester:** F-10, F-11, F-13, F-17, F-18 go
 before anything P0 touches. F-08/F-09 are one milestone together, war views
@@ -50,6 +56,10 @@ theme toggle, fixed in a thin row at the top like a tracker site.
 | `/compare` | Compare landing | mode selector (players or clans) with dual search boxes (Entity A vs Entity B) for head-to-head comparison |
 | `/compare/players?a=:tag&b=:tag` | Player compare | P1 |
 | `/compare/clans?a=:tag&b=:tag` | Clan compare | P1 |
+| `/auth` | Account login / creation | Sign In / Create Account toggle, Email + Password + Display Name, mandatory `/terms` consent checkbox, session redirect |
+| `/profile` | User profile & 1:1 bound CoC account | Account summary, 1:1 Clash of Clans in-game API token binding manager (1 CoC tag per user), scalar progression trend, saved watchlist & compare pairs |
+| `/settings` | Preferences & data controls | Persistent donation target ratio, default village tab, theme sync, community-stats opt-in toggle, JSON data export, cloud history clear, and account deletion |
+| `/terms` | Terms & Data Privacy | Supercell Fan Content Policy, stored account/CoC data inventory, non-storage of in-game API tokens, ISR cache lifecycle, and deletion rights |
 
 The lookup box's two modes keep the API's honest split: player mode is
 tag-only (validated like every other tag through the one module), clan
@@ -122,3 +132,17 @@ error (upstream busy / not found), empty
   destruction, XP earned per entry; efficiency summary header.
 - **Compare:** two columns, one row per metric, delta arrow + color; radar
   chart as P2 garnish only.
+- **Auth (`/auth`):** centered glass card with `Sign In` / `Create Account`
+  mode switch, controlled inputs, inline validation, and mandatory `/terms`
+  consent checkbox on sign-up.
+- **Profile (`/profile`):** unauthenticated state prompts sign-in with link
+  to `/auth`; signed-in renders account header, 1:1 CoC Account Binding form or
+  bound village card (with *"Unbind / Change Village"*), scalar Progression
+  Trend ledger, and Saved Watchlist / Compare Pairs tabs.
+- **Settings (`/settings`):** signed-out state prompts sign-in (with local
+  theme/ratio notes); signed-in renders audit preferences, community-stats
+  opt-in toggle, and self-service JSON Export / Clear Cloud History / Delete
+  Account controls with confirmation.
+- **Terms (`/terms`):** public readable glass sections detailing Supercell Fan
+  Content Policy, stored Supabase tables, zero persistence of in-game API
+  tokens, Edge ISR + 500 MB retention policies, and deletion rights.

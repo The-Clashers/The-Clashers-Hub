@@ -14,6 +14,7 @@ outside P0/P1 is scheduled; stretch features live in the buffer.
 | **M2: Player & analysis** | 4–5 | F-06, F-07, F-08, F-17, F-19 (player detail, rushed engine + super-troop map + reference-data bundle, achievements), heroes panel, progression grid, refresh control | Rushed % stable across the fixture set (incl. maxed account, super troops active, null maxLevel); progression grid renders icons + maxed-for-TH chips from the single player fetch; `/player/:tag` shareable |
 | **M3: War & compare** | 6–7 | F-09, F-10, F-11, F-12, F-13, F-18 (current war + preparation-day scouting + per-member impact, war log + efficiency, both compares, recent searches) | Private-log notice designed; scouting mismatch highlighting tested against a preparation-day fixture; compare URLs shareable; radar chart is the cut line if the week compresses |
 | **M4: Polish & demo** | 8–9 | a11y pass, perf pass (virtualization, route code-splitting), empty states, favicon + OG tags, demo runbook, report outline | keyboard-only walkthrough of golden path A; Lighthouse-style sanity (contrast, no layout shift from badge loads); grader demo rehearsed |
+| **M5: Database, ISR & accounts** | Post-M4 / Extension | Supabase 500 MB schema + watermark pruning, 4-layer Edge ISR + Supabase SWR cache, `GET /api/stats` live benchmarks on Home & detail views, Supabase Auth login (`/auth`), 1:1 CoC `verifytoken` binding per account, scalar progression snapshots, `/profile`, `/settings`, `/terms` ([10](./10-database-and-isr-architecture.md)) | DB footprint stays `<= 350 MB` Green watermark (`303.5 MB` cap), `scan:secrets` passes for both `COC_API_TOKEN` and `SUPABASE_SERVICE_ROLE_KEY`, 1:1 CoC account binding works via `verifytoken` without persisting raw tokens |
 | | 10 | buffer: bugfixes, report writing, presentation rehearsal | nothing new scheduled, ever |
 
 ## 2. Team split (three owners, everyone codes)
@@ -43,8 +44,10 @@ merge (that's the smoke test, manual, on the preview deploy).
 | Cold-start cache misses | certain | negligible | costs one upstream call; accepted by design ([04 §5](./04-api-strategy.md)) |
 | Engine edge cases (new content, null maxLevel) | medium | medium | fixture-driven tests from M2 ([05 §5](./05-scoring-engines.md)); reference-data fallback first, "new content skipped" footnote as the last resort |
 | Reference data drifts when the game ships new content | medium | low | versioned bundle in the repo; completeness tests fail loudly on drift; the footnote absorbs whatever is still un-mapped |
-| API key leak | low | high | env-only, gitignored `.env`, key-check step in CI (grep the built bundle for the token) |
-| Scope creep (tracker features, accounts) | high | high | the non-goals in [00 §5](./00-overview.md) are the contract; any such PR gets closed with a link to this doc |
+| API key leak | low | high | env-only, gitignored `.env`, key-check step in CI (grep the built bundle for `COC_API_TOKEN` and `SUPABASE_SERVICE_ROLE_KEY`) |
+| Supabase 500 MB ceiling exhausted | medium | high | payload projection (`~75%` reduction), scalar-only snapshots (90/tag cap), per-user caps, and 3-tier watermark eviction (`run_storage_maintenance()`) keeping total DB `<= 303.5 MB` ([10 §3](./10-database-and-isr-architecture.md)) |
+| Supabase free-tier 7-day inactivity pause | medium | medium | scheduled `.github/workflows/supabase-keepalive.yml` runs every 3 days against `/api/stats?maintenance=1` |
+| Scope creep (heavy background tracker / pollers) | high | high | no scheduled upstream CoC pollers; snapshots and stats update strictly on-visit ([10 §1](./10-database-and-isr-architecture.md)) |
 | Member availability drops mid-semester | medium | medium | rotation + ≥ 2 owners per area (§2) |
 
 ## 4. Definition of done (every PR, no exceptions)
