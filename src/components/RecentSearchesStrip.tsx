@@ -6,6 +6,7 @@ import {
   clearRecentSearches,
   readRecentSearches,
   removeRecentSearch,
+  RECENT_SEARCHES_STORAGE_KEY,
   type RecentSearchItem,
   type SearchKind,
 } from '../lib/recent-searches';
@@ -37,6 +38,24 @@ export default function RecentSearchesStrip({
 
   useEffect(() => {
     reload();
+  }, [reload]);
+
+  // Stay live beyond this tab (FR-15's persistence is the browser's, not
+  // the component's): a lookup recorded in another tab fires a storage
+  // event here, and returning to this tab after a nav-bar lookup in the
+  // same tab's history needs a focus re-read. Without these, a chip
+  // recorded elsewhere only appeared after a remount.
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === null || event.key === RECENT_SEARCHES_STORAGE_KEY) reload();
+    };
+    const onFocus = () => reload();
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('focus', onFocus);
+    };
   }, [reload]);
 
   if (items.length === 0) {
