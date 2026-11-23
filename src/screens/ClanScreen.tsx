@@ -24,6 +24,7 @@ import WarBanner from '../components/WarBanner';
 import WarStandings from '../components/WarStandings';
 import WarMemberTable from '../components/WarMemberTable';
 import WarMemberCard from '../components/WarMemberCard';
+import WarScouting from '../components/WarScouting';
 import WarlogSummary from '../components/WarlogSummary';
 import WarlogTable from '../components/WarlogTable';
 import WarlogCard from '../components/WarlogCard';
@@ -1208,20 +1209,30 @@ function WarSection({
         state={state}
         attacksAllowed={attacksAllowed}
       />
-      <WarRosterHeading label="Clan" clan={war.clan} />
-      <WarRoster
-        clan={war.clan}
-        isCardPresentation={isCardPresentation}
-        attacksPerMember={war.attacksPerMember}
-        onPressMember={openMember}
-      />
-      <WarRosterHeading label="Opponent" clan={war.opponent} />
-      <WarRoster
-        clan={war.opponent}
-        isCardPresentation={isCardPresentation}
-        attacksPerMember={war.attacksPerMember}
-        onPressMember={openMember}
-      />
+      {state === 'preparation' ? (
+        <WarScouting
+          clan={war.clan}
+          opponent={war.opponent}
+          onPressMember={openMember}
+        />
+      ) : (
+        <>
+          <WarRosterHeading label="Clan" clan={war.clan} />
+          <WarRoster
+            clan={war.clan}
+            isCardPresentation={isCardPresentation}
+            attacksPerMember={war.attacksPerMember}
+            onPressMember={openMember}
+          />
+          <WarRosterHeading label="Opponent" clan={war.opponent} />
+          <WarRoster
+            clan={war.opponent}
+            isCardPresentation={isCardPresentation}
+            attacksPerMember={war.attacksPerMember}
+            onPressMember={openMember}
+          />
+        </>
+      )}
     </View>
   );
 }

@@ -100,7 +100,7 @@ FR-18 are the team's original additions beyond the lab's example set.
 | FR-14 | give every screen (search, clan, player, compare) a shareable URL | F-12 | P0 | Draft |
 | FR-15 | persist recent searches in the browser's local storage | F-13 | P1 | Done |
 | FR-16 | display a progression grid on the player screen: every unit of both villages (troops, spells, heroes, pets, siege machines, and hero equipment where exposed) with its icon, current level, and a maxed-for-Town-Hall indicator | F-17 | P1 | Draft |
-| FR-17 | display a preparation-day scouting view when the clan is in preparation: own and opponent rosters side by side with Town Hall levels and pairwise mismatch highlighting | F-18 | P1 | Draft |
+| FR-17 | display a preparation-day scouting view when the clan is in preparation: own and opponent rosters side by side with Town Hall levels and pairwise mismatch highlighting | F-18 | P1 | Done |
 | FR-18 | provide a manual refresh control on live-data screens, guarded by a cooldown that serves cached data with a cached-data hint instead of calling the game API again | F-19 | P1 | Draft |
 | FR-19 | cache public game-API responses across Vercel Edge ISR (`s-maxage` + `stale-while-revalidate`) and a shared Supabase SWR cache (`api_cache`) with stripped payloads and stale-if-error fallback | F-20 | P1 | Draft |
 | FR-20 | provide user account creation and login (`/auth`) backed by Supabase Auth with mandatory Terms & Data Privacy consent (`/terms`) | F-21 | P1 | Draft |
@@ -175,7 +175,7 @@ SR-08 to SR-19.
 
 | ID | System requirement | Status |
 |---|---|---|
-| SR-18 | The preparation-day scouting view renders from the single current-war response: own and opponent rosters side by side with Town Hall levels, and a pairing where the own member's Town Hall is lower than the opponent's is highlighted as a mismatch | Draft |
+| SR-18 | The preparation-day scouting view renders from the single current-war response: own and opponent rosters side by side with Town Hall levels, and a pairing where the own member's Town Hall is lower than the opponent's is highlighted as a mismatch | Done |
 | SR-19 | The current-war view computes per-member impact client-side from the single war response: attacks used versus allowed, stars, average destruction, stars per attack, and a best-attack quality value; members with zero attacks are listed after participants and never averaged in as zeros | Draft |
 
 ### 6.4 M5: Supabase database, Edge ISR cache, and CoC-bound accounts

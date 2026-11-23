@@ -316,7 +316,12 @@ draw, which is why the ambience layer uses react-native-svg, the chart
   TH, attacks used, stars, average destruction) with the same 768 px
   switch to cards the attention table keeps; rows tap through to player
   detail, and a member with zero attacks shows the dash, never a zero
-  destruction average (SR-19's rule, applied to the raw view).
+  destruction average (SR-19's rule, applied to the raw view). During
+  preparation day, the third band switches to the scouting view (T-M3-6):
+  own and opponent rosters side by side by war-map position with Town
+  Hall levels, a summary mismatch count, and warning-soft row
+  highlighting whenever the own member's Town Hall is lower than the
+  opponent's.
 - **Log tab (war log):** the war log view (T-M3-2) stacks two bands under
   the tab bar. The efficiency summary: a panel titled "War efficiency"
   with the sample size labeled beside it ("Last 50 wars", the loaded
@@ -477,6 +482,7 @@ draw, which is why the ambience layer uses react-native-svg, the chart
 | `WarBanner` | the current-war view's state banner: tone dot, headline, and support line reading the war's state (preparation, battle day, ended with the verdict, or no war), the team size, and the war clock |
 | `WarStandings` | both clans' standings cards: badge, name, level, stars, destruction, attacks used; the `Leading` / `Winner` verdict chip resolved through `lib/war-standings.ts` (stars, then destruction), two-up from tablet and stacked below |
 | `WarMemberTable` / `WarMemberCard` | the war rosters' per-member attack view, table & card presentations: map position, name, TH, attacks used, stars, average destruction (the dash for zero-attack members, never a zero average) |
+| `WarScouting` | the preparation-day scouting view: own and opponent rosters side by side by war-map position with Town Hall levels, mismatch delta badge, and warning-soft row highlight when the own Town Hall is lower than the opponent's |
 | `ResultChip` | the war log's result pill: `Win` success, `Loss` danger, `Ongoing` info blue, `Tie` and `League` the quiet non-verdict fill (the RatioFlag dash treatment, since neither is anyone's verdict) |
 | `WarlogSummary` | the war log's efficiency band: "War efficiency" title with the sample size labeled ("Last N wars · excluding K leagues"), the engine's win rate / stars per attack / average destruction plus the record line as label-above-value cells, the dash for rates the loaded wars cannot answer |
 | `WarlogTable` / `WarlogCard` | the war log's entry view, table & card presentations: one row per war newest first (result chip, opponent badge and name, both sides' stars and destruction ours-first, attacks over the allowance, team size, end date), league seasons showing their own totals without opponent figures, the 768 px switch the member tables keep |
