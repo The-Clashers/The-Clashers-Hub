@@ -304,9 +304,11 @@ export default function ClanScreen() {
   const warNote =
     warQuery.isError
       ? 'War data did not load, so attacks left shows a dash for now.'
-      : war !== undefined && war.state !== 'inWar' && war.state !== 'preparation'
-        ? 'The clan is not in a war right now, so attacks left shows a dash.'
-        : null;
+      : war?.private
+        ? 'The clan keeps its war log private, so attacks left shows a dash.'
+        : war !== undefined && war.state !== 'inWar' && war.state !== 'preparation'
+          ? 'The clan is not in a war right now, so attacks left shows a dash.'
+          : null;
 
   // The breadcrumb's current crumb: the clan name once it is in hand, the
   // tag from the URL until then (and on error), which keeps the trail
@@ -1151,6 +1153,23 @@ function WarSection({
     // The query has resolved without data or error, which the states
     // above already cover; the guarded render costs less than a crash.
     return <WarLoading busyRetrying={false} />;
+  }
+
+  if (war.private) {
+    return (
+      <EmptyState
+        title="War Log is Private"
+        body={`${clanName} keeps its war log private in the game, so live war details are not available to read.`}
+        action={
+          <PillButton
+            label="View the roster"
+            variant="secondary"
+            onPress={onOpenRoster}
+            hint="Switches to the clan's Roster tab."
+          />
+        }
+      />
+    );
   }
 
   const state = war.state;

@@ -71,6 +71,8 @@ export interface WarClan {
 
 /** Shape of a successful /api/clan/:tag/war response. */
 export interface CurrentWarResponse {
+  /** True when the clan's war log is private (upstream 403 accessDenied). */
+  private?: true;
   /** Raw upstream state string, narrowed to the known four; undefined
    * when the payload does not carry a recognizable one. */
   state?: WarState;
@@ -202,6 +204,16 @@ function toCurrentWarResponse(parsed: unknown): CurrentWarResponse {
   if (!isRecord(parsed)) {
     throw new WarFetchError({ kind: 'bad_request', detail: 'response was not a JSON object' });
   }
+  const age = typeof parsed.age === 'number' ? parsed.age : 0;
+  if (parsed.private === true) {
+    return {
+      private: true,
+      age,
+      clan: toWarClan(undefined),
+      opponent: toWarClan(undefined),
+      attacksUsedByTag: new Map<string, number>(),
+    };
+  }
   const state = typeof parsed.state === 'string' && WAR_STATES.has(parsed.state)
     ? (parsed.state as WarState)
     : undefined;
@@ -210,7 +222,6 @@ function toCurrentWarResponse(parsed: unknown): CurrentWarResponse {
     typeof parsed.attacksPerMember === 'number' ? parsed.attacksPerMember : undefined;
   const startTimeMs = parseWarTimestamp(parsed.startTime);
   const endTimeMs = parseWarTimestamp(parsed.endTime);
-  const age = typeof parsed.age === 'number' ? parsed.age : 0;
   const clan = toWarClan(parsed.clan);
   const opponent = toWarClan(parsed.opponent);
   // The attacks-used projection the needs-attention tab reads: only our

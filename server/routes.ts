@@ -380,7 +380,7 @@ async function serveTagRoute(
       cacheKey: `${routeName}|${tag}`,
       upstreamPath: `${tagPath}${suffix}`,
       tag,
-      classify: routeName === 'warlog' ? classifyWarlog : classifyUpstream,
+      classify: routeName === 'warlog' || routeName === 'war' ? classifyWarlog : classifyUpstream,
     });
   } catch (error) {
     console.error(`[${routeName}]`, error);

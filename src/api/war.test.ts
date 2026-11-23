@@ -289,4 +289,16 @@ describe('attacksLeftFor', () => {
     expect(attacksLeftFor(withoutAllowance, '#HALF')).toBe(1);
     expect(attacksLeftFor(withoutAllowance, '#IDLE')).toBe(2);
   });
+
+  it('parses a private war response without throwing and returns null for attacksLeftFor', async () => {
+    const fetchImpl = async () =>
+      new Response(JSON.stringify({ private: true, age: 4 }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    const result = await fetchCurrentWar('#2J8LVPPCJ', { fetchImpl });
+    expect(result.private).toBe(true);
+    expect(result.age).toBe(4);
+    expect(attacksLeftFor(result, '#HALF')).toBeNull();
+  });
 });
