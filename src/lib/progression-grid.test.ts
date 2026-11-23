@@ -15,6 +15,7 @@ function makePlayer(overrides: Partial<PlayerResponse> = {}): PlayerResponse {
     tag: '#TEST',
     name: 'Test',
     townHallLevel: 14,
+    builderHallLevel: 0,
     expLevel: 100,
     age: 0,
     ...overrides,
@@ -171,5 +172,70 @@ describe('PROGRESSION_CATEGORY_LABELS', () => {
     for (const key of ['troops', 'spells', 'equipments', 'pets', 'siege'] as const) {
       expect(PROGRESSION_CATEGORY_LABELS[key].length).toBeGreaterThan(0);
     }
+  });
+});
+
+// ---------- the reference frame (the owner's ask, 11-19) ----------
+
+describe('playerToProgressionTiles reference frame', () => {
+  // A TH14 / BH9 payload shape: the API's global maxima are the TH18 /
+  // BH10-era numbers, so the two frames must disagree on the same tiles.
+  const framedPlayer = makePlayer({
+    townHallLevel: 14,
+    builderHallLevel: 9,
+    troops: [
+      { name: 'Barbarian', level: 10, maxLevel: 14, village: 'home' },
+      { name: 'Brand New Troop', level: 3, maxLevel: 4, village: 'home' },
+      { name: 'Raged Barbarian', level: 18, maxLevel: 20, village: 'builderBase' },
+    ],
+  });
+
+  const tileByName = (groups: ReturnType<typeof playerToProgressionTiles>, name: string) => {
+    for (const group of groups) {
+      for (const block of group.categories) {
+        const tile = block.tiles.find((t) => t.name === name);
+        if (tile) return tile;
+      }
+    }
+    return undefined;
+  };
+
+  it('defaults to the latest frame: the API maximum on every tile', () => {
+    const groups = playerToProgressionTiles(framedPlayer);
+    expect(tileByName(groups, 'Barbarian')?.maxLevel).toBe(14);
+    expect(tileByName(groups, 'Brand New Troop')?.maxLevel).toBe(4);
+    expect(tileByName(groups, 'Raged Barbarian')?.maxLevel).toBe(20);
+  });
+
+  it('townHall frame reads the home caps and the builder caps at their own halls', () => {
+    // TH14 caps: Barbarian 10; BH9 caps: Raged Barbarian 18. The builder
+    // tile answers to the Builder Hall, not the Town Hall.
+    const groups = playerToProgressionTiles(framedPlayer, 'townHall');
+    expect(tileByName(groups, 'Barbarian')?.maxLevel).toBe(10);
+    expect(tileByName(groups, 'Raged Barbarian')?.maxLevel).toBe(18);
+  });
+
+  it('townHall frame reads null for a unit the tables have not met', () => {
+    // The tile falls to the "Lv N" reading, the same shape a null API
+    // maximum takes in the latest frame.
+    const groups = playerToProgressionTiles(framedPlayer, 'townHall');
+    expect(tileByName(groups, 'Brand New Troop')?.maxLevel).toBe(null);
+  });
+
+  it('townHall frame keeps the global maximum on builder tiles when the Builder Hall is unknown', () => {
+    const unknownHall = makePlayer({
+      townHallLevel: 14,
+      builderHallLevel: 0,
+      troops: [{ name: 'Raged Barbarian', level: 18, maxLevel: 20, village: 'builderBase' }],
+    });
+    const groups = playerToProgressionTiles(unknownHall, 'townHall');
+    expect(tileByName(groups, 'Raged Barbarian')?.maxLevel).toBe(20);
+  });
+
+  it('does not mutate the input player in either frame', () => {
+    const snapshot = JSON.parse(JSON.stringify(framedPlayer));
+    playerToProgressionTiles(framedPlayer, 'townHall');
+    playerToProgressionTiles(framedPlayer, 'latest');
+    expect(JSON.parse(JSON.stringify(framedPlayer))).toEqual(snapshot);
   });
 });

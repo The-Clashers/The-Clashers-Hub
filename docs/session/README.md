@@ -62,3 +62,4 @@ One file per session, copied from [_template.md](_template.md), named
 | 11-16-2026 | 55 | [11-16-2026-session-55](./11-16-2026-session-55.md) |
 | 11-17-2026 | 56 | [11-17-2026-session-56](./11-17-2026-session-56.md) |
 | 11-19-2026 | 57 | [11-19-2026-session-57](./11-19-2026-session-57.md) |
+| 11-19-2026 | 58 | [11-19-2026-session-58](./11-19-2026-session-58.md) |

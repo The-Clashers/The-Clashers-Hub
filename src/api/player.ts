@@ -127,6 +127,13 @@ export interface PlayerResponse {
   tag: string;
   name: string;
   townHallLevel: number;
+  /** The player's Builder Hall level (0 when the payload carries none),
+   * the builder-base counterpart of townHallLevel. The reference-frame
+   * reading (lib/reference-frame.ts) needs it to cap builder-base rows at
+   * the player's own Builder Hall in the Town Hall frame; a payload without
+   * the field keeps those rows on the global max levels, the honest
+   * fallback when the hall is unknown. */
+  builderHallLevel: number;
   /** XP level, the header's XP cell. */
   expLevel: number;
   /** Current home-village trophies, the identity card's trophy chip. */
@@ -311,6 +318,13 @@ function toPlayerResponse(parsed: unknown): PlayerResponse {
   const tag = typeof parsed.tag === 'string' ? parsed.tag : '';
   const name = typeof parsed.name === 'string' ? parsed.name : '';
   const townHallLevel = typeof parsed.townHallLevel === 'number' ? parsed.townHallLevel : 0;
+  // The Builder Hall level, same tolerance as the Town Hall's: a missing
+  // or malformed field reads 0 ("unknown"), never a fake hall 1, so the
+  // reference frame can tell "not carried" from "carried as 1".
+  const builderHallLevel =
+    typeof parsed.builderHallLevel === 'number' && parsed.builderHallLevel >= 1
+      ? Math.floor(parsed.builderHallLevel)
+      : 0;
   const expLevel = typeof parsed.expLevel === 'number' ? parsed.expLevel : 0;
   const role = typeof parsed.role === 'string' && parsed.role !== '' ? parsed.role : undefined;
   // The season counters are optional numbers on the raw payload; each gets
@@ -323,6 +337,7 @@ function toPlayerResponse(parsed: unknown): PlayerResponse {
     tag,
     name,
     townHallLevel,
+    builderHallLevel,
     expLevel,
     trophies: toOptionalCount(parsed.trophies),
     warStars: toOptionalCount(parsed.warStars),

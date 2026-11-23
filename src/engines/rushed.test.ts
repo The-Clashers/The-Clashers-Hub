@@ -469,6 +469,103 @@ describe('fixture: null-maxlevel-player.json', () => {
   });
 });
 
+// ---------- the reference frame (the owner's ask, 11-19) ----------
+
+describe('playerToUnitEntries reference frame', () => {
+  // A TH14 payload shape: the API's global maxima are the TH18-era
+  // numbers, so the two frames must disagree on the same rows.
+  const troops: PlayerUnit[] = [
+    { name: 'Barbarian', level: 10, maxLevel: 14, village: 'home' },
+    { name: 'Rage Spell', level: 5, maxLevel: 8, village: 'home' },
+  ];
+  const heroes: PlayerUnit[] = [
+    { name: 'Barbarian King', level: 65, maxLevel: 110, village: 'home' },
+  ];
+
+  it('defaults to the latest frame: the API maximum with the SR-17 fallback', () => {
+    const entries = playerToUnitEntries(troops, [], heroes, []);
+    expect(entries.map((e) => [e.name, e.maxLevel])).toEqual([
+      ['Barbarian', 14],
+      ['Rage Spell', 8],
+      ['Barbarian King', 110],
+    ]);
+
+    // The explicit latest frame is the same reading.
+    const explicit = playerToUnitEntries(troops, [], heroes, [], { kind: 'latest' });
+    expect(explicit).toEqual(entries);
+  });
+
+  it('townHall frame reads the cap table at the player own hall', () => {
+    // TH14 caps from the bundle: Barbarian 10, Rage Spell 6, Barbarian
+    // King 85.
+    const entries = playerToUnitEntries(troops, [], heroes, [], {
+      kind: 'townHall',
+      townHallLevel: 14,
+    });
+    expect(entries.map((e) => [e.name, e.maxLevel])).toEqual([
+      ['Barbarian', 10],
+      ['Rage Spell', 6],
+      ['Barbarian King', 85],
+    ]);
+  });
+
+  it('townHall frame skips a unit the tables have not met, latest counts it', () => {
+    const brandNew: PlayerUnit[] = [
+      { name: 'Barbarian', level: 10, maxLevel: 14, village: 'home' },
+      { name: 'Brand New Troop', level: 2, maxLevel: 5, village: 'home' },
+    ];
+
+    const townHall = computeRushed(
+      playerToUnitEntries(brandNew, [], [], [], { kind: 'townHall', townHallLevel: 14 }),
+    );
+    expect(townHall.unitsSkipped).toBe(1);
+    expect(townHall.skippedNames).toEqual(['Brand New Troop']);
+    expect(townHall.unitsCounted).toBe(1);
+
+    const latest = computeRushed(playerToUnitEntries(brandNew, [], [], []));
+    expect(latest.unitsSkipped).toBe(0);
+    expect(latest.unitsCounted).toBe(2);
+  });
+
+  it('townHall frame reads a level past the cap as maxed, not negative', () => {
+    // Barbarian 12 against the TH14 cap 10 (the mock's synthetic shape):
+    // the deficit clamps to 0 and the row counts as maxed, never a
+    // negative deficit that would drag the percentage below zero.
+    const verdict = computeRushed(
+      playerToUnitEntries(
+        [{ name: 'Barbarian', level: 12, maxLevel: 14, village: 'home' }],
+        [],
+        [],
+        [],
+        { kind: 'townHall', townHallLevel: 14 },
+      ),
+    );
+    expect(verdict.overallPercent).toBe(0);
+    expect(verdict.unitsMaxed).toBe(1);
+    expect(verdict.band).toBe('maxed');
+  });
+
+  it('a maxed-for-TH account reads 0% in the townHall frame and non-zero in latest', () => {
+    // Every unit sits exactly at its TH14 cap while the API still reports
+    // the TH18-era global maxima: the two readings of the same account.
+    const maxedForTh: PlayerUnit[] = [
+      { name: 'Barbarian', level: 10, maxLevel: 14, village: 'home' },
+      { name: 'Rage Spell', level: 6, maxLevel: 8, village: 'home' },
+    ];
+
+    const townHall = computeRushed(
+      playerToUnitEntries(maxedForTh, [], [], [], { kind: 'townHall', townHallLevel: 14 }),
+    );
+    expect(townHall.overallPercent).toBe(0);
+    expect(townHall.band).toBe('maxed');
+    expect(townHall.topDeficits).toEqual([]);
+
+    const latest = computeRushed(playerToUnitEntries(maxedForTh, [], [], []));
+    expect(latest.overallPercent).not.toBe(0);
+    expect(latest.topDeficits.length).toBeGreaterThan(0);
+  });
+});
+
 // ---------- purity ----------
 
 describe('purity', () => {

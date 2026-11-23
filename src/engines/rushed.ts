@@ -33,7 +33,7 @@
 // null ("not available") rather than 0.
 
 import type { PlayerUnit } from '../api/player';
-import { homeReferenceMax } from '../lib/town-hall-caps';
+import { homeCapAtTownHall, homeReferenceMax } from '../lib/town-hall-caps';
 
 // ---------- reference data: the super-troop map ----------
 //
@@ -216,9 +216,24 @@ export interface RushedVerdict {
 
 // ---------- the adapter ----------
 
+/** Which maximum the analysis measures against (05 section 1's two
+ * readings): "latest" is the API's own global maximum (the furthest
+ * Town Hall's cap, the formula's original denominator), "townHall" is
+ * the cap tables' maximum at the player's own Town Hall (the
+ * maxed-for-my-hall reading). Defaults to "latest" so every existing
+ * caller keeps its verdict unchanged. */
+export type RushedFrame =
+  | { kind: 'latest' }
+  | { kind: 'townHall'; townHallLevel: number };
+
+/** The frame every caller that passes nothing gets: the API's global
+ * maximum with the reference-table fallback, the reading the engine has
+ * always computed. */
+export const DEFAULT_RUSHED_FRAME: RushedFrame = { kind: 'latest' };
+
 /**
  * Converts the player payload's unit arrays into the generic entries the
- * engine core consumes. The adapter owns three concerns so the engine core
+ * engine core consumes. The adapter owns four concerns so the engine core
  * never depends on payload shape details:
  *
  * - Village filter: only home-village units enter the rushed analysis (05
@@ -228,6 +243,13 @@ export interface RushedVerdict {
  * - Categorization: the troops array is split into troops, petsSiege (siege
  *   machines + pets) using the bundled reference lists; spells and heroes
  *   keep their own categories; hero equipment is counted as heroes.
+ * - Frame: which maximum each entry measures against. The latest frame
+ *   keeps the SR-17 split (the API's maxLevel primary, the reference
+ *   table resolving nulls); the townHall frame reads the cap table alone,
+ *   because "done for this hall" has exactly one honest source, and a
+ *   unit the tables have not met carries a null maximum into the core's
+ *   skip-and-footnote path (SR-14's shape) rather than a global maximum
+ *   that would mix two yardsticks inside one verdict.
  *
  * Pure: the input arrays are untouched, a fresh entry array comes back.
  */
@@ -236,17 +258,25 @@ export function playerToUnitEntries(
   spells: readonly PlayerUnit[] = [],
   heroes: readonly PlayerUnit[] = [],
   heroEquipment: readonly PlayerUnit[] = [],
+  frame: RushedFrame = DEFAULT_RUSHED_FRAME,
 ): UnitLevelEntry[] {
   const entries: UnitLevelEntry[] = [];
 
   const withFallback = (unit: PlayerUnit, category: RushedCategory): UnitLevelEntry => ({
     name: unit.name,
     level: unit.level,
-    // SR-17: the API's own maxLevel stays the primary denominator; the
-    // reference table resolves only a null (brand-new content the API has
-    // not caught up to). A unit absent from both stays null and the core
-    // counts it in the footnote.
-    maxLevel: unit.maxLevel ?? homeReferenceMax(unit.name),
+    // The frame decides the denominator. Latest (SR-17): the API's own
+    // maxLevel stays primary, the reference table resolves only a null
+    // (brand-new content the API has not caught up to), and a unit
+    // absent from both stays null and the core counts it in the footnote.
+    // TownHall: the cap table's maximum at the player's hall, or null
+    // when the tables have not met the unit (or cap it at 0: table
+    // drift), so the core skips it into the footnote instead of judging
+    // it against a yardstick from another hall.
+    maxLevel:
+      frame.kind === 'townHall'
+        ? positiveCapOrNull(homeCapAtTownHall(unit.name, frame.townHallLevel))
+        : unit.maxLevel ?? homeReferenceMax(unit.name),
     category,
   });
 
@@ -403,4 +433,12 @@ export function bandFor(percent: number | null): RushedBand | null {
 /** Rounds to one decimal place, the precision the display shows (07 section 5). */
 function round1(value: number): number {
   return Math.round(value * 10) / 10;
+}
+
+/** The Town Hall frame's cap lookup: a null (the tables have not met the
+ * unit) or a 0 (the tables say the unit is not unlocked at that hall)
+ * both read as "no honest hall cap", the null the core skips into the
+ * footnote. */
+function positiveCapOrNull(cap: number | null): number | null {
+  return cap !== null && cap > 0 ? cap : null;
 }
