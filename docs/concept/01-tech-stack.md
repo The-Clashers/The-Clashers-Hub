@@ -11,7 +11,8 @@
 | Data fetching | **TanStack Query** | caching, retries, background refetch, designed loading/error states for free | |
 | Charts | **react-native-svg** + small custom chart components | keeps the chart layer inside the RN paradigm; a DOM chart library would break the "written in React Native" story | |
 | Typography | **@fontsource-variable/inter** | Bundled variable font (wght 100-900) served locally from same origin; zero third-party CDN calls, no tracking, no FOUT | open source (OFL) |
-| API tier | **Vercel serverless functions** (Node, `/api/*`) | thin proxy that owns the game API key; deployed on the same origin as the app, so there is no CORS and no client-side env config | Vercel Hobby |
+| API tier | **Vercel serverless functions** (Node, `/api/*`) + **Edge ISR** | thin proxy with `s-maxage` + `stale-while-revalidate` edge caching; deployed on the same origin as the app, so there is no CORS | Vercel Hobby |
+| Database & Auth | **Supabase** (Postgres + Auth, M5) | shared persistent SWR cache, CoC-bound user accounts, compact progression snapshots, and live platform/TH statistics ([10](./10-database-and-isr-architecture.md)) | Supabase Free (500 MB) |
 | Game data | **official Clash of Clans API** via the **RoyaleAPI proxy** | solves the API key's static-IP allowlist problem ([04 §"The allowlist problem"](./04-api-strategy.md)) | free |
 | Tests | **Vitest** + Testing Library | our engines are pure TS, so table-driven tests are cheap to write and fast to run | |
 | CI | **GitHub Actions** | public repo → free minutes | free |
@@ -35,12 +36,15 @@ Deliberate exclusions:
 ```
 Browser
   │   React Native for Web app (Vite build: HTML + JS + CSS)
-  │   TanStack Query, client cache + loading/error states
+  │   TanStack Query (L0 client cache) + Supabase Auth client (RLS-scoped)
   ▼   same origin, HTTPS + JSON
+Vercel Edge Network (L1 Edge ISR: s-maxage + stale-while-revalidate)
+  ▼
 Vercel serverless functions
-  │   /api/search        /api/clan/:tag        /api/player/:tag
-  │   /api/clan/:tag/war /api/clan/:tag/warlog
-  │   in-memory TTL cache, the throttle shield (04 §"Caching")
+  │   /api/search  /api/clan/:tag  /api/player/:tag  /api/stats
+  │   /api/clan/:tag/war  /api/clan/:tag/warlog  /api/account/*
+  │   L2 in-memory TTL cache + L3 Supabase SWR cache + payload projection
+  ├──► Supabase Postgres & Auth (500 MB free tier, watermark maintenance)
   ▼
 RoyaleAPI proxy  ──►  Clash of Clans API
                      (API key + allowlisted proxy IP; key never leaves the server)
@@ -68,7 +72,7 @@ Two boundaries matter:
 | GitHub Actions | public repo | free minutes | CI on every PR |
 | Clash of Clans API | free developer key | per-key throttling (rates unpublished) | TTL cache keeps us far below any plausible cap ([04 §"Throttle math"](./04-api-strategy.md)) |
 | RoyaleAPI proxy | free community service | fair use | all upstream traffic |
-| Database | **none** | | by decision ([06 §"The no-database decision"](./06-data-flow-and-caching.md)) |
+| Database & Auth | **Supabase Free Tier** (M5) | 500 MB DB size, 7-day inactivity pause | `303.5 MB` hard cap via payload projection + watermark pruning + 3-day keepalive ([10 §3](./10-database-and-isr-architecture.md)) |
 
 If any component approaches a cap, the answer is more caching or less
 scope, never a credit card.
@@ -105,6 +109,9 @@ Exact paths are decided in milestone M0; the hard boundaries are `src/engines`
   still get working data.
 - **Preview deploys.** Vercel gives every PR a preview URL; design review
   happens on the preview, not on screenshots.
-- **Env vars.** Exactly two, both server-side only: `COC_API_TOKEN` and
-  `COC_API_BASE_URL`. `.env` files are gitignored from day one, and CI never
-  needs either (tests run on fixtures).
+- **Env vars.** Server-only variables: `COC_API_TOKEN`, `COC_API_BASE_URL`,
+  `SUPABASE_SERVICE_ROLE_KEY`, and `CRON_SECRET`. Public client-safe variables
+  (scoped strictly by Supabase RLS): `VITE_SUPABASE_URL` and
+  `VITE_SUPABASE_ANON_KEY`. `.env` files are gitignored from day one, CI never
+  needs live keys (tests run on fixtures), and `scripts/scan-bundle-secrets.mjs`
+  scans the built bundle for both `COC_API_TOKEN` and `SUPABASE_SERVICE_ROLE_KEY`.

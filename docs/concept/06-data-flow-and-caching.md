@@ -1,55 +1,69 @@
 # 06 - Data Flow & Caching
 
-One request's life, the two cache layers, the state every screen must design,
-and the biggest decision in the project: **we run without a database**.
+One request's life, the four-layer ISR + SWR cache architecture, the state
+every screen must design, and the evolution from v1's zero-database baseline to
+**M5's 500 MB free-tier Supabase architecture** ([10](./10-database-and-isr-architecture.md)).
 
 ## 1. Request lifecycle
 
 ```
 [Browser] React Native for Web app
-    │  screen mounts → TanStack Query cache
+    │  screen mounts → TanStack Query cache (L0)
     │  HIT (within staleTime) → render instantly, done
     │  MISS ▼
     │  GET /api/... (same origin, HTTPS + JSON)
+[Vercel Edge Network] (L1 Edge ISR)
+    │  Cache-Control: public, max-age=0, s-maxage=TTL, stale-while-revalidate=SWR
+    │  HIT or SWR → return immediately
+    │  MISS ▼
 [Vercel function]
     │  validate input (tag shape, filter ranges)
-    │  TTL cache check (in-memory, per instance)
-    │  HIT → return cached JSON, done
+    │  L2 In-Memory TTL cache check → HIT returns JSON
+    │  MISS ▼
+[Supabase Postgres] public.api_cache (L3 Shared SWR Store)
+    │  Fresh → return JSON | Stale → return JSON + waitUntil(revalidate)
     │  MISS ▼
     │  GET proxy → game API (key + allowlisted proxy IP)
 [Upstream]
-    │  200 → cache + return   |   429/404/403 → mapped per the error contract (04 §6)
+    │  200 → project/strip fields, upsert api_cache + entity_stats, return
+    │  429/5xx → stale-if-error fallback from api_cache or error contract (04 §6)
     ▼
 [Browser] engine re-computation is local & instant → verdicts render
 ```
 
 Two boundaries carry all the correctness: the **key boundary** (nothing
-secret left of the Vercel function) and the **analysis boundary** (nothing
-analytical right of it, engines are client-side pure modules).
+secret like `COC_API_TOKEN` or `SUPABASE_SERVICE_ROLE_KEY` left of the Vercel
+function) and the **analysis boundary** (engines stay pure client-side modules;
+`server/` reuses the pure `computeRushed` helper only when seeding scalar
+snapshots on CoC binding or player stats updates).
 
 ## 2. Cache layers
 
 | Layer | Where | TTL source | What it protects |
 |---|---|---|---|
-| Client (TanStack Query) | browser | mirrors the server TTL per route (table below) | the server tier, repeat navigation costs nothing upstream |
-| Server (in-memory Map + small LRU) | Vercel function instance | the route's TTL ([04 §5](./04-api-strategy.md)) | the API key, the throttle shield |
+| Client (TanStack Query, L0) | browser | mirrors the server fresh TTL per route (table below) | the edge & tier; repeat navigation costs nothing |
+| Edge CDN (Vercel Edge ISR, L1) | Vercel POPs | `s-maxage=TTL, stale-while-revalidate=SWR` ([10 §2](./10-database-and-isr-architecture.md)) | serverless function invocations & cold starts |
+| Server (in-memory Map + small LRU, L2) | Vercel function instance | the route's TTL ([04 §5](./04-api-strategy.md)) | Supabase read units inside warm instances |
+| Database (Supabase `api_cache`, L3) | Supabase Postgres (500 MB free tier) | `fresh_until`, `swr_until`, `expires_at` ([10 §2–3](./10-database-and-isr-architecture.md)) | the API key across cold starts & upstream `429`/`5xx` blips |
 
 Client `staleTime` per route: search 60 s, clan 180 s, player 300 s, current
-war 120 s, war log 600 s, always equal to the server TTL so the two layers
-decay together instead of fighting. Refetch triggers: window focus (all
-routes) and a 60 s interval on the current-war screen only (a war day is the
-one place data actually moves minute-to-minute). Every mutation of user intent
-(adjusting the donation target, re-sorting) is **local engine re-computation**,
-never a refetch.
+war 120 s, war log 600 s, stats 300 s — always equal to the server fresh TTL
+so the layers decay together instead of fighting. Refetch triggers: window focus
+(all routes) and a 60 s interval on the current-war screen only (a war day is
+the one place data actually moves minute-to-minute). Every mutation of user
+intent (adjusting the donation target, re-sorting) is **local engine
+re-computation**, never a refetch.
 
 **Manual refresh (F-19).** Live screens carry a refresh control. It always
-re-issues the same GET; the server's TTL decides what happens next: inside
-the TTL the tier answers from its cache and the response carries the data's
-age, so the screen shows a "cached, Ns ago" hint instead of pretending to be
-fresh; past the TTL it is a normal cache miss and one upstream call happens.
-The client disables the control for a 60 s cooldown after each use, so a
-nervous demo-tapper never reaches the key. The cooldown is pure courtesy,
-not correctness: the cache alone already guards the upstream.
+re-issues the same GET; the Edge ISR + tier TTL decides what happens next:
+inside the TTL the response answers from cache carrying `"fetchedAt"` (epoch ms)
+alongside `"age"`, so [src/lib/refresh.ts](../../src/lib/refresh.ts) computes
+the live elapsed seconds accurately even when served from Vercel Edge ISR and
+shows `"Cached, Ns ago"` instead of pretending to be fresh; past the TTL it is a
+normal cache miss (or background SWR revalidation) and an upstream call updates
+the snapshot. The client disables the control for a 60 s cooldown after each
+use, so a nervous demo-tapper never reaches the key. The cooldown is pure
+courtesy, not correctness: the multi-layer cache already guards the upstream.
 
 Cache keys include every distinguishing input (tag, filters, cursor), so two
 different searches never alias. 404 responses cache briefly (30 s) too; a
@@ -78,45 +92,50 @@ stays on screen, actions that need the network are disabled. This is a
 nice-to-have polish item, not a PWA, we cache in memory/localStorage, not a
 service worker (that would be scope creep).
 
-## 4. The no-database decision
+## 4. Evolution from v1's no-database decision to M5
 
-**Decision: there is no database, and that is a feature.**
+**v1 (M0–M4) shipped without a database by design**, keeping the live game API
+as the single data source while browser `localStorage` held recent searches.
 
-Rationale:
+**M5 ([10-database-and-isr-architecture.md](./10-database-and-isr-architecture.md))
+activates Rung 2 of the storage ladder** using the **Supabase 500 MB Free Tier**
+under strict non-tracker guardrails:
 
-- The product is a *searcher* over **live** public data ([00 §"Scope"](./00-overview.md)). Every
-  question we answer, rushed, donations, war efficiency, is answerable from
-  what the API returns *right now*. Nothing needs to accumulate.
-- No database means no schema, no migrations, no connection pooling, no
-  backups, no "why is the poll down" at 2 a.m., and no line item on the
-  free-tier budget ([NFR-01](./02-requirements-tracker.md)). The operational class of problems that comes with
-  persistent state simply does not exist here.
-- The cost is honest: no trends over time, no "member since", no alerts on
-  change. We explicitly give that up ([00 §"Non-goals"](./00-overview.md)), it is the scope line
-  between a searcher and a tracker, and we are building the searcher.
+- **Zero background polling / auto-scraping.** All cache refreshes, scalar
+  progression snapshots, and entity counter updates happen strictly **on-visit**
+  (or via background SWR revalidation triggered by a visitor request).
+- **Strict 500 MB discipline.** Every upstream payload is stripped (`~75%`
+  smaller) before entering `public.api_cache`, historical tracking stores only
+  250-byte scalar rows (`player_progression_snapshots`, max 90/tag for bound
+  villages only), and a 3-tier watermark guard (`run_storage_maintenance()`)
+  caps total Postgres footprint at `303.5 MB` (`< 61%` of 500 MB).
+- **User login & 1:1 CoC binding (`M5`).** Supabase Auth powers `/auth`,
+  `/profile`, and `/settings`, allowing each registered user account to bind
+  one verified Clash of Clans account (`linked_coc_accounts`) while keeping
+  shareable clan/player lookup routes directly accessible.
 
-## 5. Storage ladder (opt-in, never architecture-by-default)
+## 5. Storage ladder (v1 -> M5)
 
-If coursework requirements push toward persistence, climb one rung at a time;
-each rung is independently cuttable:
-
-1. **localStorage** (P1, ships by default): recent searches, and favorites if
-   F-14 survives. Nothing but tags the user typed or starred; no personal
-   data; clears with browser data.
-2. **Hosted Supabase free tier** (only under explicit course requirement):
-   a single `watchlist` table keyed by an anonymous device ID. The engines
-   never read it; it only remembers tags. If this rung activates, it gets its
-   own concept doc before any code.
-
-The rule: the ladder is a response to a requirement, never a default. A rung
-that demands scheduled jobs (cron, pollers) is out of bounds for this
-project: that is the tracker's problem class, and we are not building a
-tracker.
+1. **localStorage** (M0–M4, baseline client cache): recent searches, theme
+   preference, and browser-local watchlist fallback.
+2. **Hosted Supabase Free Tier (500 MB)** (activated in M5,
+   [10](./10-database-and-isr-architecture.md)):
+   - Shared L3 SWR cache (`public.api_cache`) behind Vercel Edge ISR;
+   - Supabase Auth login & user accounts (`/auth`, `/profile`, `/settings`,
+     `/terms`) with 1:1 Clash of Clans account binding via
+     `POST /players/{tag}/verifytoken`;
+   - Compact scalar progression history (`player_progression_snapshots`),
+     synced watchlist/compare pairs (`user_saved_entities`), and live
+     community/TH benchmark aggregates (`entity_stats`, `platform_stats_daily`).
 
 ## 6. Privacy
 
-- We display public game data about game accounts, the same data the game
-  itself shows any clan visitor.
-- No accounts, no cookies, no analytics on users.
-- localStorage holds only game tags the user typed or starred (06 §5).
+- Public CoC game data displayed across the app matches what any visitor sees
+  in-game.
+- Registered users store only email, display name, Terms consent metadata,
+  their 1:1 bound CoC tag, compact progression scalars, and explicit
+  bookmarks/preferences, with instant self-service JSON export and permanent
+  deletion on `/settings` ([/terms specification](./10-database-and-isr-architecture.md)).
+- In-game Clash of Clans API verification tokens are validated once via
+  `POST /players/{tag}/verifytoken` and immediately discarded — never persisted.
 - Fixtures in the repo are anonymized: real structure, placeholder names.
