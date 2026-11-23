@@ -24,6 +24,7 @@ describe('fetchPlayer', () => {
     tag: '#YPCC8QYU2',
     name: 'Yeon',
     townHallLevel: 18,
+    builderHallLevel: 10,
     expLevel: 220,
     trophies: 617,
     bestTrophies: 5558,
@@ -86,6 +87,7 @@ describe('fetchPlayer', () => {
       tag: '#YPCC8QYU2',
       name: 'Yeon',
       townHallLevel: 18,
+      builderHallLevel: 10,
       expLevel: 220,
       trophies: 617,
       warStars: 1959,
@@ -137,6 +139,44 @@ describe('fetchPlayer', () => {
     expect(bare.attackWins).toBeUndefined();
     expect(bare.donations).toBeUndefined();
     expect(bare.donationsReceived).toBeUndefined();
+  });
+
+  it('parses the Builder Hall level, and reads 0 when the payload carries none', async () => {
+    // The reference-frame reading (lib/reference-frame.ts) caps builder-base
+    // rows at the player's own Builder Hall, so the parse needs the level:
+    // a real number floors through, and a missing or malformed field reads
+    // 0 ("unknown"), never a fake hall 1, so the frame can tell the two
+    // apart.
+    const fractional = await fetchPlayer('#YPCC8QYU2', {
+      fetchImpl: (async () =>
+        stubResponse(200, { ...fullPayload, builderHallLevel: 9.7 })) as typeof fetch,
+    });
+    expect(fractional.builderHallLevel).toBe(9);
+
+    const missing = await fetchPlayer('#ABC', {
+      fetchImpl: (async () =>
+        stubResponse(200, {
+          tag: '#ABC',
+          name: 'No Frills',
+          townHallLevel: 3,
+          expLevel: 12,
+          age: 0,
+        })) as typeof fetch,
+    });
+    expect(missing.builderHallLevel).toBe(0);
+
+    const malformed = await fetchPlayer('#ABC', {
+      fetchImpl: (async () =>
+        stubResponse(200, {
+          tag: '#ABC',
+          name: 'No Frills',
+          townHallLevel: 3,
+          builderHallLevel: 'nine',
+          expLevel: 12,
+          age: 0,
+        })) as typeof fetch,
+    });
+    expect(malformed.builderHallLevel).toBe(0);
   });
 
   it('defaults optional fields when the payload omits them', async () => {

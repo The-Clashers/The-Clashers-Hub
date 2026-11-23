@@ -139,6 +139,10 @@ const player = {
   tag: '#MOCKPLAY',
   name: 'Mock Player',
   townHallLevel: 14,
+  // The Builder Hall the reference frame reads (the frame toggle's TH
+  // mode caps builder-base rows at the player's own hall; BH9 keeps the
+  // builder tiles climbing rather than all-maxed).
+  builderHallLevel: 9,
   expLevel: 189,
   // The season counters the player card's identity chips read (the
   // prototype rework): trophies, war stars, attack wins, and the donation
@@ -241,6 +245,9 @@ const secondPlayer = {
   tag: '#MOCKTWO',
   name: 'Mock Second',
   townHallLevel: 13,
+  // Same shape as the first mock: the Builder Hall the reference frame
+  // reads (BH8, a hall lower than the leader's).
+  builderHallLevel: 8,
   expLevel: 142,
   trophies: 3911,
   warStars: 864,
