@@ -176,7 +176,7 @@ SR-08 to SR-19.
 | ID | System requirement | Status |
 |---|---|---|
 | SR-18 | The preparation-day scouting view renders from the single current-war response: own and opponent rosters side by side with Town Hall levels, and a pairing where the own member's Town Hall is lower than the opponent's is highlighted as a mismatch | Done |
-| SR-19 | The current-war view computes per-member impact client-side from the single war response: attacks used versus allowed, stars, average destruction, stars per attack, and a best-attack quality value; members with zero attacks are listed after participants and never averaged in as zeros | Draft |
+| SR-19 | The current-war view computes per-member impact client-side from the single war response: attacks used versus allowed, stars, average destruction, stars per attack, and a best-attack quality value; members with zero attacks are listed after participants and never averaged in as zeros | Done |
 
 ### 6.4 M5: Supabase database, Edge ISR cache, and CoC-bound accounts
 
