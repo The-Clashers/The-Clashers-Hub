@@ -7,45 +7,64 @@ import {
   memberAverageDestruction,
   memberStars,
 } from '../lib/war-standings';
+import {
+  formatAttackQuality,
+  formatStarsPerAttack,
+  memberWarImpact,
+} from '../lib/war-impact';
 import { linkEnterActivation } from '../lib/link-activation';
 import type { WarMember } from '../api/war';
 
-// The current-war view's per-member attack table (T-M3-1, FR-10, the
-// "per-member attack table" piece of the War tab design in 03 section
-// 4). The columns are the requirement's own list: POSITION | NAME | TH |
-// ATTACKS | STARS | DESTRUCTION, rendered for both rosters (the screen
-// mounts one table per side) from the single current-war response
-// (SR-09's no-per-member-fetch rule holds here too).
+// The current-war view's per-member attack table (T-M3-1 + T-M3-7,
+// FR-10, FR-12, SR-19). The columns are the requirement's own list:
+// POSITION | NAME | TH | ATTACKS | STARS | S/A | DESTRUCTION | QUALITY,
+// rendered for both rosters (the screen mounts one table per side) from
+// the single current-war response (SR-09's no-per-member-fetch rule
+// holds here too).
 //
-// No sort controls, the needs-attention table's own call: the row order
-// is the war map's (mapPosition, set at parse time), the order every
-// player knows from the game's own war screen, so a sort control here
-// would second-guess the map. The per-member impact ordering
-// (participants first, worst impact visible at a glance) is T-M3-7's
-// engine, not this table's to invent early.
+// The rows arrive already ordered by the impact engine (lib/war-
+// impact.ts, T-M3-7): participants first, ordered by impact, zero-
+// attack members after them in map order. The caller hands the
+// display positions along (the war map's own numbers, resolved before
+// reordering) so the position column keeps telling the truth about the
+// map while the rows speak impact.
 //
-// Destruction is the average across the attacks the member actually
-// used; a member with zero attacks shows the quiet dash, never a zero
-// (averaging them in as zeros is the lie SR-19 forbids). Structure
-// follows the house pattern (07 section 4): grid role on the container,
-// row and columnheader roles on the header, and each body row a link
-// whose accessibility label reads the whole row.
+// Stars per attack is a rate, not a volume. Destruction is the average
+// across the attacks the member actually used; a member with zero
+// attacks shows the quiet dash, never a zero (averaging them in as
+// zeros is the lie SR-19 forbids). Quality is the member's best attack
+// (stars x 100 + destruction), colored against the side's participant
+// average the caller computes: at or above the baseline reads success,
+// below it reads danger, and the unjudged (no attacks) read the dash.
+// Structure follows the house pattern (07 section 4): grid role on the
+// container, row and columnheader roles on the header, and each body
+// row a link whose accessibility label reads the whole row.
 
 // Column widths, the roster table's own rule (the owner's consistency
 // note): fixed narrow columns, the name flexing from a modest basis, so
 // the two war tables and the roster read as one family.
-const NAME_BASIS = 160;
+const NAME_BASIS = 144;
 const COLUMN_GROW = 0.4;
 const COLUMN_WIDTHS = {
-  position: 40,
-  townHall: 52,
-  attacks: 88,
-  stars: 72,
-  destruction: 104,
+  position: 36,
+  townHall: 48,
+  attacks: 76,
+  stars: 60,
+  starsPerAttack: 60,
+  destruction: 92,
+  quality: 80,
 } as const;
 
 interface ColumnSpec {
-  id: 'position' | 'name' | 'townHall' | 'attacks' | 'stars' | 'destruction';
+  id:
+    | 'position'
+    | 'name'
+    | 'townHall'
+    | 'attacks'
+    | 'stars'
+    | 'starsPerAttack'
+    | 'destruction'
+    | 'quality';
   label: string;
   /** The full name a screen reader hears; the visible label stays terse. */
   accessibilityLabel: string;
@@ -56,9 +75,11 @@ const COLUMNS: ReadonlyArray<ColumnSpec> = [
   { id: 'position', label: '#', accessibilityLabel: 'Position on the war map', align: 'right' },
   { id: 'name', label: 'Name', accessibilityLabel: 'Member name and tag', align: 'left' },
   { id: 'townHall', label: 'TH', accessibilityLabel: 'Town Hall level', align: 'right' },
-  { id: 'attacks', label: 'Attacks', accessibilityLabel: 'Attacks used', align: 'right' },
+  { id: 'attacks', label: 'Attacks', accessibilityLabel: 'Attacks used versus allowed', align: 'right' },
   { id: 'stars', label: 'Stars', accessibilityLabel: 'Stars earned', align: 'right' },
+  { id: 'starsPerAttack', label: 'S/A', accessibilityLabel: 'Stars per attack', align: 'right' },
   { id: 'destruction', label: 'Destruction', accessibilityLabel: 'Average destruction', align: 'right' },
+  { id: 'quality', label: 'Quality', accessibilityLabel: 'Best attack quality', align: 'right' },
 ];
 
 /** The attacks cell: "2 / 2" when the payload carries the allowance,
@@ -68,10 +89,19 @@ function attacksValue(used: number, attacksPerMember: number | undefined): strin
 }
 
 export interface WarMemberTableProps {
-  /** The side's war roster, already in war-map order from the parse. */
+  /** The side's war roster, already ordered by the impact engine's
+   * participants-first rule. */
   members: WarMember[];
   /** Attacks each member may use, when the payload says. */
   attacksPerMember?: number;
+  /** Each member's display position, resolved from the payload's
+   * original roster order (war map number, or index plus one); the
+   * reordered rows read it so the position column stays honest. */
+  positions?: ReadonlyMap<string, number>;
+  /** The side's participant-average best-attack quality, the baseline
+   * the quality column colors read against; null when nobody has
+   * attacked yet. */
+  qualityBaseline?: number | null;
   /** A short label for the table's accessibility name ("Umbra Lunaria
    * war roster"); the visible section heading is the screen's. */
   accessibilityLabel: string;
@@ -82,6 +112,8 @@ export interface WarMemberTableProps {
 export default function WarMemberTable({
   members,
   attacksPerMember,
+  positions,
+  qualityBaseline,
   accessibilityLabel,
   onPressMember,
 }: WarMemberTableProps) {
@@ -108,8 +140,12 @@ export default function WarMemberTable({
         <WarMemberRow
           key={member.tag}
           member={member}
-          position={member.mapPosition > 0 ? member.mapPosition : index + 1}
+          position={
+            positions?.get(member.tag) ??
+            (member.mapPosition > 0 ? member.mapPosition : index + 1)
+          }
           attacksPerMember={attacksPerMember}
+          qualityBaseline={qualityBaseline ?? null}
           styles={styles}
           onPress={() => onPressMember(member.tag)}
         />
@@ -126,19 +162,37 @@ interface WarMemberRowProps {
    * say. */
   position: number;
   attacksPerMember: number | undefined;
+  qualityBaseline: number | null;
   styles: ReturnType<typeof createStyles>;
   onPress: () => void;
 }
 
-function WarMemberRow({ member, position, attacksPerMember, styles, onPress }: WarMemberRowProps) {
+function WarMemberRow({
+  member,
+  position,
+  attacksPerMember,
+  qualityBaseline,
+  styles,
+  onPress,
+}: WarMemberRowProps) {
   const { theme } = useTheme();
   const stars = memberStars(member);
   const averageDestruction = memberAverageDestruction(member);
+  const impact = memberWarImpact(member, attacksPerMember);
   const used = member.attacks.length;
+  // The quality ink reads against the participant average: at or above
+  // is success, below is danger, and a member without attacks is the
+  // quiet dash, unjudged.
+  const qualityStyle =
+    impact.bestAttackQuality === null
+      ? styles.cellDash
+      : qualityBaseline !== null && impact.bestAttackQuality < qualityBaseline
+        ? styles.cellBelowBaseline
+        : styles.cellAboveBaseline;
   // The whole row is the link, the same contract the roster, attention,
   // and card presentations keep: the label reads the row, the hint says
   // where the tap goes.
-  const rowLabel = `Position ${position}, ${member.name}, town hall ${member.townHallLevel}, ${attacksValue(used, attacksPerMember)} attacks used, ${stars} stars, ${averageDestruction !== null ? `${formatWarPercent(averageDestruction)} average destruction` : 'no attacks yet'}`;
+  const rowLabel = `Position ${position}, ${member.name}, town hall ${member.townHallLevel}, ${attacksValue(used, attacksPerMember)} attacks used, ${stars} stars, ${impact.starsPerAttack !== null ? `${formatStarsPerAttack(impact.starsPerAttack)} stars per attack` : 'no stars per attack yet'}, ${averageDestruction !== null ? `${formatWarPercent(averageDestruction)} average destruction` : 'no attacks yet'}, ${impact.bestAttackQuality !== null ? `best attack quality ${formatAttackQuality(impact.bestAttackQuality)}` : 'no attack quality yet'}`;
   return (
     <Pressable
       accessibilityRole="link"
@@ -171,9 +225,21 @@ function WarMemberRow({ member, position, attacksPerMember, styles, onPress }: W
           <Text style={styles.cellNumber}>{stars}</Text>
         </View>
       </View>
+      <View style={columnStyle('starsPerAttack', styles)}>
+        <Text style={impact.starsPerAttack !== null ? styles.cellNumber : styles.cellDash}>
+          {impact.starsPerAttack !== null ? formatStarsPerAttack(impact.starsPerAttack) : '\u2014'}
+        </Text>
+      </View>
       <View style={columnStyle('destruction', styles)}>
         <Text style={averageDestruction !== null ? styles.cellNumber : styles.cellDash}>
           {averageDestruction !== null ? formatWarPercent(averageDestruction) : '\u2014'}
+        </Text>
+      </View>
+      <View style={columnStyle('quality', styles)}>
+        <Text style={qualityStyle}>
+          {impact.bestAttackQuality !== null
+            ? formatAttackQuality(impact.bestAttackQuality)
+            : '\u2014'}
         </Text>
       </View>
     </Pressable>
@@ -196,8 +262,12 @@ function columnStyle(
       return styles.columnAttacks;
     case 'stars':
       return styles.columnStars;
+    case 'starsPerAttack':
+      return styles.columnStarsPerAttack;
     case 'destruction':
       return styles.columnDestruction;
+    case 'quality':
+      return styles.columnQuality;
   }
 }
 
@@ -283,6 +353,22 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       color: c.textMuted,
       textAlign: 'right',
     },
+    // The quality column's two verdicts against the participant
+    // average: the semantic pair the compare rows keep (07 section 4).
+    cellAboveBaseline: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.sm,
+      color: c.success,
+      fontVariant: ['tabular-nums'],
+      textAlign: 'right',
+    },
+    cellBelowBaseline: {
+      fontFamily: t.fontFamily.sans,
+      fontSize: t.fontSize.sm,
+      color: c.danger,
+      fontVariant: ['tabular-nums'],
+      textAlign: 'right',
+    },
     starsCell: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -321,8 +407,20 @@ function createStyles(t: ReturnType<typeof useTheme>['theme']) {
       flexGrow: COLUMN_GROW,
       flexShrink: 0,
     },
+    columnStarsPerAttack: {
+      width: COLUMN_WIDTHS.starsPerAttack,
+      flexGrow: COLUMN_GROW,
+      flexShrink: 0,
+      alignItems: 'flex-end',
+    },
     columnDestruction: {
       width: COLUMN_WIDTHS.destruction,
+      flexGrow: COLUMN_GROW,
+      flexShrink: 0,
+      alignItems: 'flex-end',
+    },
+    columnQuality: {
+      width: COLUMN_WIDTHS.quality,
       flexGrow: COLUMN_GROW,
       flexShrink: 0,
       alignItems: 'flex-end',

@@ -42,6 +42,12 @@ import {
 import { fetchWarlog, WarlogFetchError, type WarlogResponse } from '../api/warlog';
 import { leadingSide } from '../lib/war-standings';
 import { summarizeWarEfficiency } from '../lib/war-efficiency';
+import {
+  formatAttackQuality,
+  orderWarMembersByImpact,
+  participantAverageBestQuality,
+  warMemberPositions,
+} from '../lib/war-impact';
 import { busyRetryDelayMs, shouldRetryBusy } from '../lib/busy-retry';
 import { warFrequencyLabel } from '../lib/war-frequency';
 import { canonicalTagFromRoute, playerRouteFor } from '../lib/tag';
@@ -1248,11 +1254,21 @@ interface WarRosterProps {
 
 /** One side's roster in the presentation the viewport picked: the table
  * at 768 px and up, one card per member below it, the same pieces the
- * roster's own section renders. */
+ * roster's own section renders. The impact engine (T-M3-7, SR-19)
+ * orders the rows: participants first by impact, zero-attack members
+ * after them in map order, each row still wearing its war-map position;
+ * the side's participant-average best-attack quality rides along as the
+ * baseline the table's quality colors read against. */
 function WarRoster({ clan, isCardPresentation, attacksPerMember, onPressMember }: WarRosterProps) {
   const { theme } = useTheme();
   const warStyles = useMemo(() => createWarStyles(theme), [theme]);
   const clanLabel = clan.name !== '' ? clan.name : 'Clan';
+  const orderedMembers = useMemo(() => orderWarMembersByImpact(clan.members), [clan.members]);
+  const positions = useMemo(() => warMemberPositions(clan.members), [clan.members]);
+  const qualityBaseline = useMemo(
+    () => participantAverageBestQuality(clan.members),
+    [clan.members],
+  );
 
   // A war the payload says exists but whose roster did not come back is
   // a quiet note, not a broken empty table (06 section 3).
@@ -1267,11 +1283,14 @@ function WarRoster({ clan, isCardPresentation, attacksPerMember, onPressMember }
   if (isCardPresentation) {
     return (
       <>
-        {clan.members.map((member, index) => (
+        <Text style={warStyles.rosterNote}>
+          {baselineLine(clanLabel, qualityBaseline)}
+        </Text>
+        {orderedMembers.map((member) => (
           <WarMemberCard
             key={member.tag}
             member={member}
-            position={member.mapPosition > 0 ? member.mapPosition : index + 1}
+            position={positions.get(member.tag) ?? member.mapPosition}
             attacksPerMember={attacksPerMember}
             onPress={onPressMember}
           />
@@ -1281,13 +1300,30 @@ function WarRoster({ clan, isCardPresentation, attacksPerMember, onPressMember }
   }
 
   return (
-    <WarMemberTable
-      members={clan.members}
-      attacksPerMember={attacksPerMember}
-      accessibilityLabel={`${clanLabel} war roster`}
-      onPressMember={onPressMember}
-    />
+    <>
+      <Text style={warStyles.rosterNote}>
+        {baselineLine(clanLabel, qualityBaseline)}
+      </Text>
+      <WarMemberTable
+        members={orderedMembers}
+        attacksPerMember={attacksPerMember}
+        positions={positions}
+        qualityBaseline={qualityBaseline}
+        accessibilityLabel={`${clanLabel} war roster`}
+        onPressMember={onPressMember}
+      />
+    </>
   );
+}
+
+/** The quiet caption above one side's roster: what the quality column
+ * scores and which number its colors read against, so a green or red
+ * value never needs explaining outside the table. */
+function baselineLine(clanLabel: string, qualityBaseline: number | null): string {
+  if (qualityBaseline === null) {
+    return `${clanLabel}: best-attack quality appears once members attack (stars x 100 + destruction).`;
+  }
+  return `${clanLabel}: best-attack quality baseline ${formatAttackQuality(qualityBaseline)}, the participants' average.`;
 }
 
 interface WarRosterHeadingProps {
