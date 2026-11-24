@@ -312,11 +312,20 @@ draw, which is why the ambience layer uses react-native-svg, the chart
   through the game's own stars-then-destruction rule in
   `lib/war-standings.ts` so the view agrees with the game's result screen.
   The rosters: `Clan` first, `Opponent` under its own quiet badge heading,
-  each a per-member table ordered by the war map's own positions (#, name,
-  TH, attacks used, stars, average destruction) with the same 768 px
-  switch to cards the attention table keeps; rows tap through to player
-  detail, and a member with zero attacks shows the dash, never a zero
-  destruction average (SR-19's rule, applied to the raw view). During
+  each a per-member table (#, name, TH, attacks used over the allowance,
+  stars, stars per attack, average destruction, best-attack quality),
+  ordered by the impact engine (`lib/war-impact.ts`, T-M3-7): participants
+  first by stars, then quality, then average destruction, zero-attack
+  members after them in map order while the position column keeps the war
+  map's own numbers. A quiet caption above each table names the quality
+  baseline, the side's participant-average best attack, and the quality
+  column reads its colors against it: at or above the baseline in success
+  ink, below it in danger ink, the semantic pair the compare rows keep.
+  Stars per attack is a rate, not a volume; the same 768 px switch to
+  cards the attention table keeps; rows tap through to player detail,
+  and a member with zero attacks shows the dash everywhere,
+  never a zero destruction average (SR-19's rule, applied to the impact
+  view too). During
   preparation day, the third band switches to the scouting view (T-M3-6):
   own and opponent rosters side by side by war-map position with Town
   Hall levels, a summary mismatch count, and warning-soft row
@@ -481,7 +490,7 @@ draw, which is why the ambience layer uses react-native-svg, the chart
 | `AttentionTable` / `AttentionCard` | the Needs Attention tab's worst-first view, table & card presentations |
 | `WarBanner` | the current-war view's state banner: tone dot, headline, and support line reading the war's state (preparation, battle day, ended with the verdict, or no war), the team size, and the war clock |
 | `WarStandings` | both clans' standings cards: badge, name, level, stars, destruction, attacks used; the `Leading` / `Winner` verdict chip resolved through `lib/war-standings.ts` (stars, then destruction), two-up from tablet and stacked below |
-| `WarMemberTable` / `WarMemberCard` | the war rosters' per-member attack view, table & card presentations: map position, name, TH, attacks used, stars, average destruction (the dash for zero-attack members, never a zero average) |
+| `WarMemberTable` / `WarMemberCard` | the war rosters' per-member impact view, table & card presentations: map position, name, TH, attacks used over the allowance, stars, stars per attack, average destruction, best-attack quality colored against the side's participant average (the dash for zero-attack members, never a zero average; participants ordered first by impact, idle members after in map order) |
 | `WarScouting` | the preparation-day scouting view: own and opponent rosters side by side by war-map position with Town Hall levels, mismatch delta badge, and warning-soft row highlight when the own Town Hall is lower than the opponent's |
 | `ResultChip` | the war log's result pill: `Win` success, `Loss` danger, `Ongoing` info blue, `Tie` and `League` the quiet non-verdict fill (the RatioFlag dash treatment, since neither is anyone's verdict) |
 | `WarlogSummary` | the war log's efficiency band: "War efficiency" title with the sample size labeled ("Last N wars · excluding K leagues"), the engine's win rate / stars per attack / average destruction plus the record line as label-above-value cells, the dash for rates the loaded wars cannot answer |

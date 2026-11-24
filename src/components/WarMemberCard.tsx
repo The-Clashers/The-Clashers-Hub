@@ -7,16 +7,24 @@ import {
   memberAverageDestruction,
   memberStars,
 } from '../lib/war-standings';
+import {
+  formatAttackQuality,
+  formatStarsPerAttack,
+  memberWarImpact,
+} from '../lib/war-impact';
 import { linkEnterActivation } from '../lib/link-activation';
 import type { WarMember } from '../api/war';
 
 // The war roster's card presentation (NFR-05), rendered below 768 px
-// where the table's six columns do not fit. Same data as the table,
+// where the table's eight columns do not fit. Same data as the table,
 // stacked: the map position, name, and Town Hall up top, the tag under
-// it, then the three war columns as the label-above-value StatChips
+// it, then the five war columns as the label-above-value StatChips
 // every other card in the app uses (the RosterCard and AttentionCard
 // pattern). Cards render in page flow like the roster's cards (07
-// section 3): the browser scrollbar owns the scrolling.
+// section 3): the browser scrollbar owns the scrolling. The rows arrive
+// already ordered by the impact engine (T-M3-7), so the cards read in
+// the same participants-first order the table does; the quality value
+// carries no baseline ink here, the table is where the colors speak.
 
 export interface WarMemberCardProps {
   member: WarMember;
@@ -39,10 +47,11 @@ export default function WarMemberCard({
   const styles = useMemo(() => createStyles(theme), [theme]);
   const stars = memberStars(member);
   const averageDestruction = memberAverageDestruction(member);
+  const impact = memberWarImpact(member, attacksPerMember);
   const used = member.attacks.length;
   // The whole card is the link, the same contract the roster cards, the
   // attention cards, and the war table rows keep.
-  const cardLabel = `Position ${position}, ${member.name}, town hall ${member.townHallLevel}, ${attacksPerMember !== undefined ? `${used} of ${attacksPerMember}` : used} attacks used, ${stars} stars, ${averageDestruction !== null ? `${formatWarPercent(averageDestruction)} average destruction` : 'no attacks yet'}`;
+  const cardLabel = `Position ${position}, ${member.name}, town hall ${member.townHallLevel}, ${attacksPerMember !== undefined ? `${used} of ${attacksPerMember}` : used} attacks used, ${stars} stars, ${impact.starsPerAttack !== null ? `${formatStarsPerAttack(impact.starsPerAttack)} stars per attack` : 'no stars per attack yet'}, ${averageDestruction !== null ? `${formatWarPercent(averageDestruction)} average destruction` : 'no attacks yet'}, ${impact.bestAttackQuality !== null ? `best attack quality ${formatAttackQuality(impact.bestAttackQuality)}` : 'no attack quality yet'}`;
   return (
     <Pressable
       accessibilityRole="link"
@@ -73,8 +82,20 @@ export default function WarMemberCard({
         />
         <StatChip label="Stars" value={String(stars)} />
         <StatChip
+          label="Stars / Atk"
+          value={impact.starsPerAttack !== null ? formatStarsPerAttack(impact.starsPerAttack) : '\u2014'}
+        />
+        <StatChip
           label="Destruction"
           value={averageDestruction !== null ? formatWarPercent(averageDestruction) : '\u2014'}
+        />
+        <StatChip
+          label="Best Attack"
+          value={
+            impact.bestAttackQuality !== null
+              ? formatAttackQuality(impact.bestAttackQuality)
+              : '\u2014'
+          }
         />
       </View>
     </Pressable>
